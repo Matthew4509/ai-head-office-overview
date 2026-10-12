@@ -1,7 +1,7 @@
 @echo off
 rem AI Head Office Overview demo: made-up projects with real little websites, for screenshots and trying it out.
 rem Runs on 127.0.0.1:8882 with its own data (data-demo), so the real office and its settings are not touched.
-rem About > Quit in the demo window stops the demo and its sites.
+rem Settings > About > Quit in the demo window stops the demo and its sites.
 cd /d "%~dp0"
 where node >nul 2>&1 || goto :no_node
 node demo\demo.js

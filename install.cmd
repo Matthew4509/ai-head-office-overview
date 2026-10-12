@@ -5,7 +5,7 @@ rem      own installer, it asks before it changes anything), or points to nodejs
 rem   2. Asks about the desktop shortcut and Start with Windows, and sets up the Start office link (all for this Windows
 rem      user only, no administrator needed): node tools\setup.js install.
 rem   3. Starts the office and opens its window.
-rem uninstall.cmd undoes step 2. About > Run setup again does step 2 from inside the office.
+rem uninstall.cmd undoes step 2. Settings > Setup does step 2 from inside the office.
 setlocal
 cd /d "%~dp0"
 title AI Head Office Overview setup

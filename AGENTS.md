@@ -3,7 +3,71 @@
 AI Head Office Overview runs on the user's own PC (Windows). It reads Claude Code's transcripts
 (`~/.claude/projects/**/*.jsonl`), draws each thread as a person in an office, and lists the user's projects with
 their local copies, audits, git state and live sites. It sends nothing anywhere. These notes are for an agent asked to
-set it up, most often to turn on **advanced setup** (hooks). Read the whole file before changing anything.
+install it, review it, update it from GitHub, or turn on **advanced setup** (hooks). Read the whole file before
+changing anything.
+
+Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Node.js 22+, no npm packages).
+
+## Ground rules for an agent
+- Ask the user before each step that changes their PC: installing Node.js, cloning into a folder, shortcuts, Start
+  with Windows, the start link, advanced setup. Say what will change first. Reading and testing need no permission.
+- Never touch the office's `data` folder (the user's settings, audits, prompts, private details, the office's
+  records) or `projects.json`. Both are git-ignored: a clone or pull never brings them and never changes them.
+- Never send anything from `data`, the transcripts or `~/.claude/settings.json` anywhere, and never paste them into a
+  report. Report what you checked, not the user's content.
+
+## Install it (first time)
+1. **Where:** ask the user for the folder their projects sit in (for example `C:\Users\<name>\projects`). The app
+   lists the folders next to its own folder on its first start, so it belongs inside that folder.
+2. **Node.js:** `node --version` must say v22 or newer. If not, ask, then `winget install --id OpenJS.NodeJS.LTS -e
+   --source winget` (or point the user to https://nodejs.org). A new terminal is needed afterwards for the PATH.
+3. **Get it:** from the projects folder,
+   `git clone https://github.com/Matthew4509/ai-head-office-overview.git` (then work inside
+   `ai-head-office-overview`). No git? `winget install --id Git.Git -e`, or download the repository's zip.
+4. **Check it before running it** (see "Review it" below): at least `npm test` (about 6 minutes). Its data is made up
+   and kept in temp folders; the setup test also uses a throwaway registry key (removed at the end) and briefly opens a
+   minimised console window for its test copy (port 8881). Nothing of the user's is read or changed. A quicker look:
+   `node tools/test-all.js office server` (about 2 minutes).
+5. **Shortcuts (ask first):** `node tools/setup.js install --yes` sets up the start link, a desktop shortcut and
+   Start with Windows for this Windows user only (no admin). Leave one out with `--no-desktop` or `--no-startup`.
+   It never removes anything and never touches the user's data.
+6. **Start it:** `cmd /c start "" start.cmd` (opens the app in its own Edge window; a minimised console window is the
+   app itself), or `node server.js` in a terminal that stays open. Then `node server.js --status` must exit 0 and
+   print that it is running; the page is http://127.0.0.1:8880/. The first start reads every transcript once (up to a
+   minute); the page says "Loading" meanwhile, and shows a Welcome window the user answers.
+7. Tell the user: Settings (top right) has Folders (add their projects folder if the list is empty), Setup (shortcuts,
+   and advanced setup for hooks: see below), Help and About (Quit, Uninstall).
+
+## Update it (pull)
+1. **See what is new before taking it:** in the app's folder,
+   `git fetch origin` then `git log --oneline HEAD..origin/main` (the new commits) and
+   `git diff --stat HEAD..origin/main` (the files they change). Read the diff of anything that runs on the user's PC
+   (`lib/`, `office/`, `*.cmd`, `server.js`) and summarise it for the user before pulling.
+2. **Stop it:** `node server.js --stop` (it also stops every local copy the app started).
+3. **Take it:** `git pull --ff-only`. If git refuses because files were changed here, stop and tell the user: do not
+   reset, stash or overwrite their changes without their word.
+4. **Check and start:** `npm test`, then `cmd /c start "" start.cmd` and `node server.js --status`.
+5. The version is in `lib/config.js` (`VERSION`) and Settings › About. The user's data stays as it was; a new version
+   reads it as it is.
+
+## Review it (what it does on this PC)
+- **Listens** on 127.0.0.1 only (port 8880; 8881 tests, 8882 demo, 8883 test copy). Every API request needs the per-run
+  key the page was served with; the one exception, `/api/office/hook`, takes only a JSON event. Code: `lib/routes/index.js`.
+- **Reads:** `~/.claude/projects` (transcripts), `~/.codex/sessions` (token counts), the project folders in its
+  working folders, and the Claude desktop app's thread records (the Open button). It never writes to any of them.
+- **Writes:** its own `data` folder only; the AI app's `~/.claude/settings.json` only when the user turns advanced
+  setup on or off (a copy is saved first; code: `office/src/setup.mjs`); shortcuts and the start link only through
+  setup (`lib/setup.js`).
+- **Runs:** a project's own start command from that project's `.claude/launch.json` or `project.json` (never text
+  from the page; code: `lib/projects.js`, `lib/runner.js`), `git` read-only commands, and PowerShell helpers in
+  `lib/platform/windows/`.
+- **Sends:** nothing about the user. The only requests that leave the PC are plain GETs to the live addresses the user
+  adds (`lib/live.js`, `lib/audit.js`) and, only if ticked under About, one request a day to GitHub for the newest Git
+  version (`lib/git-program.js`). To check: search the code for `fetch(`, `http.get`, `http.request`.
+- **Its own privacy check:** `node tools/disclose.js` scans the folder, its git history and any zip for private
+  details, other project names, AI trail and local paths; it prints labels and places only. "Nothing found" is clean.
+- A test copy that changes nothing: `node server.js --dry-run --port=8883` (reports windows, shortcuts and hooks
+  instead of making them; reads no real transcripts). Stop it with `node server.js --stop --port=8883`.
 
 ## First, check the basics
 1. Node.js 22 or newer: `node --version`.

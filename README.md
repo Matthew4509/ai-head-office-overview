@@ -1,4 +1,4 @@
-# AI Head Office Overview 0.1.0 (Windows)
+# AI Head Office Overview 0.1.1 (Windows)
 
 Your AI coding threads as staff in a little office, beside the projects they work on. Each thread is a person at their
 project's desk: working, thinking, standing with a question for you, or gone home. Next to them, each project has
@@ -12,6 +12,9 @@ only requests that leave your PC are plain page requests to the live addresses y
 a daily check with GitHub for the newest Git version).
 
 ![The office with its staff, the Running strip and Needs attention](screenshots/office.png)
+
+Using an AI helper to install, review or update it? **[AGENTS.md](AGENTS.md)** has the steps it should follow,
+including how to see what an update changes before pulling it.
 
 ## What you need
 

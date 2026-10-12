@@ -1,7 +1,7 @@
 @echo off
 rem Takes AI Head Office Overview off this PC's menus: stops it, removes the desktop shortcut, Start with Windows and the
 rem Start office link (this Windows user only). Your files are not deleted: it says which folder to delete yourself.
-rem About > Uninstall in the office does the same.
+rem Settings > About > Uninstall in the office does the same.
 setlocal
 cd /d "%~dp0"
 title AI Head Office Overview uninstall

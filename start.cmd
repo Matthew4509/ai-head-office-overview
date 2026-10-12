@@ -1,7 +1,7 @@
 @echo off
 rem AI Head Office Overview. Starts the office with its console window minimised, then opens the office in its own window
 rem (Microsoft Edge app mode). Closing the console window stops the office and every local copy it started;
-rem Quit on the About page does the same. Starting it again while it runs just opens the window.
+rem Settings > About > Quit does the same. Starting it again while it runs just opens the window.
 rem "start.cmd quiet" (Start with Windows, and the Start office link) starts it without opening the window.
 rem First time on this PC? Double-click install.cmd instead: it checks Node.js and sets up the shortcuts.
 rem

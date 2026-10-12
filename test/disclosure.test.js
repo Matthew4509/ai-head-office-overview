@@ -349,8 +349,9 @@ async function main() {
   // written out in full; the files themselves now build them at run time. Nothing else may be found, now or in history.
   const pastFixture = f => f.rule === 'DISC-003' && /^git history: test\/museum\/cases-4-disclosure\.js:\d+$/.test(f.where);
   // The app's own AGENTS.md and CLAUDE.md ship on purpose: they tell a person's AI helper how to set the app up.
-  // One of them alone, or the two grouped ("(2 files, e.g. AGENTS.md)"); a third such file would read "3 files" and fail.
-  const ownGuide = f => f.rule === 'DISC-003' && /^((AGENTS|CLAUDE)\.md|\(2 files, e\.g\. (AGENTS|CLAUDE)\.md\))$/.test(f.where);
+  // One of them alone, or the two grouped ("(2 files, e.g. AGENTS.md)"), at the top of this folder or of a zip baked
+  // from it (tools/disclose.js allows the same); a third such file would read "3 files" and fail.
+  const ownGuide = f => f.rule === 'DISC-003' && /^(_releases\/ai-head-office-overview-[\d.]+\.zip > ai-head-office-overview\/ ?)?((AGENTS|CLAUDE)\.md|\(2 files, e\.g\. (AGENTS|CLAUDE)\.md\))$/.test(f.where);
   const selfFound = self.findings.filter(f => !pastFixture(f) && !ownGuide(f));
   check('the office\'s own folder scans clean', () => assert.strictEqual(selfFound.length, 0, selfFound.map(f => f.rule + '@' + f.where + ' ' + f.title).join('\n  ')));
 
