@@ -1,0 +1,14 @@
+{
+  "note": "Copy this file to projects.json (next to server.js) to give your projects nicer names, one-line descriptions, live addresses and extra start commands. It is keyed by folder name; nothing here is ever written into a project's own folder, and projects.json is git-ignored so your own list never lands in the repo. Keys per folder: name, description, liveUrl, hide (true = leave off the list), start {name, exe, args[], port} (an extra start command), auditSkip [folders inside the project the audit leaves out, e.g. a vendored copy], auditAccept [older hand-written set-asides: {rule, file, fp (line fingerprint), reason}; an edited line is checked again. Use Not a fault in the audit window instead: it keeps the reason and who checked it in data/judged.json]. A folder with no entry gets its folder name and the first sentence of its README.",
+  "projects": {
+    "my-site": {
+      "name": "My Site",
+      "description": "Booking pages for the shop.",
+      "liveUrl": "https://example.com",
+      "start": { "name": "dev", "exe": "node", "args": ["server.js"], "port": 3000 }
+    },
+    "old-prototype": {
+      "hide": true
+    }
+  }
+}

@@ -1,0 +1,27 @@
+# Made while the office runs (settings, audits, logs, site pictures, Edge profile for pictures)
+data/
+data-dryrun/
+data-demo/
+# Baked zips (made by node tools/bake.js)
+_releases/
+*.zip
+# Your own project list (names, descriptions, live addresses): keep it out of the repo.
+# Copy projects.example.json to projects.json and edit that. The office reads projects.json; it is never published.
+projects.json
+# Working notes kept beside the code but never published: handovers and the token log.
+HANDOFF-*.md
+TOKEN-LOG.md
+# The phase plan: working notes, never published.
+PLAN.md
+# Logs, packages, secrets and the clutter editors and systems leave behind
+*.log
+node_modules/
+.env
+.env.*
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+# AI tool settings (the preview's launch.json): they name the tool the office was built with, so they stay on this PC.
+.claude/
