@@ -1,7 +1,7 @@
-// The project planner on the page: the Today band at the top of the Projects tab, a score and plan marks on each
-// tile, By priority order and the search box, the Score, Categories and Hours and rules windows, Filter by Category,
-// and today's check-ins in Needs attention (Fine for now / Needs work / Park it). The rules and the data are the
-// engine's (lib/priorities.js, /api/priorities): this file draws them and sends what is changed, nothing more.
+// The project planner on the page, in its own tab (shown once ticked in Settings › Office): Today, then every project
+// by priority with its score and plan marks, the search box, the Score, Categories and Hours and rules windows, Filter
+// by Category, and today's check-ins in Needs attention (Fine for now / Needs work / Park it). The rules and the data
+// are the engine's (lib/priorities.js, /api/priorities): this file draws them and sends what is changed, nothing more.
 'use strict';
 
 (() => {
@@ -176,34 +176,62 @@
     return bits.length ? el('div', { class: 'row plan-tags' }, ...bits) : null;
   };
 
-  // ---- the search box and the order (above the tiles; built once, so typing is never interrupted) ----
-  app.projOrder = 'today';
-  try { if (localStorage.getItem('aho-proj-order') === 'priority') app.projOrder = 'priority'; } catch { /* fine */ }
+  // ---- the Project planner tab: the search box (built once, so typing is never interrupted), Today, then every
+  // project by priority ----
   app.projSearch = '';
   let bar = null;
-  app.plannerBar = () => {
+  function plannerBar() {
     if (bar) return bar;
     const search = el('input', { type: 'search', class: 'field-text proj-search', placeholder: 'Search a name or category', 'aria-label': 'Search projects by name or category',
       oninput: (e) => { app.projSearch = e.target.value; app.draw(); } });
-    const order = el('select', { class: 'filter-by proj-order', 'aria-label': 'Order', onchange: (e) => { app.projOrder = e.target.value; try { localStorage.setItem('aho-proj-order', app.projOrder); } catch { /* fine */ } app.draw(); } },
-      el('option', { value: 'today', selected: app.projOrder === 'today' }, 'Who is in first'),
-      el('option', { value: 'priority', selected: app.projOrder === 'priority' }, 'By priority (score, high to low)'));
-    bar = el('div', { class: 'row proj-bar' }, search, el('label', { class: 'note proj-order-label' }, 'Order ', order));
+    bar = el('div', { class: 'row proj-bar' }, search);
     return bar;
-  };
+  }
   /** Does a project match the search (its name, folder, or either category)? */
-  app.plannerMatch = (p, folder) => {
+  function matches(p) {
     const q = app.projSearch.trim().toLowerCase();
     if (!q) return true;
-    const names = p ? [p.name, p.folder, ...app.plannerCats(p.id).map((id) => catOf(id)?.name || '')] : [folder || 'Consultants'];
-    return names.some((n) => String(n || '').toLowerCase().includes(q));
-  };
-  /** By priority: the ranking score (a hard date first, soonest first), then the longest wait; parked last. */
-  app.plannerSort = (list) => {
-    if (app.projOrder !== 'priority' || !pl.data) return null;
+    return [p.name, p.folder, ...app.plannerCats(p.id).map((id) => catOf(id)?.name || '')].some((n) => String(n || '').toLowerCase().includes(q));
+  }
+  /** By priority: a hard date first (soonest first), then the score (+20 while Needs work is on), then the longest
+   * wait; parked last. */
+  function byPriority(list) {
     const rank = (p) => { const r = rowOf(p.id) || { score: 0 }; return { parked: r.stage === 'parked' ? 1 : 0, due: r.deadline || '9999', s: r.score + (r.flag ? 20 : 0), w: r.waiting ?? 1e6 }; };
     return [...list].sort((a, b) => { const x = rank(a), y = rank(b); return x.parked - y.parked || x.due.localeCompare(y.due) || y.s - x.s || y.w - x.w; });
+  }
+  app.drawPlanner = (box) => {
+    if (!box) return;
+    let body = box.querySelector(':scope > .proj-body');
+    if (!body) { body = el('div', { class: 'proj-body' }); box.replaceChildren(plannerBar(), body); }
+    if (!pl.data) { app.swap(body, el('p', { class: 'note', text: 'Reading the project planner…' })); return; }
+    const links = app.data?.links || {};
+    const folderOfId = Object.fromEntries(Object.entries(links).map(([f, id]) => [id, f]));
+    // What Filter by and the search show.
+    const inView = (p) => (app.inFilter?.(folderOfId[p.id] ?? p.folder, p) ?? true) && matches(p);
+    const list = byPriority(eng.projects.filter(inView));
+    // Drawn again every few seconds: a focused button keeps the focus.
+    const had = body.contains(document.activeElement) ? document.activeElement : null;
+    const focusKey = had?.dataset.act ? `[data-act="${CSS.escape(had.dataset.act)}"][data-id="${CSS.escape(had.dataset.id || '')}"]` : '';
+    const row = (p) => el('li', { class: 'plan-item' }, app.plannerBadge(p),
+      el('div', { class: 'plan-item-text' }, el('b', { text: p.name }), el('span', { class: 'note', text: p.description || p.folder })),
+      app.plannerTags(p) || el('span'));
+    const searching = app.projSearch.trim();
+    const drawn = app.swap(body, app.plannerBand(inView),
+      el('h2', { class: 'plan-list-title', text: `All projects by priority (${list.length})` }),
+      el('p', { class: 'note', text: 'The number is the score out of 100: press it to change the score, deadline, stage and categories.' }),
+      list.length ? el('ol', { class: 'plan-list' }, ...list.map(row))
+        : el('p', { class: 'empty', text: searching ? `No project's name or category has "${searching}" in it. Clear the search to see them all.` : 'No project in what Filter by shows. Pick All projects to see them all.' }));
+    if (drawn && focusKey) body.querySelector(focusKey)?.focus();
   };
+  /** Settings › Office: show or hide the planner. Hidden, its tab, its check-ins and Filter by › Category go; its
+   * scores and categories are kept. */
+  app.setPlannerOn = (on) => {
+    try { localStorage.setItem('aho-planner', on ? 'on' : 'off'); } catch { /* fine */ }
+    document.getElementById('tab-planner').hidden = !on;
+    if (!on && app.view === 'planner') app.setView('list');
+    if (on) load(); else app.draw();
+  };
+  document.getElementById('tab-planner').hidden = !app.plannerOn();
 
   // ---- the score window ----
   function scoreWindow(id) {
@@ -374,7 +402,7 @@
   // ---- Needs attention: today's check-ins not answered yet ----
   app.plannerCheckins = (inFilter) => {
     const plan = pl.data?.plan;
-    if (!plan) return [];
+    if (!plan || !app.plannerOn()) return [];
     const links = app.data?.links || {};
     const folderOf = Object.fromEntries(Object.entries(links).map(([f, id]) => [id, f]));
     const due = [...plan.paid, ...plan.checkins, ...(plan.low ? [plan.low] : [])].filter((c) => !c.answer);
@@ -390,6 +418,7 @@
     });
   };
 
-  load();
-  setInterval(load, 15000);
+  // Read only while the planner is shown.
+  if (app.plannerOn()) load();
+  setInterval(() => { if (app.plannerOn()) load(); }, 15000);
 })();

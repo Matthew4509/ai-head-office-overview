@@ -90,7 +90,7 @@ async function main() {
   const key = (page.match(/name="aho-key" content="([0-9a-f]+)"/) || [])[1];
   // The page comes in its theme (none chosen yet: the default, Auto, already light or dark by the sun), so it never
   // flashes light before turning dark.
-  assert.ok(/<html lang="en" data-theme-choice="auto" data-theme="(light|dark)">/.test(page), 'the page is served with its theme on <html>');
+  assert.ok(/<html lang="en" data-theme-choice="light" data-theme="light">/.test(page), 'the page is served with its theme on <html>: light (day) until one is chosen');
   const api = async (p, body, headers = {}) => {
     const res = await fetch(BASE + p, { method: body ? 'POST' : 'GET', headers: { 'X-AHO-Key': key, 'Content-Type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined });
     return { status: res.status, json: await res.json() };

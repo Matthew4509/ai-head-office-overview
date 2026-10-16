@@ -113,6 +113,8 @@
   app.filterBy = 'project';
   app.folder = null;
   app.category = null;
+  /** Is the project planner shown (Settings › Office)? Off until ticked; kept in this browser. */
+  app.plannerOn = () => { try { return localStorage.getItem('aho-planner') === 'on'; } catch { return false; } };
   // Above Filter by: Show names (the staff's names in the office) and PC name (the project's name above each desk's
   // computer), both on until unticked, to see the staff better or for a screenshot. Kept in this browser only.
   const remembered = (k) => { try { return localStorage.getItem(k) !== 'off'; } catch { return true; } };
@@ -162,7 +164,9 @@
     const choose = el('select', { id: 'filter-by', class: 'filter-by', 'aria-label': 'Filter by', onchange: (e) => setFilterBy(e.target.value) },
       el('option', { value: 'project', selected: app.filterBy === 'project' }, 'Project'),
       el('option', { value: 'folder', selected: app.filterBy === 'folder' }, 'Working folder'),
-      el('option', { value: 'category', selected: app.filterBy === 'category' }, 'Category'));
+      app.plannerOn?.() ? el('option', { value: 'category', selected: app.filterBy === 'category' }, 'Category') : null);
+    // The planner hidden while Filter by showed its categories: back to projects.
+    if (app.filterBy === 'category' && !app.plannerOn?.()) { app.filterBy = 'project'; app.category = null; choose.value = 'project'; }
     let items;
     let foot = null;
     if (app.filterBy === 'category') {
@@ -521,6 +525,7 @@
     if (app.view === 'list') drawList();
     if (app.view === 'favs') drawFavs();
     if (app.view === 'prompts') app.drawPrompts?.();
+    if (app.view === 'planner') app.drawPlanner?.(document.getElementById('planner-view'));
     if (!app.editing) {
       const p = app.picked && app.data.people.find((x) => x.key === app.picked);
       if (!p) app.picked = null;
@@ -587,10 +592,12 @@
     document.getElementById('tab-list').setAttribute('aria-selected', String(v === 'list'));
     document.getElementById('tab-favs').setAttribute('aria-selected', String(v === 'favs'));
     document.getElementById('tab-prompts').setAttribute('aria-selected', String(v === 'prompts'));
+    document.getElementById('tab-planner').setAttribute('aria-selected', String(v === 'planner'));
     document.getElementById('office-view').hidden = v !== 'office';
     document.getElementById('list-view').hidden = v !== 'list';
     document.getElementById('favs-view').hidden = v !== 'favs';
     document.getElementById('prompts-view').hidden = v !== 'prompts';
+    document.getElementById('planner-view').hidden = v !== 'planner';
     try { localStorage.setItem('aho-view', v); } catch { /* fine */ }
     draw();
   }
@@ -610,13 +617,15 @@
   document.getElementById('tab-list').addEventListener('click', () => setView('list'));
   document.getElementById('tab-favs').addEventListener('click', () => setView('favs'));
   document.getElementById('tab-prompts').addEventListener('click', () => setView('prompts'));
+  document.getElementById('tab-planner').addEventListener('click', () => setView('planner'));
   app.setView = setView;
   let saved = 'office';
   try { saved = localStorage.getItem('aho-view') || 'office'; } catch { /* fine */ }
-  // An address can name the tab: /#projects, /#prompts, /#favourites or /#office.
-  saved = { '#projects': 'list', '#prompts': 'prompts', '#favourites': 'favs', '#office': 'office' }[location.hash] || saved;
+  // An address can name the tab: /#projects, /#prompts, /#favourites, /#planner (when shown) or /#office.
+  saved = { '#projects': 'list', '#prompts': 'prompts', '#favourites': 'favs', '#planner': 'planner', '#office': 'office' }[location.hash] || saved;
+  if (saved === 'planner' && !app.plannerOn?.()) saved = 'list';
   if (!window.officeView) saved = 'list';
-  setView(['list', 'favs', 'prompts'].includes(saved) ? saved : 'office');
+  setView(['list', 'favs', 'prompts', 'planner'].includes(saved) ? saved : 'office');
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     for (const id of ['setup', 'edit', 'check']) {

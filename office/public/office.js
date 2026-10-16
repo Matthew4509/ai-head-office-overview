@@ -929,8 +929,11 @@
   function stepTech(dt) {
     const k = tech;
     if (!k) return;
+    // Seen coming as the tech comes in by the front door (every room is indoors), or at the room's door at the latest.
+    if (k.phase === 'coming' && nearDoor(k)) notice(k, roomSeen(k.lock));
     if (k.path.length && !move(k, dt, HURRY)) return;
     if (k.phase === 'coming') {
+      notice(k, roomSeen(k.lock));
       k.phase = 'working';
       k.face = doorOf(k.lock).face;
       k.doneAt = world.time + 3;
@@ -994,9 +997,33 @@
     };
     return spots[id] ?? [905, 610];
   }
+  /** Beach gear: carried along the path outside to the sand, past the front door but never in by it. */
+  const BEACH = new Set(['deckchair', 'volleyball']);
+  const nearDoor = (k) => Math.hypot(k.x - DOOR[0], k.y - DOOR[1]) < 60;
+  /** The staff notice a worker once the worker is there to be seen, never at the moment of buying: a couple of them
+   * (the same few each time) say a line each. Once per trip (`k.noticed`). */
+  function notice(k, lines) {
+    if (k.noticed) return;
+    k.noticed = true;
+    // The line turns with each worker seen, so two deliveries in a row are not met with the same words (the chat leaves
+    // out the same words from the same person for a while).
+    world.noticed = (world.noticed || 0) + 1;
+    present().filter((p) => p.seed % 3 === 0).slice(0, 2).forEach((p, i) => say(p, lines[(p.seed + i + world.noticed) % lines.length], 3));
+  }
+  const BOX_SEEN = ['A delivery! What\'s in the box?', 'Is that for us?', 'Ooh, a box!'];
+  const BOX_AGAIN = ['Another box!', 'There\'s more?'];
+  const BEACH_SEEN = ['Something\'s going up on the beach!', 'What\'s that on the sand?', 'Beach delivery!'];
+  const roomSeen = (lock) => [`A new ${lock === 'lounge' ? 'lounge' : 'meeting room'}? Can't wait to see it!`, 'Did the boss just buy a room?', 'Someone\'s unlocking a door!'];
   /** A piece of furniture bought: held out of the room until the fitter has set it up. */
   function callFitter(id) {
     world.fitting.push(id);
+    // On the way out after the last piece: the fitter turns back for this one (else it would wait for ever).
+    if (fitter?.phase === 'leaving') {
+      const [x, y] = fitSpot(world.fitting[0]);
+      Object.assign(fitter, { phase: 'coming', carry: 'parcel', noticed: false, trips: 0, path: route(fitter.x, fitter.y, x, y) });
+      say(fitter, 'One more for you!', 3);
+      wake();
+    }
     if (fitter) return;
     const look = L ? { ...L.fromId('fitter'), top: 'mustard', headwear: 'cap', glasses: 'none' } : null;
     const [x, y] = fitSpot(id);
@@ -1007,8 +1034,14 @@
   function stepFitter(dt) {
     const k = fitter;
     if (!k) return;
+    // Seen coming: indoors, as the fitter comes in by the front door; beach gear (or a second piece, carried from
+    // inside), once the fitter is at the spot.
+    const piece = world.fitting[0];
+    const seen = BEACH.has(piece) ? BEACH_SEEN : k.trips ? BOX_AGAIN : BOX_SEEN;
+    if (k.phase === 'coming' && !BEACH.has(piece) && !k.trips && nearDoor(k)) notice(k, seen);
     if (k.path.length && !move(k, dt, HURRY)) return;
     if (k.phase === 'coming') {
+      notice(k, seen);
       k.phase = 'working';
       k.carry = null;
       k.doneAt = world.time + 3;
@@ -1035,6 +1068,8 @@
       if (world.fitting.length) {
         const [x, y] = fitSpot(world.fitting[0]);
         k.phase = 'coming';
+        k.noticed = false;
+        k.trips = (k.trips || 0) + 1;
         k.carry = 'parcel';
         k.path = route(k.x, k.y, x, y);
       } else {
@@ -2080,12 +2115,12 @@
           v.told = '';
           tell(v);
         }
-        // No thanks yet: the room is still locked. The thanks and the wave come when the IT tech opens the door.
-        for (const p of present()) if (p.seed % 3 === 0) say(p, [`A new ${item.unlocks === 'lounge' ? 'lounge' : 'meeting room'}? Can't wait to see it!`, 'Did the boss just buy a room?', 'Someone\'s unlocking a door!'][(p.seed >> 2) % 3], 3);
+        // Nothing said yet: a couple notice the IT tech coming in by the front door (stepTech), and the thanks and the
+        // wave come when the tech opens the room.
         shopSaid.textContent = `${item.unlocks === 'lounge' ? 'The lounge' : 'The meeting room'} is bought (${big(item.price)} tokens): the IT tech is on the way to unlock it. Then furnish it from the list below.`;
       } else {
-        // Not seen yet, so no thanks yet: only a couple notice the delivery. The thanks come once the fitter has set it up.
-        present().filter((p) => p.seed % 3 === 0).slice(0, 2).forEach((p, i) => say(p, ['A delivery! What\'s in the box?', 'Is that for us?'][i], 3));
+        // Nothing said yet: a couple notice the fitter at the front door, or at the spot for beach gear (stepFitter),
+        // and the thanks come once it is set up.
         shopSaid.textContent = `${item.name} bought (${big(item.price)} tokens): the fitter is bringing it in.`;
       }
       wake();

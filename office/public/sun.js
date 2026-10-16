@@ -85,7 +85,7 @@
       return `today the sun rises at ${clock(t.rise)} and sets at ${clock(t.set)} ${where}.`.replace(/^t/, 'T');
     }
     const apply = () => {
-      const choice = html.dataset.themeChoice || html.dataset.theme || 'auto';
+      const choice = html.dataset.themeChoice || html.dataset.theme || 'light';
       const want = resolve(choice);
       if (html.dataset.theme !== want) html.dataset.theme = want;
       for (const b of doc.querySelectorAll('[data-theme-pick]')) {

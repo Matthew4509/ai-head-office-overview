@@ -124,7 +124,7 @@
     const every = el('select', { class: 'field-text short', 'aria-label': 'Check the live sites every' }, [5, 10, 15].map((m) => el('option', { value: String(m), selected: (app.engineData.stats?.liveEvery || 15) === m }, `${m} minutes`)));
     const save = (body, done) => async () => { try { await app.api('/api/settings', body()); await app.refresh(); say(done); } catch (e) { say(fault(e)); } };
     // The theme the page was served in is the one in use (the office's choice, or its default).
-    const now = document.documentElement.dataset.themeChoice || 'auto';
+    const now = document.documentElement.dataset.themeChoice || 'light';
     const THEMES = [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark'], ['system', 'Match Windows']];
     const sun = window.officeSun;
     const themeBtn = ([id, name]) => el('button', {
@@ -150,6 +150,11 @@
       el('div', { class: 'row' }, el('span', { text: 'Check every live URL every' }), every, btn('Save', async () => {
         try { const r = await app.engine('/api/live/every', { minutes: Number(every.value) }); say(`Live sites are checked every ${r.every} minutes.`); } catch (e) { say(fault(e)); }
       }, true), btn('Check all now', async () => { try { await app.engine('/api/live/check-all', {}); say('Checking the live sites, one at a time…'); } catch (e) { say(fault(e)); } })),
+      // The project planner is off until ticked: its tab, its check-ins in Needs attention and Filter by › Category.
+      el('h3', { text: 'Project planner' }),
+      el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: !!app.plannerOn?.(), onchange: (e) => { app.setPlannerOn?.(e.target.checked); say(e.target.checked ? 'The Project planner tab is shown, beside Prompts.' : 'The Project planner is hidden. Its scores and categories are kept.'); } }),
+        ' Show the Project planner tab: it scores every project and splits your day between them'),
+      el('p', { class: 'note', text: 'Shown, it also adds today\'s check-ins to Needs attention and Category to Filter by. Kept in this browser.' }),
     ];
   }
 
