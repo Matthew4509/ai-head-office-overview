@@ -94,8 +94,9 @@ button { cursor: pointer; }
 .filter-item:hover { border-color: var(--line); background: var(--page); }
 .filter-item[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .filter-item[aria-pressed="true"] .filter-sub, .filter-item[aria-pressed="true"] .filter-sub span { color: var(--accent-ink); }
-/* Above Filter by: Show names (staff names in the office) and PC name (the project name above each desk). */
-.name-ticks { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 10px; font-size: 13px; color: var(--soft); }
+/* Under the tabs, above the office: Show names, PC name and Hide general chit-chat, on one row. */
+.name-ticks { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; font-size: 13px; color: var(--soft); }
+.view-ticks[hidden] { display: none; }
 .name-tick { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .filter-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filter-sub { font-size: 12px; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

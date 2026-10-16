@@ -193,14 +193,27 @@
       items = [row(app.project === null, () => pickProject(null), 'All projects', `${n(prs.length, 'project', 'projects')} · ${n(peopleIn(prs), 'person', 'people')}`, 'Show everyone in every project'),
         ...prs.map((pr) => row(app.project === pr.folder, () => pickProject(pr.folder), projectName(pr.folder), says(pr), `Show only ${projectName(pr.folder)}: ${n(pr.people.length, 'person', 'people')}`))];
     }
-    const tick = (label, on, key, set) => el('label', { class: 'name-tick' }, el('input', { type: 'checkbox', checked: on,
-      onchange: (e) => { set(e.target.checked); try { localStorage.setItem(key, e.target.checked ? 'on' : 'off'); } catch { /* fine */ } } }), ` ${label}`);
-    const ticks = el('div', { class: 'name-ticks' },
-      tick('Show names', app.showNames, 'aho-show-names', (on) => { app.showNames = on; window.officeView?.refresh?.(); }),
-      tick('PC name', app.showPcName, 'aho-show-pc-name', (on) => { app.showPcName = on; window.officeView?.refresh?.(); }));
-    swap(nav, ticks, el('div', { class: 'filter-head' }, el('h2', { id: 'filter-title', text: 'Filter by' }), choose),
+    swap(nav, el('div', { class: 'filter-head' }, el('h2', { id: 'filter-title', text: 'Filter by' }), choose),
       el('ul', { class: 'filter-list' }, ...items), foot,
       prs.length || app.filterBy === 'category' ? null : el('p', { class: 'empty', text: 'No threads today yet.' }));
+  }
+
+  /** One row under the tabs, above the office: Show names (the staff's names), PC name (the project's name above each
+   * desk's computer) and Hide general chit-chat (the office chat: ticked, Thoughts keeps only what the threads are doing,
+   * as Work only under Settings › Office). Shown with the office only. Names and PC name are on until unticked. */
+  function drawViewTicks() {
+    const row = document.getElementById('view-ticks');
+    if (!row) return;
+    row.hidden = app.view !== 'office';
+    const tick = (label, on, title, set) => el('label', { class: 'name-tick', title }, el('input', { type: 'checkbox', checked: on, onchange: (e) => set(e.target.checked) }), ` ${label}`);
+    const keep = (key, on) => { try { localStorage.setItem(key, on ? 'on' : 'off'); } catch { /* fine */ } };
+    // A box ticked from the keyboard keeps the focus when the row is drawn again.
+    const focused = [...row.querySelectorAll('input')].indexOf(document.activeElement);
+    const drawn = swap(row,
+      tick('Show names', app.showNames, 'The staff\'s names under them in the office', (on) => { app.showNames = on; keep('aho-show-names', on); window.officeView?.refresh?.(); }),
+      tick('PC name', app.showPcName, 'The project\'s name above each desk\'s computer', (on) => { app.showPcName = on; keep('aho-show-pc-name', on); window.officeView?.refresh?.(); }),
+      tick('Hide general chit-chat', app.chatMode() !== 'all', 'Thoughts keeps only what the threads are doing, with no office banter (Settings › Office also has Off)', (on) => app.setChatMode(on ? 'work' : 'all')));
+    if (drawn && focused >= 0) row.querySelectorAll('input')[focused]?.focus();
   }
 
   /** Project, Working folder or Category: switching shows everyone again, then the new list to pick from. */
@@ -525,6 +538,7 @@
   function draw() {
     if (!app.data) return;
     drawProjects();
+    drawViewTicks();
     drawPurse();
     // The office first: it also takes in the shop, which the right panel's Staff rewards tab is drawn from.
     window.officeView?.update?.(app.data, officePeople());
