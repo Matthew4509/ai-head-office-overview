@@ -19,28 +19,32 @@
   /** The office by night (the dark theme): floors, walls, the outside and the furniture in evening light. People, screens,
    * signs, food and the beach things keep their own colours, so they stand out as they do by day. A colour not listed
    * here is the same by day and by night. */
+  // One family by night, matched to the page's own dark cards (slate blue-grey): every room floor at the same darkness
+  // with only a hint of its day colour, the hallway a step lighter (with lamplight, see lamps), wood and sand muted
+  // rather than bright, and outlines near-black so furniture keeps its edges on a dark floor.
   const NIGHT = {
-    '#cbd6df': '#1c2531', // the corridors
-    '#e8eff2': '#2a3542', // computer room
-    '#e9e7f1': '#2e2c3d', // meeting room
-    '#f3e9dc': '#3a3129', // kitchen
-    '#e0ece7': '#273731', // lounge and library
-    '#b9c9a4': '#33412c', // the verge
-    '#d9cfb8': '#4a4538', // the path
-    '#f2dfae': '#6b5d3e', // the sand
-    '#7fc4e0': '#1d4a63', // the sea
-    '#d8f0fa': '#4f88a6', // waves
-    '#cfe8f5': '#3f6680', // the lounge window
-    '#a4b8c3': '#4d5f6c', // the front door, the sink
-    '#d5e3e8': '#7d9099', // the sink's basin
-    '#e8bb80': '#a77d4c', // desks, tables, the counter
-    '#9eb3c8': '#5b6f84', // desk chairs
-    '#a6aacb': '#5f6283', // meeting room chairs
-    '#fff7e9': '#cfc6b6', // keyboards
-    '#b78966': '#8a6548', // the bookcase
-    '#a4bac9': '#566b7b', // the armchair
-    '#9ab4c9': '#506a80', // the sofa's seat
-    '#b8cddd': '#62788c', // the sofa's back
+    '#27364e': '#0b0f15', // outlines (INK)
+    '#cbd6df': '#2b3440', // the hallway: a step lighter than the rooms, like a lit corridor
+    '#e8eff2': '#232b36', // computer room
+    '#e9e7f1': '#262735', // meeting room (a hint of violet)
+    '#f3e9dc': '#2b2926', // kitchen (a hint of warmth)
+    '#e0ece7': '#222d2c', // lounge and library (a hint of green)
+    '#b9c9a4': '#25302a', // the verge
+    '#d9cfb8': '#3a3d44', // the path
+    '#f2dfae': '#4a4434', // the sand
+    '#7fc4e0': '#15344a', // the sea
+    '#d8f0fa': '#36627f', // waves
+    '#cfe8f5': '#4f6f8a', // the lounge window (moonlight)
+    '#a4b8c3': '#46525f', // the front door, the sink
+    '#d5e3e8': '#6d7d89', // the sink's basin
+    '#e8bb80': '#7e6650', // desks, tables, the counter: muted wood
+    '#9eb3c8': '#45546a', // desk chairs
+    '#a6aacb': '#4f5170', // meeting room chairs
+    '#fff7e9': '#a8b0bc', // keyboards
+    '#b78966': '#6c5644', // the bookcase
+    '#a4bac9': '#4a5c6c', // the armchair
+    '#9ab4c9': '#46596c', // the sofa's seat
+    '#b8cddd': '#55697d', // the sofa's back
   };
   /** True while the page is dark (Settings › Office › Theme, or Windows when it follows Windows): see readTheme. */
   let night = false;
@@ -1128,6 +1132,19 @@
     oval(c, x + 7, y, 3, 4, '#fff9eb');
   }
 
+  /** By night, soft pools of light down the hallways from ceiling lamps: an office keeps some lights on, not many. */
+  function lamps(c) {
+    const spots = [[600, 70], [600, 230], [600, 400], [600, 570], [600, 730], [130, 400], [330, 400], [870, 400], [1070, 400]];
+    for (const [x, y] of spots) {
+      const g = c.createRadialGradient(x, y, 4, x, y, 95);
+      g.addColorStop(0, 'rgba(255, 228, 176, 0.20)');
+      g.addColorStop(1, 'rgba(255, 228, 176, 0)');
+      c.fillStyle = g;
+      c.fillRect(x - 95, y - 95, 190, 190);
+      oval(c, x, y, 3, 3, 'rgba(255, 236, 200, 0.85)', null);
+    }
+  }
+
   /** The rooms, the furniture and the desks: drawn once (and again when the desks change), then copied each frame. */
   function drawBackground() {
     const cv = document.createElement('canvas');
@@ -1136,6 +1153,7 @@
     const c = cv.getContext('2d');
     c.fillStyle = tone('#cbd6df');
     c.fillRect(0, 0, W, H);
+    if (night) lamps(c);
     ROOMS.forEach((r, i) => {
       box(c, r.x, r.y, r.w, r.h, 16, r.fill);
       const xx = i % 2 === 0 ? r.x + r.w : r.x;
