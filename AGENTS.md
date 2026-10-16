@@ -2,9 +2,9 @@
 
 AI Head Office Overview runs on the user's own PC (Windows). It reads Claude Code's transcripts
 (`~/.claude/projects/**/*.jsonl`), draws each thread as a person in an office, and lists the user's projects with
-their local copies, audits, git state and live sites. It sends nothing anywhere. These notes are for an agent asked to
-install it, review it, update it from GitHub, or turn on **advanced setup** (hooks). Read the whole file before
-changing anything.
+their local copies, audits, git state and live sites. It sends nothing about the user anywhere (the few requests it
+makes are listed under "Review it"). These notes are for an agent asked to install it, review it, update it from
+GitHub, or turn on **advanced setup** (hooks). Read the whole file before changing anything.
 
 Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Node.js 22+, no npm packages).
 
@@ -60,8 +60,9 @@ Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Nod
 - **Reads:** `~/.claude/projects` (transcripts), `~/.codex/sessions` (token counts), the project folders in its
   working folders, and the Claude desktop app's thread records (the Open button). It never writes to any of them.
 - **Writes:** its own `data` folder only; the AI app's `~/.claude/settings.json` only when the user turns advanced
-  setup on or off (a copy is saved first; code: `office/src/setup.mjs`); shortcuts and the start link only through
-  setup (`lib/setup.js`).
+  setup on or off, and uninstall takes its own hooks out again (a copy is saved first each time; code:
+  `office/src/setup.mjs`, `lib/setup.js`); the start link is set again on every start (start.cmd), and the shortcuts
+  only through setup (`lib/setup.js`).
 - **Runs:** a project's own start command from that project's `.claude/launch.json` or `project.json` (never text
   from the page; code: `lib/projects.js`, `lib/runner.js`), and only after the person has seen the whole command in a
   first-run window and said yes (asked again when the command changes; `trustCheck` in `lib/runner.js`); `git`
@@ -137,7 +138,7 @@ Use **Settings › Setup › Go back to easy setup**. By hand: remove every hook
 `office/hook.mjs` reads the event Claude Code gives it and sends `{ event, session, message }` to
 `http://127.0.0.1:<port>/api/office/hook`.
 - It prints nothing, so it never adds to what Claude sees.
-- It gives up in under a second and always exits 0, so Claude carries on as normal if the office is closed.
+- It gives up within 1.5 seconds and always exits 0, so Claude carries on as normal if the office is closed.
 - It sends only to this PC.
 - A "waiting for your input" notification counts as finished, not as "Needs you": it comes after every reply.
 

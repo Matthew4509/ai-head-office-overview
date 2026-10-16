@@ -209,6 +209,27 @@ async function main() {
       assert(Date.now() - t < 6000, 'took ' + (Date.now() - t) + ' ms');
       assert(!(await list()).find(p => p.folder === 'ends-at-once').running, 'still shown as running');
     });
+    await check('a live address in a project\'s own project.json is only a suggestion: nothing is asked of it', async () => {
+      make('suggest-site', { 'project.json': JSON.stringify({ name: 'Suggest', liveUrl: 'https://example.com' }) });
+      const p = (await list()).find(x => x.folder === 'suggest-site');
+      assert(p.liveUrl === '' && /^https:\/\/example\.com/.test(p.liveSuggested), JSON.stringify({ liveUrl: p.liveUrl, liveSuggested: p.liveSuggested }));
+    });
+    await check('Run asks first and shows what really runs: a node.cmd in the project folder, warned about', async () => {
+      const port = await freePort();
+      make('shadow-site', { '.claude/launch.json': launch({ name: 'x', runtimeExecutable: 'node', runtimeArgs: ['server.js'], port }), 'node.cmd': '@echo off\r\necho not the usual node\r\n' });
+      const t = (await post('/api/start', { id: await idOf('shadow-site'), key: '0', open: false })).json.needsTrust;
+      assert(t && t.local === true && /shadow-site[\\/]node\.cmd$/i.test(t.exe), JSON.stringify(t));
+    });
+    await check('Run asks again when the npm script it runs changes, and shows the script', async () => {
+      const port = await freePort();
+      const dir = make('script-site', { '.claude/launch.json': launch({ name: 'x', runtimeExecutable: 'npm', runtimeArgs: ['run', 'dev'], port }), 'package.json': JSON.stringify({ scripts: { dev: 'node server.js' } }) });
+      const id = await idOf('script-site');
+      const a = (await post('/api/start', { id, key: '0', open: false })).json.needsTrust;
+      assert(a && a.script && a.script.name === 'dev' && a.script.text === 'node server.js', JSON.stringify(a));
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ scripts: { dev: 'node other.js' } }));
+      const b = (await post('/api/start', { id, key: '0', open: false })).json.needsTrust;
+      assert(b && b.fp !== a.fp && b.script.text === 'node other.js', 'a changed script is a changed command');
+    });
     await check('S5: two Run requests at once start one copy; the other is told it is already starting', async () => {
       const port = await freePort();
       make('double-run', { '.claude/launch.json': launch({ name: 'x', runtimeExecutable: NODE, runtimeArgs: ['-e', "require('http').createServer((q, s) => s.end('ok')).listen(" + port + ", '127.0.0.1')"], port }) });

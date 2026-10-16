@@ -36,8 +36,21 @@ function report(r) {
     const name = setup.NAMES[x.where];
     if (x.error) say('  x ' + name + ': ' + x.error);
     else if (x.dryRun) say('  - ' + name + ': test copy, not changed (' + x.dryRun + ')');
+    else if (x.where === 'hooks') say('  OK ' + name + (x.removed ? ' taken out of the AI app settings (a copy is kept: ' + x.backup + ')' : ': none were set up'));
     else say('  ' + (x.exists ? 'OK ' + name + (x.path ? ' (' + x.path + ')' : '') : 'OK ' + name + ' removed'));
   }
+}
+
+// install.cmd has just asked both questions: the office's first-start Welcome window must not ask them again (and its
+// ticked boxes must not undo a no). Kept in the office's own settings file.
+function welcomed() {
+  try {
+    const Settings = require('../lib/settings');
+    const cfg = require('../lib/config');
+    const s = Settings.load(cfg.SETTINGS_FILE, cfg.DEFAULT_ROOT);
+    s.welcomed = true;
+    Settings.save(cfg.SETTINGS_FILE, s);
+  } catch { /* the Welcome then asks once more: no harm */ }
 }
 
 async function install() {
@@ -49,6 +62,7 @@ async function install() {
   console.log('');
   const r = await setup.apply(want);
   report(r);
+  welcomed();
   if (r.errors.length) { say(''); say('Not everything could be set up. The office still works: start it with start.cmd.'); return 1; }
   return 0;
 }

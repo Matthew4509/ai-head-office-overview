@@ -2033,7 +2033,7 @@
     v.strip.replaceChildren(el('b', { text: 'Thoughts' }),
       off ? el('p', { class: 'note', text: 'The chat is off. Turn it on under Settings › Office.' })
         : list.length ? el('ul', { class: 'thoughts' }, ...list) : el('p', { class: 'note', text: 'Quiet for now: what they say and think shows here.' }),
-      el('span', { class: 'note', text: 'Click a person to see what they are doing.' }));
+      el('span', { class: 'note', text: 'Click someone for details.' }));
   }
 
   // ---- Pointer: press a person to pick them; press a desk to show only that project ----

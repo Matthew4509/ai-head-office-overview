@@ -234,7 +234,7 @@
   function liveWindow(id) {
     const p = proj(id);
     if (!p) return;
-    const input = el('input', { type: 'text', class: 'field-text', inputmode: 'url', value: p.liveUrl || '', placeholder: 'example.com', 'aria-label': 'Live URL', spellcheck: 'false', autocomplete: 'off' });
+    const input = el('input', { type: 'text', class: 'field-text', inputmode: 'url', value: p.liveUrl || p.liveSuggested || '', placeholder: 'example.com', 'aria-label': 'Live URL', spellcheck: 'false', autocomplete: 'off' });
     const err = said();
     const state = el('div', {}, liveState(p));
     const set = async (url) => {
@@ -246,6 +246,7 @@
       } catch (e) { err.textContent = faultText(e); }
     };
     open(`Live site: ${p.name}`, [el('p', { class: 'note', text: `Where ${p.name} is hosted on the internet. The office checks it when it starts and every ${eng.stats?.liveEvery || 15} minutes with one plain request, the same as opening the page: ● up, ▲ unsure, ✕ down.` }),
+      !p.liveUrl && p.liveSuggested ? el('p', { class: 'note', text: `The project's own project.json suggests ${p.liveSuggested}. Nothing is asked of it until you add it.` }) : null,
       input, state, err],
     [btn(p.liveUrl ? 'Save and check' : 'Add and check', () => { const v = input.value.trim(); if (!v) { err.textContent = p.liveUrl ? 'Use Remove address to take it off.' : 'Type the address the site is hosted at, like example.com.'; return input.focus(); } set(v); }, true),
       p.liveUrl ? btn('Check now', async () => { err.textContent = `Checking ${p.liveUrl}…`; try { await app.engine('/api/live/check', { id }); await app.loadProjects(); liveWindow(id); } catch (e) { err.textContent = faultText(e); } }) : null,

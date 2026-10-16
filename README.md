@@ -9,8 +9,9 @@ saved or pushed in git.
 
 It runs only on your PC. It reads the AI app's transcripts already on your PC and never changes or sends them. The
 only requests that leave your PC: plain page requests to the live addresses you add (their checks, and the audit's
-look at the live site), a `git fetch` of this repository when you open Settings › Update, and, only if you turn it
-on, a daily check with GitHub for the newest Git version. The version you have is under Settings › About.
+look at the live site, with a DNS lookup of its mail settings), a `git fetch` of this repository when you open
+Settings › Update, and, only if you turn it on, a daily check with GitHub for the newest Git version. A live address
+in a project's own project.json is only a suggestion: nothing is asked of it until you add it. The version you have is under Settings › About.
 
 Free for **noncommercial** use under the PolyForm Noncommercial License 1.0.0 (see [Licence](#licence)). For any
 commercial use, ask the owner first, through this repository on GitHub.
@@ -82,10 +83,10 @@ running).
 - **Treats** (pizza, donuts, sandwiches, coffee): each order comes in with its own courier, so pizza, donuts and coffee
   bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something turns to face you
   and waves a thank-you.
-- One row under the tabs, above the office: **Show names** (the staff's names under them) and **PC name** (the
-  project's name above each desk's computer): untick either to see the staff better, or for a screenshot; and **Hide
-  general chit-chat**: Thoughts keeps only what the threads are doing (the same as Work only under Settings › Office).
-  Remembered in this browser.
+- One row under the tabs, above the office, all ticked to start with: **Show names** (the staff's names under them)
+  and **PC name** (the project's name above each desk's computer): untick either to see the staff better, or for a
+  screenshot; and **Show general chit-chat**: untick it and Thoughts keeps only what the threads are doing (the same
+  as Work only under Settings › Office). Remembered in this browser.
 - **Filter by** (left of the office), with a choice of **Project** or **Working folder** (and **Category** while the
   project planner is shown). What it picks is what every tab shows: the office, the Projects tiles, Favourites and
   Thoughts (prompts are not per project). Project: **All projects**, then each project with someone in today and, in
@@ -202,7 +203,10 @@ Each mark opens its window:
   once and never shown again; a finding shows only its label. They are kept as plain text in the office's data folder
   (`data/private-details.json`): never sent and never published, but readable by anyone who can open that folder or a
   copy of it. **Delete all** removes the file.
-- **Help** and **About** (the version, the Git program's own security state, Quit, Uninstall).
+- **Update**: a newer version from GitHub, shown before it is taken and taken in one click (a fast-forward `git pull`;
+  it refuses when files here were changed).
+- **Help** and **About** (the version, the Git program's own security state, Quit, Uninstall: it removes the
+  shortcuts, the start link and advanced setup's hooks, and leaves the folder for you to delete).
 
 ### Easy or advanced setup
 
@@ -212,7 +216,7 @@ what someone is doing can be up to 3 seconds behind.
 
 **Advanced** also adds three small hooks to the AI app's settings file (`%USERPROFILE%\.claude\settings.json`): when a
 thread gets a message, waits for your permission or finishes a reply, the app runs `office/hook.mjs`, which tells the
-office at once. It sends only to 127.0.0.1, prints nothing back, and gives up in under a second if the office is
+office at once. It sends only to 127.0.0.1, prints nothing back, and gives up within 1.5 seconds if the office is
 closed. Hooks you already have stay exactly as they are, a copy of the file is saved first, and **Go back to easy
 setup** takes out only this office's three (they carry the mark `--ai-head-office-hook`). Other apps' hooks are never
 counted, changed or removed. `AGENTS.md` has the same steps for an AI helper asked to do it by hand.
@@ -335,7 +339,7 @@ audit lists the record of every rule it shows that someone has judged.
   Live pages are asked **one every 5 seconds** and the compare stops at the first firewall or "too many requests"
   answer, because a burst of requests can get your own address blocked by the host.
 - **What publishing would give away about you (the disclosure pass):** your private details (a list you fill in
-  under **Audits › Private details**, plus what the office reads from this PC each time: your user name, PC name,
+  under **Settings › Private details**, plus what the office reads from this PC each time: your user name, PC name,
   home folder, git name and email, and your projects folder), the **names of your other projects** (not inside a
   link, and a name that is an ordinary word only when written as a path to it, such as `../notes/`), an **AI or
   prompt trail** (AI tool folders and settings such as `.claude/` or `CLAUDE.md`, handover notes, prompt and revert

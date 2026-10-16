@@ -16,8 +16,13 @@ const WAITING_DAYS = 7;
 /** Bump when the summary's shape changes: the cache is then read again from the start. */
 const CACHE_VERSION = 6;
 
+/** A file of the office's own: not there = `fallback`; there but unreadable (cut short, edited by hand) = copied aside
+ * first (<name>.damaged-<time>.json), so the next save cannot wipe what was in it (the ledger holds what was earned). */
 function readJson(file, fallback) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {
+    if (e.code !== 'ENOENT') try { fs.copyFileSync(file, `${file.replace(/\.json$/i, '')}.damaged-${new Date().toISOString().replace(/[:.]/g, '-')}.json`); } catch { /* nothing to keep */ }
+    return fallback;
+  }
 }
 
 /** Writes beside the file, then swaps it in, so a crash never leaves half a file. */

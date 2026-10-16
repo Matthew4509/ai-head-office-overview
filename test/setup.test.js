@@ -61,7 +61,9 @@ function run(exe, args, { env, input = '', cwd = HERE, timeout = 60000 } = {}) {
   const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-setup-data-'));
   const WS = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-setup-ws-'));
   fs.mkdirSync(path.join(WS, 'some-project'));
-  const env = { ...process.env, AHO_SHORTCUT_DIR: SC, AHO_LINK_KEY: TEST_KEY, AHO_DATA: DATA, AHO_PORT: String(PORT), AHO_ROOT: WS, AHO_TRANSCRIPTS: path.join(DATA, 'transcripts') };
+  // AHO_SETTINGS: a throwaway copy of the AI app's settings, so uninstall's hook removal never touches the real one.
+  const CLAUDE_SETTINGS = path.join(DATA, 'claude-settings.json');
+  const env = { ...process.env, AHO_SHORTCUT_DIR: SC, AHO_LINK_KEY: TEST_KEY, AHO_DATA: DATA, AHO_PORT: String(PORT), AHO_ROOT: WS, AHO_TRANSCRIPTS: path.join(DATA, 'transcripts'), AHO_SETTINGS: CLAUDE_SETTINGS };
   const lnk = where => path.join(SC, where, 'AI Head Office Overview.lnk');
   regClean();
   if (await portOpen(PORT)) { console.log('Port ' + PORT + ' is in use: stop whatever holds it, then run the test again.'); process.exit(1); }
@@ -76,9 +78,16 @@ function run(exe, args, { env, input = '', cwd = HERE, timeout = 60000 } = {}) {
     const r = await run(process.execPath, ['tools/setup.js', 'install'], { env, input: '\n\n' });
     assert(r.code === 0 && fs.existsSync(lnk('desktop')) && fs.existsSync(lnk('startup')), r.out);
   });
-  await check('setup uninstall: shortcuts and link gone, folder named, nothing deleted', async () => {
+  await check('setup uninstall: shortcuts, link and the office\'s own hooks gone (others kept), folder named, nothing deleted', async () => {
+    const ours = { type: 'command', command: 'node "C:/x/office/hook.mjs" 8880 --ai-head-office-hook', timeout: 3 };
+    const theirs = { type: 'command', command: 'play-a-sound.cmd' };
+    fs.mkdirSync(path.dirname(CLAUDE_SETTINGS), { recursive: true });
+    fs.writeFileSync(CLAUDE_SETTINGS, JSON.stringify({ hooks: { Stop: [{ hooks: [theirs] }, { hooks: [ours] }], UserPromptSubmit: [{ hooks: [ours] }] } }, null, 2));
     const r = await run(process.execPath, ['tools/setup.js', 'uninstall'], { env });
     assert(r.code === 0, r.out);
+    const after = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8'));
+    assert(!JSON.stringify(after).includes('--ai-head-office-hook') && JSON.stringify(after).includes('play-a-sound.cmd'), JSON.stringify(after));
+    assert(fs.readdirSync(DATA).some(n => n.startsWith('claude-settings.json.before-ai-head-office-')), 'a copy of the file is kept first');
     assert(!fs.existsSync(lnk('desktop')) && !fs.existsSync(lnk('startup')) && regValue(TEST_KEY + '\\shell\\open\\command') === null, r.out);
     assert(r.out.includes(HERE) && fs.existsSync(path.join(HERE, 'server.js')));
   });
@@ -93,10 +102,10 @@ function run(exe, args, { env, input = '', cwd = HERE, timeout = 60000 } = {}) {
     assert(/<title>AI Head Office Overview<\/title>/.test(page) && /id="office"/.test(page));
     assert.strictEqual(regValue(TEST_KEY + '\\shell\\open\\command'), linkHere); // start.cmd set it up again, in the test key
   });
-  await check('the office install.cmd started is a fresh one: not welcomed yet', async () => {
+  await check('install.cmd asked already, so the office it started does not show the Welcome again', async () => {
     const run = JSON.parse(fs.readFileSync(path.join(DATA, 'run.json'), 'utf8'));
     const s = await (await fetch('http://127.0.0.1:' + PORT + '/api/stats', { headers: { 'X-AHO-Key': run.key } })).json();
-    assert(s.welcomed === false && s.dryRun === true, JSON.stringify({ welcomed: s.welcomed, dryRun: s.dryRun }));
+    assert(s.welcomed === true && s.dryRun === true, JSON.stringify({ welcomed: s.welcomed, dryRun: s.dryRun }));
   });
   await check('uninstall.cmd stops that office and removes everything', async () => {
     const r = await run('cmd.exe', ['/d', '/c', path.join(HERE, 'uninstall.cmd')], { env: { ...env, AHO_INSTALL_NO_START: '1' } });

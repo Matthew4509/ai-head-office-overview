@@ -62,8 +62,8 @@ button { cursor: pointer; }
 
 /* Three columns: Filter by project | the office (and its tabs) | the right panel. Under 1200 px the filter list goes
    above as a row of buttons; under 900 px everything stacks. */
-.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr) 340px; gap: 16px; padding: 16px; align-items: start; }
-@media (max-width: 1200px) { .layout { grid-template-columns: minmax(0, 1fr) 340px; } .filter { grid-column: 1 / -1; } }
+.layout { display: grid; grid-template-columns: 185px minmax(0, 1fr) 375px; gap: 16px; padding: 16px; align-items: start; }
+@media (max-width: 1200px) { .layout { grid-template-columns: minmax(0, 1fr) 375px; } .filter { grid-column: 1 / -1; } }
 @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
 .middle, .side, .filter { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
@@ -200,8 +200,8 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .side-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
 .side-tabs button { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 4px 12px; }
 .side-tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-/* Staff rewards: tiles two across, each the same shape (picture, name, price and what is left to go, the button). */
-.side .shop-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* Staff rewards: tiles three across, each the same shape (picture, name, price and what is left to go, the button). */
+.side .shop-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .side .shop-item { grid-template-columns: minmax(0, 1fr); gap: 6px; align-content: start; padding: 8px; }
 .side .shop-item > .btn { justify-self: start; }
 .side .shop-item canvas { width: 64px; height: 48px; }

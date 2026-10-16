@@ -25,3 +25,4 @@ desktop.ini
 .idea/
 # AI tool settings (the preview's launch.json): they name the tool the office was built with, so they stay on this PC.
 .claude/
+mockups/

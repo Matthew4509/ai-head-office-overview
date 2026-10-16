@@ -72,6 +72,8 @@ function serve(handler) {
     await check('GPU on this PC: a real reading arrives (0-100) with the card\'s name', async () => {
       let g = S.gpuStats();
       for (let i = 0; i < 40 && g.pct == null && !g.error; i++) { await new Promise(r => setTimeout(r, 250)); g = S.gpuStats(); }
+      // A virtual machine, a remote session or a PC without GPU counters has no reading to give: skipped, not failed.
+      if (g.error && /no GPU Engine counters|no graphics card|no adapter/i.test(g.error) && !(g.adapters || []).length) { console.log('     (skipped: ' + g.error + ')'); S.stopGpu(); return; }
       assert(!g.error, g.error);
       assert(typeof g.pct === 'number' && g.pct >= 0 && g.pct <= 100, JSON.stringify(g));
       assert(g.adapters.length > 0, 'no adapter name');

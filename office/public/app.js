@@ -199,8 +199,8 @@
   }
 
   /** One row under the tabs, above the office: Show names (the staff's names), PC name (the project's name above each
-   * desk's computer) and Hide general chit-chat (the office chat: ticked, Thoughts keeps only what the threads are doing,
-   * as Work only under Settings › Office). Shown with the office only. Names and PC name are on until unticked. */
+   * desk's computer) and Show general chit-chat (the office chat; unticked, Thoughts keeps only what the threads are
+   * doing, as Work only under Settings › Office). Shown with the office only. All three are on until unticked. */
   function drawViewTicks() {
     const row = document.getElementById('view-ticks');
     if (!row) return;
@@ -212,7 +212,7 @@
     const drawn = swap(row,
       tick('Show names', app.showNames, 'The staff\'s names under them in the office', (on) => { app.showNames = on; keep('aho-show-names', on); window.officeView?.refresh?.(); }),
       tick('PC name', app.showPcName, 'The project\'s name above each desk\'s computer', (on) => { app.showPcName = on; keep('aho-show-pc-name', on); window.officeView?.refresh?.(); }),
-      tick('Hide general chit-chat', app.chatMode() !== 'all', 'Thoughts keeps only what the threads are doing, with no office banter (Settings › Office also has Off)', (on) => app.setChatMode(on ? 'work' : 'all')));
+      tick('Show general chit-chat', app.chatMode() === 'all', 'The office banter in Thoughts. Untick to keep only what the threads are doing (Settings › Office also has Off)', (on) => app.setChatMode(on ? 'all' : 'work')));
     if (drawn && focused >= 0) row.querySelectorAll('input')[focused]?.focus();
   }
 

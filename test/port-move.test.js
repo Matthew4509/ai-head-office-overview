@@ -17,9 +17,13 @@ check('the port in the arguments is swapped: alone, after a host, after = and in
   assert.deepStrictEqual(c.args, ['serve.js', '5309', '127.0.0.1:5309', '--port=5309', '-p', '5309']);
   assert(c.port === 5309 && c.env.PORT === '5309' && c.moved.named === true && c.moved.from === 5307, JSON.stringify(c));
 });
-check('a longer number that only contains the port is left alone', () => {
-  const c = onPort({ args: ['53070', '15307', 'v5307x'], port: 5307 }, 5307, 5309);
-  assert.deepStrictEqual(c.args, ['53070', '15307', 'v5309x']);
+check('a longer number, or a file name, that only contains the port is left alone', () => {
+  const c = onPort({ args: ['53070', '15307', 'v5307x', 'serve-5307.js'], port: 5307 }, 5307, 5309);
+  assert.deepStrictEqual(c.args, ['53070', '15307', 'v5307x', 'serve-5307.js']);
+});
+check('the port alone, a port option, or an address ending in it is moved', () => {
+  const c = onPort({ args: ['5307', '--port=5307', 'localhost:5307', 'http://127.0.0.1:5307'], port: 5307 }, 5307, 5309);
+  assert.deepStrictEqual(c.args, ['5309', '--port=5309', 'localhost:5309', 'http://127.0.0.1:5309']);
 });
 check('a command that does not name its port is moved through PORT only, and says so', () => {
   const c = onPort({ exe: 'npm', args: ['run', 'dev'], port: 3000 }, 3000, 3001);
