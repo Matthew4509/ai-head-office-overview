@@ -805,11 +805,11 @@
       const freshSnag = p.row && !snap && snagAt && snagAt !== p.row.snag?.at && nowMs - Date.parse(snagAt) < 120000;
       if (freshSnag) banter(p, { kind: s.snag.kind === 'bug' ? 'bug' : 'failed' });
       if (freshSnag && s.snag.run >= BIG_BUG) callCouncil(p);
-      // Something measured in their thread: tests passed or failed, a commit or a push (on a Friday, its own lines), the
-      // same file edited again, a reply you stopped.
+      // Something measured in their thread: tests passed or failed, a commit or a push (a Friday or weekend push, and
+      // failed tests on a Monday, have their own lines: officeBanter.dayKind), the same file edited again, a reply you stopped.
       const eventAt = s.event?.at || '';
       if (p.row && !snap && eventAt && eventAt !== p.row.event?.at && nowMs - Date.parse(eventAt) < 120000) {
-        banter(p, s.event.kind === 'push' && new Date(eventAt).getDay() === 5 ? { ...s.event, kind: 'push-friday' } : s.event);
+        banter(p, window.officeBanter?.dayKind?.(s.event, eventAt) ?? s.event);
       }
       // Working late (11 pm to 5 am on this PC's clock): once a night each.
       const night = new Date(Date.now() - 5 * 3600e3).toDateString();

@@ -11,7 +11,7 @@ const B = window.officeBanter;
 /** A steady "random": the same sequence every run. */
 const seq = (seed) => { let x = seed; return () => { x = (x * 16807) % 2147483647; return (x - 1) / 2147483646; }; };
 const EVENTS = [{ kind: 'tests-passed' }, { kind: 'tests-failed' }, { kind: 'commit' }, { kind: 'push' }, { kind: 'push-friday' }, { kind: 'again', file: 'app.js', n: 3 },
-  { kind: 'stopped' }, { kind: 'late' }, { kind: 'pair' }, { kind: 'bug' }, { kind: 'failed' }];
+  { kind: 'stopped' }, { kind: 'late' }, { kind: 'pair' }, { kind: 'bug' }, { kind: 'failed' }, { kind: 'push-weekend' }, { kind: 'tests-failed-monday' }];
 
 test('six characters, one for good per seat, all of them used', () => {
   assert.equal(B.CHARACTERS.length, 6);
@@ -57,4 +57,35 @@ test('Work only: the plain fact for each event from a thread', () => {
   for (const e of EVENTS.filter((x) => !['late', 'pair'].includes(x.kind))) assert.ok(B.fact(e), e.kind);
   assert.equal(B.fact({ kind: 'again', file: 'app.js', n: 6 }), 'Editing app.js again (6 times).');
   assert.equal(B.fact({ kind: 'late' }), null, 'office-only moments have no fact');
+});
+
+test('"It worked on my desk." always gets its answer from the nearest, when someone is near', () => {
+  const bold = { ...B.CHARACTERS.find((c) => c.id === 'bold'), talk: 1 };
+  const near = [{ character: B.CHARACTERS.find((c) => c.id === 'quiet'), name: 'Otto' }];
+  let seen = 0;
+  for (let r = 1; r < 400; r++) {
+    const lines = B.plan({ kind: 'tests-failed' }, bold, near, 'Wren', seq(r));
+    const i = lines.findIndex((l) => l.by === -1 && l.text === 'It worked on my desk.');
+    if (i < 0) continue;
+    seen++;
+    assert.equal(lines[i + 1]?.by, 0);
+    assert.equal(lines[i + 1]?.text, B.COMEBACKS['It worked on my desk.'][0]);
+  }
+  assert.ok(seen > 10, `the line comes up (${seen})`);
+  for (let r = 1; r < 400; r++) for (const l of B.plan({ kind: 'tests-failed' }, bold, [], 'Wren', seq(r))) assert.equal(l.by, -1, 'nobody near, nobody answers');
+});
+
+test('day-specific moments: a Friday or weekend push always, failed tests on a Monday about half the time', () => {
+  // 13-18 Oct 2026, local noon: Tuesday 13th to Sunday 18th; 12th is a Monday.
+  const at = (d) => new Date(2026, 9, d, 12).toISOString();
+  const always = () => 0;
+  assert.equal(B.dayKind({ kind: 'push' }, at(16), always).kind, 'push-friday');
+  assert.equal(B.dayKind({ kind: 'push' }, at(17), always).kind, 'push-weekend');
+  assert.equal(B.dayKind({ kind: 'push' }, at(18), always).kind, 'push-weekend');
+  assert.equal(B.dayKind({ kind: 'push' }, at(14), always).kind, 'push');
+  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(12), always).kind, 'tests-failed-monday');
+  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(12), () => 0.9).kind, 'tests-failed', 'Mondays still hear the usual lines');
+  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(13), always).kind, 'tests-failed');
+  assert.equal(B.dayKind({ kind: 'commit', file: 'a.js' }, at(16), always).file, 'a.js', 'the rest of the event is kept');
+  assert.ok(B.LINES['push-friday'].any.includes('Pushing on a Friday... isn\'t there a rule about this?'));
 });
