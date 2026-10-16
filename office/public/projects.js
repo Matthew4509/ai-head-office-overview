@@ -142,8 +142,8 @@
   }
   /** Browser, at the end of the Audit / Git / Live marks: only when the project has a local address. */
   const browserButton = (p) => (p.running || p.commands.some((c) => c.port) ? tileBtn(p, 'browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null);
-  /** The tile's button row: Free port when another program holds its port (or "No start command"), Copy prompt, Folder,
-   * and More (Terminal, Hide, Remove from list). */
+  /** The tile's button row: Free port when another program holds its port (or "No start command"), and More (Copy
+   * prompt, Folder, Terminal, Hide, Remove from list). */
   function actions(p, open) {
     const b = (what, label, title) => tileBtn(p, what, label, title);
     const port = p.portInUse && !p.running ? b('free-port', `Free port ${p.portInUse}`, `Another program holds port ${p.portInUse}: stop it so ${p.name} can run`) : null;
@@ -151,11 +151,11 @@
     const more = el('details', { class: 'more', open: !!open, 'data-id': p.id,
       onkeydown: (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } } },
     el('summary', { class: 'btn small', title: `More for ${p.name}`, 'data-act': 'more', 'data-id': p.id }, 'More'),
-      el('div', { class: 'more-menu' }, b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
+      el('div', { class: 'more-menu' }, b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
+        b('folder', 'Folder', `Open ${p.name}'s folder`), b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
         p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
         b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`)));
-    return el('div', { class: 'row proj-actions' }, port, none, b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
-      b('folder', 'Folder', `Open ${p.name}'s folder`), more);
+    return el('div', { class: 'row proj-actions' }, port, none, more);
   }
   /** On a person's card the same buttons sit in one Actions menu under EDIT: Run or Stop first, then the rest. A choice
    * closes the menu; Escape closes it and goes back to its button. `open`: it was open, so a redraw keeps it open. */

@@ -54,6 +54,11 @@ running).
   **Settings** (the gear).
 - **A room bought** (Staff rewards, or a click on a locked room): the IT tech walks in and unlocks its door, then
   everyone with nothing to do runs in, jumping and spinning, for a few seconds; whoever is busy cheers from their desk.
+- **Furniture bought:** a fitter carries it in and sets it up, and it shows in the room once they have. Several pieces
+  bought together are set up one after another.
+- **Treats** (pizza, donuts, sandwiches, coffee): each order comes in with its own courier, so pizza, donuts and coffee
+  bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something turns to face you
+  and waves a thank-you.
 - **Filter by** (left of the office), with a choice of **Project** or **Working folder**. Project: **All projects**,
   then each project with someone in today and, in words, who is doing what ("1 working · 1 needs you"). Working folder:
   each folder from Settings › Folders with its projects and people today. Click one to see only that.
@@ -65,8 +70,8 @@ running).
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
   beside the port. Under them: its **Audit / Git / Live** marks with **Browser** at their end, then **Free port N** when
-  another program holds its port (it names that program and asks before stopping it), **Copy prompt** (its name and
-  full folder, to paste into the AI you use; the office never starts an AI itself), **Folder**, and **More**:
+  another program holds its port (it names that program and asks before stopping it), and **More**: **Copy prompt**
+  (its name and full folder, to paste into the AI you use; the office never starts an AI itself), **Folder**,
   **Terminal**, **Hide** (stays on the list, out of view until **Show hidden** is ticked) and **Remove from list** (its
   folder and files are never touched; Settings › Folders brings it back).
 - **Favourites** tab: your starred people and projects.

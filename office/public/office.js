@@ -131,7 +131,7 @@
   /** A room still locked (its key not bought yet): its door stays shut with a padlock on it. */
   // A room just bought stays shut (world.unlocking) until the IT tech has walked over and unlocked it.
   const lockedRoom = (r) => !!r.lock && (!!world.rooms.locked?.[r.lock] || world.unlocking === r.lock);
-  const world = { desks: [], deckOrder: [], people: new Map(), staff: [], time: 0, selected: null, seenAt: 0, first: true, grid: [], layout: '', pizzaUntil: 0, pizzaOn: false, food: 'pizza', rooms: EMPTY, roomsKey: '', purse: null, shop: [], recent: [], blocks: FIXED, filter: undefined, unlocking: null, party: null };
+  const world = { desks: [], deckOrder: [], people: new Map(), staff: [], time: 0, selected: null, seenAt: 0, first: true, grid: [], layout: '', table: [], tableAt: 0, fitting: [], serverRooms: null, rooms: EMPTY, roomsKey: '', purse: null, shop: [], recent: [], blocks: FIXED, filter: undefined, unlocking: null, party: null };
   /** The pieces in the way now: the fixed ones and whatever is bought. */
   const blocksOf = () => [...FIXED, ...Object.entries(PIECES).filter(([k]) => (k === 'table' ? world.rooms.boardroom.table : world.rooms.lounge[k])).map(([, b]) => b), ...(world.rooms.lounge.gym ? GYM : []), ...(world.rooms.boardroom.plants ? PLANTS.map((p) => ({ x: p.x - 14, y: p.y - 14, w: 28, h: 28 })) : [])];
   const views = [];
@@ -291,8 +291,8 @@
       const i = world.staff.filter((x) => x.doing === 'resting').findIndex((x) => x.id === s.id);
       return { key: `party:${i}`, x: r.x + 90 + (i % 5) * 90, y: r.y + 110 + (Math.floor(i / 5) % 3) * 70, face: 'south', area: 'party' };
     }
-    // Pizza on the kitchen table: everyone with nothing to do gathers round it (whoever works, works on).
-    if (world.pizzaOn && s.doing === 'resting') {
+    // Food on the kitchen table: everyone with nothing to do gathers round it (whoever works, works on).
+    if (world.table.length && s.doing === 'resting') {
       const i = world.staff.filter((x) => x.doing === 'resting').findIndex((x) => x.id === s.id);
       const [x, y, face] = PIZZA[i % PIZZA.length];
       return { key: `pizza:${i}`, x: x + Math.floor(i / PIZZA.length) * 12, y, face, area: 'kitchen', pizza: true };
@@ -432,6 +432,12 @@
     p.bubble = text;
     p.bubbleUntil = world.time + seconds;
   }
+  /** Seconds a thank-you wave lasts. */
+  const WAVE_SECONDS = 3;
+  /** A thank-you: they turn to face you and wave (once they stand still, if they are walking). */
+  function thank(p, seconds = WAVE_SECONDS) {
+    p.waveUntil = world.time + seconds;
+  }
 
   /** What a person is doing, in the office's words. */
   function doingOf(person) {
@@ -529,6 +535,7 @@
     }
     stepCourier(dt);
     stepTech(dt);
+    stepFitter(dt);
     if (world.party && world.time > world.party.until) {
       world.party = null;
       for (const p of world.people.values()) if (p.target?.area === 'party') p.targetKey = '';
@@ -536,16 +543,28 @@
     for (const [id, p] of world.people) if (p.leaving && p.out) world.people.delete(id);
   }
 
-  // ---- Pizza, donuts and coffee: a delivery comes in by the front door ----
+  // ---- Pizza, donuts, sandwiches and coffee: each order comes in by the front door with its own courier ----
 
-  let courier = null;
+  /** The couriers in the office now, each with their own order (several can be on the way at once). */
+  const couriers = [];
+  /** Orders waiting at the door: the next courier comes in a moment after the last, so they file in one by one. */
   const deliveries = [];
-  const tableBusy = () => world.pizzaOn || deliveries.some((d) => FOOD[d.kind]) || !!FOOD[courier?.job.kind];
+  /** Seconds between two couriers coming in at the door. */
+  const COURIER_GAP = 2.5;
+  let courierAt = -Infinity;
+  let courierN = 0;
+  /** An order of this kind is waiting at the door or being carried in (it is not on the table yet). */
+  const onTheWay = (kind) => deliveries.some((d) => d.kind === kind) || couriers.some((k) => k.job.kind === kind && k.phase === 'coming');
   function orderFood(kind) {
-    if (tableBusy()) return false;
+    if (onTheWay(kind)) return false;
     deliveries.push({ kind });
     wake();
     return true;
+  }
+  /** Which of the foods on the table someone is having (each keeps to one while it is there). */
+  function foodOf(p) {
+    const t = world.table;
+    return t.length ? t[(p.seed ?? 0) % t.length].kind : 'pizza';
   }
   /** Beside the next one on a delivery's list (job.who, from job.at) who is still here, or null. */
   function nextStop(job) {
@@ -578,6 +597,7 @@
         got.sliceUntil = world.time + PIZZA_SECONDS;
         say(got, FOOD[k.job.kind].cheer[got.seed % 3], 3);
       }
+      thank(got);
       k.face = got.x < k.x ? 'west' : 'east';
       say(k, 'Here you go!', 2);
       k.job.at++;
@@ -590,48 +610,63 @@
     return false;
   }
   function startCourier() {
-    while (!courier && deliveries.length) {
+    while (deliveries.length && world.time - courierAt >= COURIER_GAP) {
       const job = deliveries.shift();
       const at = dropOf(job);
       if (!at) continue;
       const food = FOOD[job.kind];
       const coffee = job.kind === 'coffee';
-      const look = L ? { ...L.fromId('courier'), top: food ? 'coral' : 'mint', headwear: 'cap', glasses: 'none' } : null;
-      courier = { id: 'courier', row: { name: food?.courier ?? 'Coffee delivery', doing: 'courier' }, job, x: GONE[0], y: GONE[1], face: 'east', look, seed: 5, phase: 'coming', carry: food ? job.kind : coffee ? 'coffee' : null, bubble: '', bubbleUntil: 0, path: route(GONE[0], GONE[1], at[0], at[1]) };
-      say(courier, food?.called ?? 'Coffee delivery!', 3);
+      const id = `courier:${++courierN}`;
+      const look = L ? { ...L.fromId(id), top: food ? 'coral' : 'mint', headwear: 'cap', glasses: 'none' } : null;
+      const k = { id, delivery: true, row: { name: food?.courier ?? 'Coffee delivery', doing: 'courier' }, job, x: GONE[0], y: GONE[1], face: 'east', look, seed: 5 + courierN, phase: 'coming', carry: food ? job.kind : coffee ? 'coffee' : null, bubble: '', bubbleUntil: 0, path: route(GONE[0], GONE[1], at[0], at[1]) };
+      say(k, food?.called ?? 'Coffee delivery!', 3);
+      couriers.push(k);
+      courierAt = world.time;
     }
+  }
+  /** One courier's step; false once they have gone out of the door. */
+  function stepOne(k, dt) {
+    if (k.path.length && !move(k, dt, HURRY)) return true;
+    if (k.phase === 'coming' && FOOD[k.job.kind]) {
+      // The box goes on the kitchen table, beside any food already there: whoever has finished gathers round it and
+      // waves a thank-you. Everyone still at work (they will not come to the table) is then brought a piece where
+      // they are, so nobody misses out.
+      const kind = k.job.kind;
+      const on = world.table.find((f) => f.kind === kind);
+      if (on) on.until = world.time + PIZZA_SECONDS;
+      else world.table.push({ kind, until: world.time + PIZZA_SECONDS });
+      world.tableAt = world.time;
+      say(k, 'Enjoy!', 2);
+      for (const p of world.people.values()) {
+        if (p.row.doing !== 'resting' || p.out || p.leaving) continue;
+        say(p, FOOD[kind].cheer[p.seed % 3], 3);
+        // Already standing at the table: the wave comes now (the others wave when they get there).
+        if (p.target?.pizza && !p.path.length) {
+          p.thankedAt = world.tableAt;
+          thank(p);
+        }
+      }
+      k.job.who = [...world.people.values()].filter((p) => !p.out && !p.leaving && p.row.doing !== 'resting').map((p) => p.id);
+      k.job.at = 0;
+      k.phase = 'round';
+    }
+    if (k.phase === 'coming' || k.phase === 'round') {
+      // One for each on the list, wherever they are (busy or not); someone who walked off meanwhile is followed.
+      if (handRound(k)) return true;
+      k.phase = 'leaving';
+      k.carry = null;
+      k.path = route(k.x, k.y, GONE[0], GONE[1]);
+      return true;
+    }
+    return false;
   }
   function stepCourier(dt) {
     startCourier();
-    const k = courier;
-    if (k) {
-      if (k.path.length && !move(k, dt, HURRY)) return;
-      if (k.phase === 'coming' && FOOD[k.job.kind]) {
-        // The box goes on the kitchen table: whoever has finished gathers round it. Everyone still at work (they will
-        // not come to the table) is then brought a piece where they are, so nobody misses out.
-        world.pizzaOn = true;
-        world.food = k.job.kind;
-        world.pizzaUntil = world.time + PIZZA_SECONDS;
-        say(k, 'Enjoy!', 2);
-        for (const p of world.people.values()) if (p.row.doing === 'resting') say(p, FOOD[world.food].cheer[p.seed % 3], 3);
-        k.job.who = [...world.people.values()].filter((p) => !p.out && !p.leaving && p.row.doing !== 'resting').map((p) => p.id);
-        k.job.at = 0;
-        k.phase = 'round';
-      }
-      if (k.phase === 'coming' || k.phase === 'round') {
-        // One for each on the list, wherever they are (busy or not); someone who walked off meanwhile is followed.
-        if (handRound(k)) return;
-        k.phase = 'leaving';
-        k.carry = null;
-        k.path = route(k.x, k.y, GONE[0], GONE[1]);
-        return;
-      }
-      courier = null;
-    }
-    if (world.pizzaOn && world.time > world.pizzaUntil) {
-      world.pizzaOn = false;
-      for (const p of world.people.values()) if (p.target?.pizza) p.targetKey = '';
-    }
+    for (let i = couriers.length - 1; i >= 0; i--) if (!stepOne(couriers[i], dt)) couriers.splice(i, 1);
+    // Each food is cleared from the table when it is eaten; once the table is bare the gatherers go back.
+    const had = world.table.length;
+    world.table = world.table.filter((f) => world.time <= f.until);
+    if (had && !world.table.length) for (const p of world.people.values()) if (p.target?.pizza) p.targetKey = '';
   }
 
   // ---- A room bought: the IT tech comes in to unlock it, then everyone free runs in to see it ----
@@ -689,22 +724,109 @@
     }
   }
 
+  // ---- Furniture bought: a fitter carries it in and sets it up; until then it is not in the room ----
+
+  let fitter = null;
+  /** The lounge's resting spots and the piece each needs (as src/shop.mjs roomsOf). */
+  const SPOT_PIECE = { nap: 'armchair', library: 'bookcase', chat: 'sofa', tv: 'tv', treadmill: 'gym', weights: 'gym', arcade: 'arcade' };
+  /** The rooms as the server has them, less the pieces still waiting for the fitter. */
+  function lessFitting(rooms) {
+    if (!world.fitting.length) return rooms;
+    const r = structuredClone(rooms);
+    for (const id of world.fitting) {
+      if (id === 'chairs') r.boardroom.chairs = Math.max(0, r.boardroom.chairs - 2);
+      else if (id in r.boardroom) r.boardroom[id] = false;
+      else if (id in r.lounge) r.lounge[id] = false;
+      else if (id === 'deckchair') r.deckchairs = Math.max(0, r.deckchairs - 1);
+      else if (id === 'volleyball') r.volleyball = false;
+    }
+    const has = (spot) => !SPOT_PIECE[spot] || r.lounge[SPOT_PIECE[spot]];
+    r.rest = r.rest.filter(has);
+    r.away = r.away.filter(has);
+    if (!r.away.length) r.away = ['window'];
+    return r;
+  }
+  /** Where the fitter stands to set a piece up (beside where it goes). */
+  function fitSpot(id) {
+    const spots = {
+      table: [905, 300], chairs: [905, 300], whiteboard: [1090, 185], plants: [705, 85],
+      armchair: [765, 660], bookcase: [735, 545], sofa: [1020, 645], tv: [1030, 575], gym: [860, 625], arcade: [1095, 540],
+      deckchair: [(DECK[Math.min(world.rooms.deckchairs, DECK.length - 1)] ?? DECK[0])[0], 826], volleyball: [NET.x - 25, 866],
+    };
+    return spots[id] ?? [905, 610];
+  }
+  /** A piece of furniture bought: held out of the room until the fitter has set it up. */
+  function callFitter(id) {
+    world.fitting.push(id);
+    if (fitter) return;
+    const look = L ? { ...L.fromId('fitter'), top: 'mustard', headwear: 'cap', glasses: 'none' } : null;
+    const [x, y] = fitSpot(id);
+    fitter = { id: 'fitter', row: { name: 'Fitter', doing: 'courier' }, x: GONE[0], y: GONE[1], face: 'east', look, seed: 9, phase: 'coming', carry: 'parcel', bubble: '', bubbleUntil: 0, path: route(GONE[0], GONE[1], x, y) };
+    say(fitter, 'Delivery for the office!', 3);
+    wake();
+  }
+  function stepFitter(dt) {
+    const k = fitter;
+    if (!k) return;
+    if (k.path.length && !move(k, dt, HURRY)) return;
+    if (k.phase === 'coming') {
+      k.phase = 'working';
+      k.carry = null;
+      k.doneAt = world.time + 3;
+      say(k, 'Setting it up…', 3);
+      return;
+    }
+    if (k.phase === 'working') {
+      if (world.time < k.doneAt) return;
+      // In place: the piece shows, and everyone cheers and waves a thank-you (whoever was resting tries it out).
+      world.fitting.shift();
+      applyRooms(lessFitting(world.serverRooms ?? world.rooms));
+      say(k, 'All set!', 2);
+      for (const p of world.people.values()) {
+        if (p.leaving || p.out) continue;
+        say(p, ['New furniture!', 'Nice!', 'Very smart!'][p.seed % 3], 4);
+        thank(p);
+        if (p.target?.rest) p.restUntil = 0;
+      }
+      if (world.fitting.length) {
+        const [x, y] = fitSpot(world.fitting[0]);
+        k.phase = 'coming';
+        k.carry = 'parcel';
+        k.path = route(k.x, k.y, x, y);
+      } else {
+        k.phase = 'leaving';
+        k.path = route(k.x, k.y, GONE[0], GONE[1]);
+      }
+      return;
+    }
+    fitter = null;
+  }
+  /** A cardboard box, carried in by the fitter. */
+  function parcel(c, p) {
+    const dx = p.face === 'west' ? -14 : p.face === 'east' ? 14 : 0;
+    box(c, p.x + dx - 12, p.y - 6, 24, 18, 2, '#c99a62', INK, 1.5);
+    line(c, p.x + dx - 12, p.y + 1, p.x + dx + 12, p.y + 1, '#a87a46', 2);
+  }
+
   // ---- The shop's answer: the purse, the items, and what the rooms offer ----
 
+  /** What the rooms have changed: the walls and furniture are drawn again, and everyone picks where to go afresh. */
+  function applyRooms(rooms) {
+    const key = JSON.stringify(rooms);
+    if (key === world.roomsKey) return;
+    world.rooms = rooms;
+    world.roomsKey = key;
+    world.blocks = blocksOf();
+    background = null;
+    regrid();
+    for (const p of world.people.values()) if (!p.leaving) p.targetKey = '';
+  }
   function officeData(shop) {
     world.purse = shop.purse ?? null;
     world.shop = shop.items ?? [];
     world.recent = Array.isArray(shop.recent) ? shop.recent : [];
-    const rooms = shop.rooms ?? world.rooms;
-    const key = JSON.stringify(rooms);
-    if (key !== world.roomsKey) {
-      world.rooms = rooms;
-      world.roomsKey = key;
-      world.blocks = blocksOf();
-      background = null;
-      regrid();
-      for (const p of world.people.values()) if (!p.leaving) p.targetKey = '';
-    }
+    if (shop.rooms) world.serverRooms = shop.rooms;
+    applyRooms(world.serverRooms ? lessFitting(world.serverRooms) : world.rooms);
     // While the shop is open, rebuilding the tiles under the pointer loses the click: they are drawn again only when
     // what they say changes (the list arrives after the tab was opened, something was bought, or "more to go" moved).
     const left = world.purse?.left ?? 0;
@@ -722,7 +844,7 @@
     const still = !p.path.length;
     if (p.coffee === 'have' && world.time < p.coffeeUntil) items.push('a coffee (your treat)');
     if (p.slice && world.time < p.sliceUntil) items.push(`${FOOD[p.slice].holding}, brought over (your treat)`);
-    else if (p.target?.pizza && still) items.push(FOOD[world.food].holding);
+    else if (p.target?.pizza && still) items.push(FOOD[foodOf(p)].holding);
     else if (p.target?.rest?.id === 'weights' && still) items.push('a pair of dumbbells');
     else if (p.target?.rest?.id === 'treadmill' && still) items.push('a water bottle');
     else if (p.target?.rest?.id === 'coffee' && still) items.push('a mug of coffee');
@@ -737,6 +859,11 @@
   }
   function arrived(p) {
     p.face = p.target?.face ?? 'south';
+    // At the kitchen table for food that came since they last said thanks: a wave to you first.
+    if (p.target?.pizza && p.thankedAt !== world.tableAt) {
+      p.thankedAt = world.tableAt;
+      thank(p);
+    }
     if (p.targetKey === 'gone') p.out = true;
     if (p.target?.area === 'volley' && !p.volleyUntil) p.volleyUntil = world.time + VOLLEY_GAME + Math.random() * VOLLEY_GAME;
   }
@@ -745,7 +872,7 @@
   function wordsOf(p) {
     const s = p.row;
     const t = p.target;
-    if (t?.pizza) return p.path.length ? FOOD[world.food].going : FOOD[world.food].having;
+    if (t?.pizza) return p.path.length ? FOOD[foodOf(p)].going : FOOD[foodOf(p)].having;
     if (t?.helping) {
       const lead = thinkersNow()[0]?.name ?? 'someone';
       return p.path.length ? `Off to the meeting room to help ${lead} think` : `Helping ${lead} think`;
@@ -1198,14 +1325,17 @@
   }
 
   function drawPeople(c, full) {
-    const list = [...world.people.values(), ...(courier ? [courier] : []), ...(tech ? [tech] : [])].filter((p) => !p.out || p.path.length).sort((a, b) => a.y - b.y);
+    const list = [...world.people.values(), ...couriers, ...(tech ? [tech] : []), ...(fitter ? [fitter] : [])].filter((p) => !p.out || p.path.length).sort((a, b) => a.y - b.y);
     const size = labelSize(c);
     for (const p of list) {
       const walk = p.path.length > 0;
       const y = p.y;
       if (world.selected === p.id) oval(c, p.x, p.y + 12, 22, 11, '#f8d878', null);
       const look = p.look ?? (L ? L.fromId(p.id) : null);
-      if (look && !walk && p.target?.area === 'party') {
+      if (look && !walk && p.waveUntil > world.time) {
+        // A thank-you for a treat: turned to face you, waving.
+        L.sprite(c, look, p.x, y, 'south', { time: world.time, seed: p.seed % 10, wave: true });
+      } else if (look && !walk && p.target?.area === 'party') {
         // In a room just opened: jumping, and every other one spinning round as they jump.
         const spin = ['south', 'east', 'north', 'west'][Math.floor(world.time * 4 + p.seed) % 4];
         L.sprite(c, look, p.x, y - Math.abs(Math.sin(world.time * 7 + p.seed)) * 12, p.seed % 2 ? spin : 'south', { walk: true, time: world.time, seed: p.seed % 10 });
@@ -1216,6 +1346,7 @@
       else oval(c, p.x, y, 14, 18, PALETTE[p.seed % 6]);
       if (p.carry === 'coffee') coffeeTray(c, { ...p, y });
       else if (FOOD[p.carry]) pizzaBox(c, { ...p, y }, p.carry);
+      else if (p.carry === 'parcel') parcel(c, { ...p, y });
       else if (p.coffee === 'have' && world.time < p.coffeeUntil) coffeeHeld(c, { ...p, y });
       else if (breakOf(p) && !walk) drinkHeld(c, { ...p, y });
       if (p.slice && world.time < p.sliceUntil && !p.carry) sliceHeld(c, { ...p, y }, p.slice);
@@ -1235,12 +1366,12 @@
         c.stroke();
       }
       // Every name is shown (the nicknames are the point); at a shared desk they are cut to fit the chair.
-      if (full && p.id !== 'courier') {
+      if (full && !p.delivery) {
         const seats = p.target?.desk?.seats.length ?? 1;
         // On a towel the rows are staggered: a name is cut to its own towel's width.
         const max = p.target?.area === 'desk' || p.target?.area === 'needs' ? Math.max(48, 150 / seats) : p.target?.area === 'towel' ? 80 : 140;
         text(c, fitText(c, p.row.name, max, size * 0.85), p.x, y + 28, size * 0.85, floorInk(), 'center');
-      } else if (full && p.id === 'courier' && walk) text(c, p.row.name, p.x, y + 32, size * 0.92, night ? '#aab6c4' : '#56677b', 'center');
+      } else if (full && p.delivery && walk) text(c, p.row.name, p.x, y + 32, size * 0.92, night ? '#aab6c4' : '#56677b', 'center');
     }
   }
 
@@ -1304,17 +1435,27 @@
     if (full && !world.people.size) text(c, 'Nobody in yet: start a thread in Claude and they come in.', 290, 200, labelSize(c), floorSoft(), 'center');
     drawDesks(c, full);
     for (const p of world.people.values()) if (p.target?.area === 'towel' && !p.path.length && !p.leaving) towel(c, p.target.x, p.target.y, p.seed);
-    if (world.pizzaOn && world.food === 'donuts') {
-      box(c, 268, 603, 70, 38, 4, '#ffe3ef', INK, 2);
-      for (let i = 0; i < 6; i++) donut(c, 281 + (i % 3) * 22, 613 + Math.floor(i / 3) * 18, 7, PALETTE[i % 6]);
-    } else if (world.pizzaOn && world.food === 'sandwiches') {
-      box(c, 262, 603, 82, 38, 6, '#f6f1e6', INK, 2);
-      for (let i = 0; i < 4; i++) sandwich(c, 277 + i * 18, 623, 8);
-    } else if (world.pizzaOn) {
-      box(c, 268, 603, 70, 38, 4, '#fff6e4', INK, 2);
-      oval(c, 303, 622, 26, 14, '#f2bc66');
-      for (let i = 0; i < 6; i++) oval(c, 285 + i * 7, 618 + (i % 2) * 7, 3, 3, '#dc776e', null);
-    }
+    // The food on the kitchen table: one box in the middle, or two or three side by side (smaller, to fit the table).
+    const SPOTS = [[[305, 1]], [[268, 0.9], [342, 0.9]], [[257, 0.66], [305, 0.66], [353, 0.66]]][Math.min(world.table.length, 3) - 1] ?? [];
+    world.table.slice(0, 3).forEach((f, i) => {
+      const [cx, s] = SPOTS[i];
+      c.save();
+      c.translate(cx, 622);
+      c.scale(s, s);
+      c.translate(-303, -622);
+      if (f.kind === 'donuts') {
+        box(c, 268, 603, 70, 38, 4, '#ffe3ef', INK, 2);
+        for (let j = 0; j < 6; j++) donut(c, 281 + (j % 3) * 22, 613 + Math.floor(j / 3) * 18, 7, PALETTE[j % 6]);
+      } else if (f.kind === 'sandwiches') {
+        box(c, 262, 603, 82, 38, 6, '#f6f1e6', INK, 2);
+        for (let j = 0; j < 4; j++) sandwich(c, 277 + j * 18, 623, 8);
+      } else {
+        box(c, 268, 603, 70, 38, 4, '#fff6e4', INK, 2);
+        oval(c, 303, 622, 26, 14, '#f2bc66');
+        for (let j = 0; j < 6; j++) oval(c, 285 + j * 7, 618 + (j % 2) * 7, 3, 3, '#dc776e', null);
+      }
+      c.restore();
+    });
     if (world.rooms.boardroom.whiteboard && thinkersNow().length) for (let i = 0; i < 4; i++) line(c, 1122, 140 + i * 23, 1122 + 16 * ((Math.sin(world.time + i) + 1) / 2) + 2, 140 + i * 23, PALETTE[i], 4);
     if (world.rooms.lounge.arcade && [...world.people.values()].some((p) => p.target?.rest?.id === 'arcade' && !p.path.length)) {
       // Someone is playing: the screen flickers.
@@ -1611,18 +1752,20 @@
   const present = () => [...world.people.values()].filter((p) => !p.out && !p.leaving);
   function buyPizza() {
     if (!present().length) return (shopSaid.textContent = 'Nobody is in the office to buy for: start a thread in Claude first.');
-    if (!orderFood('pizza')) return (shopSaid.textContent = 'Food is on the table, or on its way: order again once it is eaten.');
+    if (!orderFood('pizza')) return (shopSaid.textContent = 'A pizza is on its way already: order another once it is on the table.');
     shopSaid.textContent = 'Pizza ordered (free).';
   }
   async function buyItem(item, button) {
     if (item.room === 'treats' && !present().length) return (shopSaid.textContent = 'Nobody is in the office to buy for: start a thread in Claude first.');
-    if (FOOD[item.id] && tableBusy()) return (shopSaid.textContent = 'Food is on the table, or on its way: buy more once it is eaten.');
-    if (item.id === 'coffee' && (courier?.job.kind === 'coffee' || deliveries.some((d) => d.kind === 'coffee'))) return (shopSaid.textContent = 'A coffee delivery is on its way already: buy another once it has been round.');
+    if (FOOD[item.id] && onTheWay(item.id)) return (shopSaid.textContent = `${SHOP_WORDS[item.id]?.label ?? item.name} are on their way already: buy more once they are on the table.`);
+    if (item.id === 'coffee' && onTheWay('coffee')) return (shopSaid.textContent = 'A coffee delivery is on its way already: buy another once it has been round.');
     button.disabled = true;
     try {
       const d = await window.aiOffice.api('/api/buy', { item: item.id });
       // A room key: the room stays shut until the IT tech has walked over and unlocked it (callTech, then openRoom).
       if (item.unlocks) callTech(item.unlocks);
+      // Furniture: it shows once the fitter has carried it in and set it up (callFitter, then stepFitter).
+      else if (item.keeps) callFitter(item.id);
       officeData(d.shop);
       drawShop();
       // One short line: the purse line above says what is left, and Recent purchases keeps the record.
@@ -1638,14 +1781,14 @@
           v.told = '';
           tell(v);
         }
-        for (const p of present()) say(p, ['Thanks, boss!', 'A new room!', 'Ooh!'][p.seed % 3], 3);
+        for (const p of present()) {
+          say(p, ['Thanks, boss!', 'A new room!', 'Ooh!'][p.seed % 3], 3);
+          thank(p);
+        }
         shopSaid.textContent = `${item.unlocks === 'lounge' ? 'The lounge' : 'The meeting room'} is bought (${big(item.price)} tokens): the IT tech is on the way to unlock it. Then furnish it from the list below.`;
       } else {
-        for (const p of present()) {
-          say(p, ['New furniture!', 'Nice!', 'Very smart!'][p.seed % 3], 4);
-          if (p.target?.rest) p.restUntil = 0;
-        }
-        shopSaid.textContent = `${item.name} bought (${big(item.price)} tokens).`;
+        for (const p of present()) say(p, ['Thanks, boss!', 'Ooh, what is it?', 'Nice!'][p.seed % 3], 3);
+        shopSaid.textContent = `${item.name} bought (${big(item.price)} tokens): the fitter is bringing it in.`;
       }
       wake();
     } catch (e) {
