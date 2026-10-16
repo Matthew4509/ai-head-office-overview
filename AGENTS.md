@@ -35,7 +35,7 @@ Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Nod
    app itself), or `node server.js` in a terminal that stays open. Then `node server.js --status` must exit 0 and
    print that it is running; the page is http://127.0.0.1:8880/. The first start reads every transcript once (up to a
    minute); the page says "Loading" meanwhile, and shows a Welcome window the user answers.
-7. Tell the user: Settings (top right) has Folders (add their projects folder if the list is empty), Setup (shortcuts,
+7. Tell the user: Settings (the gear, top right) has Folders (add their projects folder if the list is empty), Setup (shortcuts,
    and advanced setup for hooks: see below), Help and About (Quit, Uninstall).
 
 ## Update it (pull)
@@ -85,7 +85,7 @@ Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Nod
   gets a message, waits for permission, or finishes a reply.
 
 ## Turning on advanced setup: the preferred way
-Ask the user to open the office, press **Settings**, then **Setup**, then **Turn on advanced setup**. That button does
+Ask the user to open the office, press **Settings** (the gear, top right), then **Setup**, then **Turn on advanced setup**. That button does
 everything below safely:
 - it saves a copy of the settings file first;
 - it keeps every hook already there and adds only its own three;

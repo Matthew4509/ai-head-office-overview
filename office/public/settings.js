@@ -190,7 +190,7 @@
         'Staff rewards: every token written since the office opened goes into a purse to spend on the office.'),
       h3('Projects'),
       li('The Projects tab has a tile per project with its staff, its Audit, Git and Live marks, and Run (starts its own dev server, from its .claude/launch.json or project.json, and opens it), Stop, Folder, Terminal and Browser.',
-        'The Running strip lists every local copy the office started, with Open, Stop and Stop all.',
+        'N projects open (top line) › View all lists every local copy the office started, with Open, Stop and Stop all.',
         'Needs attention: threads waiting for an answer, then projects: a live site down, Critical or High audit findings, git waiting for a save or push. Click a row to open it.'),
       h3('Audit, Git and Live'),
       li('Audit checks the code (and the running copy and live site, when there are) against about 130 rules: keys, injection, sign-in and payment gaps, uploads, exposed files, trackers, private details. It catches common faults, not everything. Not a fault… sets one place aside with your reason; Review with AI… builds a prompt to paste into the AI you use.',

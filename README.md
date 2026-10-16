@@ -11,7 +11,7 @@ It runs only on your PC. It reads the AI app's transcripts already on your PC an
 only requests that leave your PC are plain page requests to the live addresses you add (and, only if you turn it on,
 a daily check with GitHub for the newest Git version).
 
-![The office with its staff, the Running strip and Needs attention](screenshots/office.png)
+![The office with its staff and Needs attention](screenshots/office.png)
 
 Using an AI helper to install, review or update it? **[AGENTS.md](AGENTS.md)** has the steps it should follow,
 including how to see what an update changes before pulling it.
@@ -47,15 +47,23 @@ running).
 
 ## The window
 
-- **Top:** the purse (tokens to spend on Staff rewards) and **Settings**. Under it, a chip per project with someone in
-  today (click one to see only that project), then the **Running** strip: every local copy the office started, with
-  **Open**, **Stop** and **Stop all**.
+- **Top line:** the name, then **This PC** as rings (CPU, memory, disk and graphics card, each its share with the
+  number inside; point at one for the details, at the PC name for its model, cores and time switched on), then
+  **N projects open · View all** (a window with every local copy the office started: its address, **Open** and
+  **Stop**, and **Stop all**); on the right, **Spending balance** (the tokens to spend on Staff rewards) and
+  **Settings** (the gear).
+- **A room bought** (Staff rewards, or a click on a locked room): the IT tech walks in and unlocks its door, then
+  everyone with nothing to do runs in, jumping and spinning, for a few seconds; whoever is busy cheers from their desk.
+- **Filter by** (left of the office), with a choice of **Project** or **Working folder**. Project: **All projects**,
+  then each project with someone in today and, in words, who is doing what ("1 working · 1 needs you"). Working folder:
+  each folder from Settings › Folders with its projects and people today. Click one to see only that.
 - **Office** tab: the office seen from above. Each thread is a person at their project's desk (the project folder they
   write files in, or the one their first message says START HERE in); a thread that works in two or more projects is
   a **Consultant** at the projects folder's own desk. Working is at the desk; a thread that stopped to ask you
   something stands with a "?"; a long think goes to the meeting room once it has one; after an hour with nothing
   happening they go home. Favourites wait on a beach towel. Click anyone for their card.
-- **Projects** tab: a tile per project with its staff as faces, its **Audit / Git / Live** marks, and **Run** (starts
+- **Projects** tab: a tile per project with a star after its name (click to make it a favourite project), its staff as
+  faces, its **Audit / Git / Live** marks, and **Run** (starts
   the project's own dev server and opens it) or **Stop**, **Copy prompt** (its name and full folder, to paste into the
   AI you use; the office never starts an AI itself), **Folder**, **Terminal**, **Browser**, **Free port N** when another
   program holds its port (it names that program and asks before stopping it), and **More**: **Hide** (stays on the
@@ -66,11 +74,14 @@ running).
   **Remove**; **New category**, **Add prompt**, **Rename** and **Delete category**; search across them all. Words in
   [brackets] are yours to fill in.
 - **Right panel:** **Needs attention** (threads with a question first, then projects: a live site down, Critical or
-  High audit findings, git waiting for a save or push; click a row to open it), **Staff rewards** (spend the purse:
-  coffee, plants, furniture, room keys) and **This PC** (processor, memory, disk, graphics card).
-- **A person's card:** what they are doing now, their last messages and steps, tokens today and in all, **Open** in the
-  AI desktop app when it has a record of the thread, **EDIT** (their name and look; both belong to the seat, so the next
-  thread at that desk is the same person), **Favourite**, and their project's marks and buttons.
+  High audit findings, git waiting for a save or push; click a row to open it) and **Staff rewards** (spend the purse:
+  coffee, plants, furniture, room keys).
+- **A person's card:** a star beside their name and one on their project's heading (click to make them, or the whole
+  project, a favourite; point at a star to read what that does), **EDIT** (their name and look; both belong to the
+  seat, so the next thread at that desk is the same person) and under it **Actions** (Run or Stop, Copy prompt, Folder,
+  Terminal, Browser, Hide, Remove from list), what they are doing now, **Earnings** (helpers and tokens today, since
+  the office opened and in all; click to fold it open), their last messages and steps, **Open** in the AI desktop app
+  when it has a record of the thread, and their project's marks.
 
 ![The Projects tab](screenshots/projects.png)
 

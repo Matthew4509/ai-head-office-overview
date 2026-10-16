@@ -25,6 +25,8 @@
     box.querySelector('button, textarea, input')?.focus();
   }
   function close() { sheet.hidden = true; sheet.replaceChildren(); }
+  app.openWindow = open;
+  app.closeWindow = close;
   const btn = (label, onclick, primary = false, extra = {}) => el('button', { type: 'button', class: `btn${primary ? ' primary' : ''}`, onclick, ...extra }, label);
   const closeBtn = () => btn('Close', close, true);
   const said = () => el('p', { class: 'note check-said', role: 'status' });
@@ -256,7 +258,8 @@
     const items = [];
     for (const p of eng.projects) {
       if (p.hiddenView) continue;
-      if (folder !== null && folderOf[p.id] !== folder) continue;
+      // folder: one desk's folder, null for all, or a test (Filter by working folder) given the desk folder and the project.
+      if (typeof folder === 'function' ? !folder(folderOf[p.id], p) : folder !== null && folderOf[p.id] !== folder) continue;
       if (p.liveUrl && p.live?.state === 'down') items.push({ kind: 'live', cls: 'm-bad', title: `✕ Live site down · ${p.name}`, sub: `${hostOf(p.liveUrl)}: ${p.live.reason}`, open: () => liveWindow(p.id), rank: 0 });
       const c = p.audit?.counts || {};
       if (c.Critical || c.High) items.push({ kind: 'audit', cls: 'm-bad', title: `▲ Audit · ${p.name}`, sub: `${[c.Critical && `${c.Critical} Critical`, c.High && `${c.High} High`].filter(Boolean).join(', ')}, from the audit ${when(p.audit.ranAt)}`, open: () => auditWindow(p.id), rank: 1 });

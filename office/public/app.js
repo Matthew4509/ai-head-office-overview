@@ -1,5 +1,5 @@
 // AI Head Office Overview page: asks the office (/api/office/state) for everyone every 3 seconds and draws the projects strip,
-// the right panel's tabs (Needs attention, Staff rewards, This PC) and a person's card. The office drawing itself is
+// the right panel's tabs (Needs attention, Staff rewards) and a person's card. The office drawing itself is
 // office.js (window.officeView); the Projects tab, Run / Stop and the Running strip are projects.js.
 'use strict';
 
@@ -107,38 +107,87 @@
   }
   app.api = api;
 
+  // What is shown: everyone, one project (app.project, a desk's folder) or every project in one working folder
+  // (app.folder, a path from Settings › Folders). app.filterBy says which list Filter by shows.
+  app.filterBy = 'project';
+  app.folder = null;
+  try { if (localStorage.getItem('aho-filter-by') === 'folder') app.filterBy = 'folder'; } catch { /* fine */ }
+  const sameFolder = (a, b) => !!a && !!b && a.replace(/[\\/]+$/, '').toLowerCase() === b.replace(/[\\/]+$/, '').toLowerCase();
+  /** Is a desk's folder (and its project, when known) in what is shown? */
+  function inFilter(folder, project) {
+    if (app.folder !== null) return sameFolder(project ? project.workingFolder : app.workingFolderOf?.(folder), app.folder);
+    return app.project === null || folder === app.project;
+  }
+  app.inFilter = inFilter;
+  app.filterKey = () => `${app.project ?? ''}|${app.folder ?? ''}`;
+
   function people() {
     const all = app.data?.people || [];
     const today = new Set((app.data?.projects || []).flatMap((pr) => pr.people));
-    return all.filter((p) => (app.project === null || p.folder === app.project) && (app.showAll || today.has(p.key) || p.state !== 'home'));
+    return all.filter((p) => inFilter(p.folder) && (app.showAll || today.has(p.key) || p.state !== 'home'));
   }
   app.visiblePeople = people;
-  /** Everyone the office draws: the people above, and the favourites who have gone home (not hidden), in the project picked. */
+  /** Everyone the office draws: the people above, and the favourites who have gone home (not hidden), in what is shown. */
   function officePeople() {
     const ps = people();
     const have = new Set(ps.map((p) => p.key));
-    const favs = (app.data?.people || []).filter((p) => p.fav && !p.favHidden && !have.has(p.key) && (app.project === null || p.folder === app.project));
+    const favs = (app.data?.people || []).filter((p) => p.fav && !p.favHidden && !have.has(p.key) && inFilter(p.folder));
     return [...ps, ...favs];
   }
 
+  /** Filter by, down the left of the office: a choice of Project or Working folder, then the list for it. Projects: All
+   * projects, then each project with someone in today and who is doing what in words ("1 working · 1 needs you").
+   * Working folders: All folders, then each folder from Settings › Folders with its projects and people today. */
   function drawProjects() {
     const nav = document.getElementById('projects');
     const prs = app.data.projects;
-    const all = el('button', { type: 'button', class: 'chip', 'aria-pressed': String(app.project === null), onclick: () => pickProject(null) }, `All projects (${prs.length})`);
-    const chips = prs.map((pr) => el('button', {
-      type: 'button',
-      class: 'chip',
-      'aria-pressed': String(app.project === pr.folder),
-      title: `${projectName(pr.folder)}: ${pr.people.length} ${pr.people.length === 1 ? 'person' : 'people'}`,
-      onclick: () => pickProject(pr.folder),
-    }, el('b', { text: projectName(pr.folder) }), el('span', { class: 'counts' },
-      ...ORDER.filter((s) => pr[s]).map((s) => el('span', { class: `count state-${s}`, title: `${pr[s]} ${STATES[s].word.toLowerCase()}` }, `${STATES[s].icon}${pr[s]}`)))));
-    swap(nav, all, ...chips, prs.length ? null : el('span', { class: 'empty', text: 'No threads today yet.' }));
+    const row = (on, pick, name, sub, title) => el('li', {}, el('button', { type: 'button', class: 'filter-item', 'aria-pressed': String(on), title, onclick: pick },
+      el('span', { class: 'filter-name', text: name }), sub ? el('span', { class: 'filter-sub' }, sub) : null));
+    const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+    const says = (pr) => ORDER.filter((s) => pr[s]).map((s) => el('span', { class: `state-${s}` }, `${pr[s]} ${STATES[s].word.toLowerCase()}`)).flatMap((x, i) => (i ? [' · ', x] : [x]));
+    const peopleIn = (list) => list.reduce((k, pr) => k + pr.people.length, 0);
+    const choose = el('select', { id: 'filter-by', class: 'filter-by', 'aria-label': 'Filter by', onchange: (e) => setFilterBy(e.target.value) },
+      el('option', { value: 'project', selected: app.filterBy === 'project' }, 'Project'),
+      el('option', { value: 'folder', selected: app.filterBy === 'folder' }, 'Working folder'));
+    let items;
+    if (app.filterBy === 'folder') {
+      const folders = app.workingFolders?.() || [];
+      const deskIn = (f) => prs.filter((pr) => sameFolder(app.workingFolderOf?.(pr.folder), f));
+      items = [row(app.folder === null, () => pickFolder(null), 'All folders', `${n(folders.length, 'working folder', 'working folders')} · ${n(peopleIn(prs), 'person', 'people')}`, 'Show everyone in every working folder'),
+        ...folders.map((f) => {
+          const name = f.split(/[\\/]/).filter(Boolean).pop() || f;
+          const desks = deskIn(f);
+          return row(sameFolder(app.folder, f), () => pickFolder(f), name, `${n(desks.length, 'project', 'projects')} in today · ${n(peopleIn(desks), 'person', 'people')}`, `Show only the projects in ${f}`);
+        })];
+    } else {
+      items = [row(app.project === null, () => pickProject(null), 'All projects', `${n(prs.length, 'project', 'projects')} · ${n(peopleIn(prs), 'person', 'people')}`, 'Show everyone in every project'),
+        ...prs.map((pr) => row(app.project === pr.folder, () => pickProject(pr.folder), projectName(pr.folder), says(pr), `Show only ${projectName(pr.folder)}: ${n(pr.people.length, 'person', 'people')}`))];
+    }
+    swap(nav, el('div', { class: 'filter-head' }, el('h2', { id: 'filter-title', text: 'Filter by' }), choose),
+      el('ul', { class: 'filter-list' }, ...items),
+      prs.length ? null : el('p', { class: 'empty', text: 'No threads today yet.' }));
   }
 
+  /** Project or Working folder: switching shows everyone again, then the new list to pick from. */
+  function setFilterBy(by) {
+    app.filterBy = by === 'folder' ? 'folder' : 'project';
+    try { localStorage.setItem('aho-filter-by', app.filterBy); } catch { /* fine */ }
+    app.project = null;
+    app.folder = null;
+    draw();
+    document.getElementById('filter-by')?.focus();
+  }
   app.pickProject = (folder) => pickProject(folder);
   function pickProject(folder) {
     app.project = folder;
+    app.folder = null;
+    // A desk clicked in the office while the list shows working folders: the list turns to projects, to show which.
+    if (folder !== null && app.filterBy !== 'project') { app.filterBy = 'project'; try { localStorage.setItem('aho-filter-by', 'project'); } catch { /* fine */ } }
+    draw();
+  }
+  function pickFolder(path) {
+    app.folder = path;
+    app.project = null;
     draw();
   }
 
@@ -169,9 +218,9 @@
 
   }
 
-  const TABS = { needs: 'Needs attention', rewards: 'Staff rewards', pc: 'This PC' };
+  const TABS = { needs: 'Needs attention', rewards: 'Staff rewards' };
   app.sideTab = 'needs';
-  try { const s = localStorage.getItem('aho-side'); if (s === 'rewards' || s === 'pc') app.sideTab = s; } catch { /* fine */ }
+  try { const s = localStorage.getItem('aho-side'); if (s === 'rewards') app.sideTab = s; } catch { /* fine */ }
 
   /** The right panel: its two tabs, or a person's card (or their nickname box) in their place. */
   function drawSide() {
@@ -180,20 +229,17 @@
     document.getElementById('side-card').hidden = !showCard;
     const needsPane = document.getElementById('side-needs');
     const rewardsPane = document.getElementById('side-rewards');
-    const pcPane = document.getElementById('side-pc');
     const wasHidden = rewardsPane.hidden;
     needsPane.hidden = showCard || app.sideTab !== 'needs';
     rewardsPane.hidden = showCard || app.sideTab !== 'rewards';
-    pcPane.hidden = showCard || app.sideTab !== 'pc';
     for (const [id, word] of Object.entries(TABS)) {
       const b = document.getElementById(`tab-${id}`);
       b.setAttribute('aria-selected', String(app.sideTab === id));
-      const label = id === 'needs' ? `${word} (${waitingList().length + (app.moreWaiting?.(app.project) || []).length})` : word;
+      const label = id === 'needs' ? `${word} (${waitingList().length + (app.moreWaiting?.(inFilter) || []).length})` : word;
       if (b.textContent !== label) b.textContent = label;
     }
     if (showCard) return;
     if (app.sideTab === 'needs') drawWaiting();
-    else if (app.sideTab === 'pc') app.drawPC?.(pcPane);
     // Staff rewards is drawn when it is opened (and after a purchase); while open only its purse line changes.
     else if (wasHidden || !rewardsPane.childElementCount) window.officeView?.rewards?.(rewardsPane);
   }
@@ -208,10 +254,9 @@
   app.showTab = showTab;
   document.getElementById('tab-needs').addEventListener('click', () => showTab('needs'));
   document.getElementById('tab-rewards').addEventListener('click', () => showTab('rewards'));
-  document.getElementById('tab-pc').addEventListener('click', () => showTab('pc'));
   document.getElementById('purse').addEventListener('click', () => showTab('rewards'));
 
-  const waitingList = () => (app.data?.waiting || []).filter((w) => app.project === null || w.folder === app.project);
+  const waitingList = () => (app.data?.waiting || []).filter((w) => inFilter(w.folder));
 
   /**
    * Favourites: each project with a favourite, its name as a subtitle and its favourite staff in a row. A favourite who
@@ -254,8 +299,8 @@
       el('q', { text: w.asked }))));
     // One list: threads waiting for an answer first, then projects waiting (live site down, High findings, git to save or push).
     // Each row opens its window; the row is found again by its place in the list at click time.
-    const more = app.moreWaiting?.(app.project) || [];
-    const moreItems = more.map((m, i) => el('li', {}, el('button', { type: 'button', class: `wait wait-${m.kind}`, 'data-i': String(i), onclick: () => (app.moreWaiting?.(app.project) || [])[i]?.open() },
+    const more = app.moreWaiting?.(inFilter) || [];
+    const moreItems = more.map((m, i) => el('li', {}, el('button', { type: 'button', class: `wait wait-${m.kind}`, 'data-i': String(i), onclick: () => (app.moreWaiting?.(inFilter) || [])[i]?.open() },
       el('b', { class: m.cls, text: m.title }), el('span', { class: 'meta', text: m.sub }))));
     swap(pane, items.length ? el('ul', { class: 'waiting' }, items) : el('p', { class: 'empty', text: 'Nobody is waiting for an answer.' }),
       moreItems.length ? el('h3', { text: 'Projects' }) : null, moreItems.length ? el('ul', { class: 'waiting' }, moreItems) : null);
@@ -269,12 +314,18 @@
     const waiting = (app.data.waiting || []).find((w) => w.person === p.key);
     const dl = el('dl', {},
       el('dt', { text: 'Now' }), el('dd', {}, stateTag(p.state), p.state === 'home' ? '' : ` ${p.words}`, p.since ? el('span', { class: 'note' }, ` · for ${lasted(p.since)}`) : ''),
-      el('dt', { text: 'Thread' }), el('dd', { text: t ? t.title : (p.lastAt ? `None open; last seen ${ago(Date.parse(p.lastAt))}` : 'None yet') }),
-      el('dt', { text: 'Helpers' }), el('dd', { text: t ? String(t.helpers || 0) : '0' }),
-      el('dt', { text: 'Today' }), el('dd', { text: `${tokens(p.today)} tokens written` }),
-      el('dt', { text: 'Earned' }), el('dd', { text: `${tokens(p.outSince)} tokens since the office opened (they go into the Staff rewards purse)` }),
-      el('dt', { text: 'Before' }), el('dd', { text: `${tokens(Math.max(0, p.out - p.outSince))} tokens before the office opened (shown, not spent)` }),
-      el('dt', { text: 'All time' }), el('dd', { text: `${tokens(p.out)} tokens in ${p.threads} ${p.threads === 1 ? 'thread' : 'threads'}` }));
+      el('dt', { text: 'Thread' }), el('dd', { text: t ? t.title : (p.lastAt ? `None open; last seen ${ago(Date.parse(p.lastAt))}` : 'None yet') }));
+    // Earnings: helpers and tokens, folded under one line that says today's figure; open, it stays open as the card ticks.
+    const live0 = side.dataset.card === p.key ? side.querySelector(':scope > .card-live') : null;
+    const earnOpen = !!live0?.querySelector('details.earnings[open]');
+    const earnings = el('details', { class: 'earnings', open: earnOpen },
+      el('summary', {}, el('b', { text: 'Earnings' }), el('span', { class: 'note', text: ` · ${tokens(p.today)} tokens today` })),
+      el('dl', {},
+        el('dt', { text: 'Helpers' }), el('dd', { text: t ? String(t.helpers || 0) : '0' }),
+        el('dt', { text: 'Today' }), el('dd', { text: `${tokens(p.today)} tokens written` }),
+        el('dt', { text: 'Earned' }), el('dd', { text: `${tokens(p.outSince)} tokens since the office opened (they go into the Staff rewards purse)` }),
+        el('dt', { text: 'Before' }), el('dd', { text: `${tokens(Math.max(0, p.out - p.outSince))} tokens before the office opened (shown, not spent)` }),
+        el('dt', { text: 'All time' }), el('dd', { text: `${tokens(p.out)} tokens in ${p.threads} ${p.threads === 1 ? 'thread' : 'threads'}` })));
     const asked = (waiting || (t && t.asked)) ? el('div', { class: 'asked' }, el('b', { text: 'Asked you: ' }), (waiting?.asked || t.asked)) : null;
     const doneBtn = waiting ? el('div', { class: 'row' }, el('button', {
       type: 'button',
@@ -293,29 +344,54 @@
       side.replaceChildren(head, live);
       side.dataset.card = p.key;
     }
+    // EDIT, and under it the project's Actions menu (kept open across a redraw if it was open).
+    const wasOpen = !!head.querySelector('details.card-actions[open]');
+    const projectHead = app.projectActions?.(p.folder, projStar(p)) || null;
     swap(head, back,
-      el('div', { class: 'card-title' }, face(p, 48), el('div', { class: 'card-name' }, el('h2', { text: p.name }), el('p', { class: 'sub', text: where(p) + (p.nick ? ` · first called ${defaultName(p)}` : '') })), edit),
-      favRow(p), openRow(p), asked, doneBtn, app.projectActions?.(p.folder));
+      el('div', { class: 'card-title' }, face(p, 48), el('div', { class: 'card-name' }, el('h2', { class: 'name-heading' }, p.name, personStar(p)), el('p', { class: 'sub', text: where(p) + (p.nick ? ` · first called ${defaultName(p)}` : '') })),
+        el('div', { class: 'card-buttons' }, edit, app.projectMenu?.(p.folder, wasOpen))),
+      favRow(p, !projectHead), openRow(p), asked, doneBtn, projectHead);
     // Their newest thread's last messages, in the order they were said (also once they have gone home).
     const r = p.recent;
     const msgs = r?.msgs?.length ? el('ol', { class: 'msgs' }, r.msgs.slice(-6).map((m) => el('li', { class: `msg msg-${m.who === 'you' ? 'you' : 'ai'}` },
       el('span', { class: 'msg-who' }, m.who === 'you' ? 'You' : 'Claude', el('time', { datetime: m.at, text: ` ${clock(m.at)}` })),
       el('span', { class: 'msg-text', text: m.text })))) : null;
     const msgsHead = msgs ? el('h3', { text: t ? 'Recent messages' : `Recent messages: ${r.title}` }) : null;
-    swap(live, dl, msgsHead, msgs, steps ? el('h3', { text: 'Last steps' }) : null, steps);
+    swap(live, dl, earnings, msgsHead, msgs, steps ? el('h3', { text: 'Last steps' }) : null, steps);
   }
 
-  /** The card's two stars: this person, and their whole project. */
-  function favRow(p) {
-    const star = (on) => (on ? '★' : '☆');
-    const toggle = (body) => async () => {
-      try { await api('/api/favourite', body()); showFault(null); await refresh(); } catch (e) { showFault(e); }
-    };
+  /** The card's stars: this person (a button under the name), and their whole project (a star on the project's heading,
+   * projStar). `withProject`: no project heading to put the project's star on, so it sits here as a button. */
+  const star = (on) => (on ? '★' : '☆');
+  const favToggle = (body) => async () => {
+    try { await api('/api/favourite', body()); showFault(null); await refresh(); } catch (e) { showFault(e); }
+  };
+  function favRow(p, withProject) {
+    if (!withProject) return null;
     const now = () => app.data.people.find((x) => x.key === p.key) || p;
-    const mine = el('button', { type: 'button', class: 'btn fav-btn', 'aria-pressed': String(!!p.favSeat), title: 'A favourite stays at the office on a beach towel after they go home, and is listed under Favourites', onclick: toggle(() => ({ folder: now().folder, seat: now().seat, on: !now().favSeat })) }, `${star(p.favSeat)} Favourite`);
-    const all = el('button', { type: 'button', class: 'btn fav-btn', 'aria-pressed': String(!!p.favProject), title: `Everyone in ${projectName(p.folder)} is a favourite`, onclick: toggle(() => ({ folder: now().folder, project: true, on: !now().favProject })) }, `${star(p.favProject)} Favourite project`);
-    return el('div', { class: 'row fav-row' }, mine, all);
+    return el('div', { class: 'row fav-row' }, el('button', { type: 'button', class: 'btn fav-btn', 'aria-pressed': String(!!p.favProject), title: `Everyone in ${projectName(p.folder)} is a favourite`, onclick: favToggle(() => ({ folder: now().folder, project: true, on: !now().favProject })) }, `${star(p.favProject)} Favourite project`));
   }
+  /** This person's star, beside their name: filled when they are a favourite; the tooltip says what a click does. */
+  function personStar(p) {
+    const now = () => app.data.people.find((x) => x.key === p.key) || p;
+    const hint = p.favSeat
+      ? `${p.name} is a favourite: they stay at the office on a beach towel after going home, and are listed under Favourites. Click to take them off.`
+      : `Click to make ${p.name} a favourite: they stay at the office on a beach towel after going home, and are listed under Favourites.`;
+    return el('button', { type: 'button', class: 'star-btn', 'aria-pressed': String(!!p.favSeat), 'aria-label': `Favourite: ${p.name}`, title: hint,
+      onclick: favToggle(() => ({ folder: now().folder, seat: now().seat, on: !now().favSeat })) }, star(p.favSeat));
+  }
+  /** A project's star (on a person's card and on each tile of the Projects tab): filled when it is a favourite project;
+   * the tooltip says what a click does. `folder`: the project's desk folder; `name`: what to call it. */
+  function projectStar(folder, name) {
+    const on = () => (app.data?.favProjects || []).includes(folder);
+    const hint = on()
+      ? `${name} is a favourite project: everyone in it stays at the office on a beach towel after going home. Click to take it off.`
+      : `Click to make ${name} a favourite project: everyone in it stays at the office on a beach towel after going home, and is listed under Favourites.`;
+    return el('button', { type: 'button', class: 'star-btn', 'aria-pressed': String(on()), 'aria-label': `Favourite project: ${name}`, title: hint,
+      onclick: favToggle(() => ({ folder, project: true, on: !on() })) }, star(on()));
+  }
+  app.projectStar = projectStar;
+  const projStar = (p) => projectStar(p.folder, projectName(p.folder));
 
   /** The open-thread button: their thread (the open one, else their newest) in the AI desktop app, when the app has it. */
   function openRow(p) {
@@ -388,8 +464,8 @@
     const shop = app.data.shop;
     if (!shop) { b.hidden = true; return; }
     b.hidden = false;
-    b.textContent = `${tokens(shop.purse.left)} tokens to spend`;
-    b.title = 'Open Staff rewards';
+    b.textContent = `Spending balance ${tokens(shop.purse.left)}`;
+    b.title = 'Tokens the AI has written since the office opened, less what was spent: open Staff rewards to spend them';
   }
 
   function draw() {
@@ -479,6 +555,7 @@
   document.getElementById('home').addEventListener('click', (e) => {
     e.preventDefault();
     app.project = null;
+    app.folder = null;
     app.picked = null;
     app.editing = false;
     window.officeView?.select?.(null);

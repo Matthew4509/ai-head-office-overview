@@ -507,6 +507,11 @@ async function main() {
   });
 
   // ----- This PC -----
+  await check('This PC is on the top line, between the name and the buttons; the right panel no longer has its tab', () => {
+    assert(/<\/h1>\s*<p id="pc-line"[^>]*><\/p>\s*<div class="top-right">\s*<button type="button" id="purse"/.test(page), 'pc-line sits right after the name; the balance and the gear on the right');
+    assert(!/id="running"/.test(page), 'the Running row is gone: N projects open on the top line opens the list');
+    assert(!/id="tab-pc"|id="side-pc"/.test(page), 'the This PC tab is gone from the right panel');
+  });
   await check('stats carry GPU use; CPU temperature only when its switch is on', async () => {
     const s = (await api('/api/stats')).json;
     assert(s.gpu && 'pct' in s.gpu && Array.isArray(s.gpu.adapters), JSON.stringify(s.gpu));
