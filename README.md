@@ -62,13 +62,13 @@ running).
   a **Consultant** at the projects folder's own desk. Working is at the desk; a thread that stopped to ask you
   something stands with a "?"; a long think goes to the meeting room once it has one; after an hour with nothing
   happening they go home. Favourites wait on a beach towel. Click anyone for their card.
-- **Projects** tab: a tile per project with a star after its name (click to make it a favourite project), its staff as
-  faces, its **Audit / Git / Live** marks, and **Run** (starts
-  the project's own dev server and opens it) or **Stop**, **Copy prompt** (its name and full folder, to paste into the
-  AI you use; the office never starts an AI itself), **Folder**, **Terminal**, **Browser**, **Free port N** when another
-  program holds its port (it names that program and asks before stopping it), and **More**: **Hide** (stays on the
-  list, out of view until **Show hidden** is ticked) and **Remove from list** (its folder and files are never touched;
-  Settings › Folders brings it back).
+- **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
+  favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
+  beside the port. Under them: its **Audit / Git / Live** marks with **Browser** at their end, then **Free port N** when
+  another program holds its port (it names that program and asks before stopping it), **Copy prompt** (its name and
+  full folder, to paste into the AI you use; the office never starts an AI itself), **Folder**, and **More**:
+  **Terminal**, **Hide** (stays on the list, out of view until **Show hidden** is ticked) and **Remove from list** (its
+  folder and files are never touched; Settings › Folders brings it back).
 - **Favourites** tab: your starred people and projects.
 - **Prompts** tab: prompts you use again and again, a tile per category: **Copy**, **Edit** (which can move it),
   **Remove**; **New category**, **Add prompt**, **Rename** and **Delete category**; search across them all. Words in

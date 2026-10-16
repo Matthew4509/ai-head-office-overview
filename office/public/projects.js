@@ -131,21 +131,31 @@
   }
   app.projectAct = act;
 
-  /** The buttons for one project: Run or Stop, Folder, Terminal, Browser (and a way to free its port). */
-  function actions(p, compact = false) {
-    const busy = eng.busy.has(p.id);
-    const b = (what, label, title, primary) => el('button', { type: 'button', class: `btn${primary ? ' primary' : ''}${compact ? ' small' : ''}`, disabled: busy, title, 'data-act': what, 'data-id': p.id, onclick: () => act(p.id, what) }, label);
-    const canRun = p.commands.length > 0;
-    const run = p.running ? b('stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`, false)
-      : canRun ? b('run', busy ? 'Starting…' : 'Run', `Start ${p.name}'s local copy (${p.commands[0].name || 'its start command'}${p.commands[0].port ? `, port ${p.commands[0].port}` : ''}) and open it`, true)
-        : el('span', { class: 'note', title: 'No start command in the project\'s .claude/launch.json or project.json' }, 'No start command');
-    const port = p.portInUse && !p.running ? b('free-port', `Free port ${p.portInUse}`, `Another program holds port ${p.portInUse}: stop it so ${p.name} can run`, false) : null;
-    const more = el('details', { class: 'more' }, el('summary', { class: `btn${compact ? ' small' : ''}`, title: `More for ${p.name}` }, 'More'),
-      el('div', { class: 'more-menu' }, p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
+  /** A small button on a project's tile, greyed while that project is busy. */
+  const tileBtn = (p, what, label, title, primary) => el('button', { type: 'button', class: `btn small${primary ? ' primary' : ''}`, disabled: eng.busy.has(p.id), title, 'data-act': what, 'data-id': p.id,
+    onclick: (e) => { const menu = e.currentTarget.closest('details'); if (menu) menu.open = false; act(p.id, what); } }, label);
+  /** Run or Stop, on the tile's title line left of the port; nothing there when it has no start command. */
+  function runButton(p) {
+    if (p.running) return tileBtn(p, 'stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`);
+    if (!p.commands.length) return null;
+    return tileBtn(p, 'run', eng.busy.has(p.id) ? 'Starting…' : 'Run', `Start ${p.name}'s local copy (${p.commands[0].name || 'its start command'}${p.commands[0].port ? `, port ${p.commands[0].port}` : ''}) and open it`, true);
+  }
+  /** Browser, at the end of the Audit / Git / Live marks: only when the project has a local address. */
+  const browserButton = (p) => (p.running || p.commands.some((c) => c.port) ? tileBtn(p, 'browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null);
+  /** The tile's button row: Free port when another program holds its port (or "No start command"), Copy prompt, Folder,
+   * and More (Terminal, Hide, Remove from list). */
+  function actions(p, open) {
+    const b = (what, label, title) => tileBtn(p, what, label, title);
+    const port = p.portInUse && !p.running ? b('free-port', `Free port ${p.portInUse}`, `Another program holds port ${p.portInUse}: stop it so ${p.name} can run`) : null;
+    const none = p.commands.length ? null : el('span', { class: 'note', title: 'No start command in the project\'s .claude/launch.json or project.json' }, 'No start command');
+    const more = el('details', { class: 'more', open: !!open, 'data-id': p.id,
+      onkeydown: (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } } },
+    el('summary', { class: 'btn small', title: `More for ${p.name}`, 'data-act': 'more', 'data-id': p.id }, 'More'),
+      el('div', { class: 'more-menu' }, b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
+        p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
         b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`)));
-    return el('div', { class: 'row proj-actions' }, run, port, b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
-      b('folder', 'Folder', `Open ${p.name}'s folder`), b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
-      p.running || p.commands.some((c) => c.port) ? b('browser', 'Browser', p.running ? `Open ${p.running.url}` : `Open its local address`) : null, more);
+    return el('div', { class: 'row proj-actions' }, port, none, b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
+      b('folder', 'Folder', `Open ${p.name}'s folder`), more);
   }
   /** On a person's card the same buttons sit in one Actions menu under EDIT: Run or Stop first, then the rest. A choice
    * closes the menu; Escape closes it and goes back to its button. `open`: it was open, so a redraw keeps it open. */
@@ -188,27 +198,35 @@
     const staffOf = (p) => byFolder.get(folderOfId[p.id]) || [];
     const sorted = [...shown].sort((a, b) => (staffOf(b).length > 0) - (staffOf(a).length > 0) || (!!b.running - !!a.running) || String(b.updated || '').localeCompare(String(a.updated || '')));
     const face = (p) => el('button', { type: 'button', class: `staff state-${p.state}`, title: `${p.name}: ${p.words || p.state}`, onclick: () => app.pick(p.key) }, app.face(p, 30));
+    // The tiles are drawn again as tokens and times change: an open More menu stays open, and a focused tile button keeps
+    // the focus, so Terminal, Hide and Remove are not pulled from under the pointer or the keyboard.
+    const openMore = new Set([...box.querySelectorAll('details.more[open]')].map((d) => d.dataset.id));
+    const had = box.contains(document.activeElement) ? document.activeElement : null;
+    const focusKey = had?.dataset.act ? `[data-act="${CSS.escape(had.dataset.act)}"][data-id="${CSS.escape(had.dataset.id || '')}"]` : '';
+    // The top of a tile: its staff's faces on the left, its title, description and meta lines beside them.
+    const top = (head, sub, meta, faces) => el('div', { class: 'proj-top' }, el('div', { class: 'staff-row' }, faces),
+      el('div', { class: 'proj-text' }, head, el('span', { class: 'proj-sub', text: sub }), el('span', { class: 'proj-meta', text: meta })));
     const tile = (p) => {
       const staff = staffOf(p);
       return el('li', { class: `proj${p.running ? ' is-running' : ''}` },
-        el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: p.name }), app.projectStar?.(folderOfId[p.id] || p.folder, p.name), p.running ? el('span', { class: 'run-dot', title: `Running on port ${p.running.port}` }, `● ${p.running.port}`) : null),
-        el('span', { class: 'proj-sub', text: p.description || p.folder }),
-        el('span', { class: 'proj-meta', text: [p.tokens ? `${tokens(p.tokens)} tokens` : '', p.updated ? `updated ${ago(p.updated)}` : ''].filter(Boolean).join(' · ') }),
-        el('div', { class: 'staff-row' }, staff.length ? staff.map(face) : el('span', { class: 'note', text: 'Nobody in today' })),
-        app.checkMarks?.(p), actions(p, true));
+        top(el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: p.name, title: p.name }), app.projectStar?.(folderOfId[p.id] || p.folder, p.name),
+          runButton(p), p.running ? el('span', { class: 'run-dot', title: `Running on port ${p.running.port}` }, `● ${p.running.port}`) : null),
+        p.description || p.folder, [p.tokens ? `${tokens(p.tokens)} tokens` : '', p.updated ? `updated ${ago(p.updated)}` : ''].filter(Boolean).join(' · '),
+        staff.length ? staff.map(face) : el('span', { class: 'note', text: 'Nobody in today' })),
+        app.checkMarks?.(p, browserButton(p)), actions(p, openMore.has(p.id)));
     };
     // Desks with no project on the list (the projects folder itself: Consultants, or a folder elsewhere) keep a plain tile.
     const linked = new Set(Object.keys(links));
     const loose = [...byFolder.keys()].filter((f) => !linked.has(f) || !eng.projects.some((p) => p.id === links[f]));
-    const looseTile = (f) => el('li', { class: 'proj' }, el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: f || 'Consultants' })),
-      el('span', { class: 'proj-sub', text: f ? 'Not on the project list' : 'Threads in the projects folder itself' }), el('span', { class: 'proj-meta', text: '' }),
-      el('div', { class: 'staff-row' }, byFolder.get(f).map(face)));
+    const looseTile = (f) => el('li', { class: 'proj' }, top(el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: f || 'Consultants' })),
+      f ? 'Not on the project list' : 'Threads in the projects folder itself', '', byFolder.get(f).map(face)));
     const hiddenN = eng.projects.filter((p) => p.hiddenView).length;
     const toggle = el('div', { class: 'row note' }, el('label', {}, el('input', { type: 'checkbox', checked: app.showAll, onchange: (e) => { app.showAll = e.target.checked; app.draw(); } }), ' Show everyone, not only today'),
       hiddenN ? el('label', {}, el('input', { type: 'checkbox', checked: !!app.showHidden, onchange: (e) => { app.showHidden = e.target.checked; app.draw(); } }), ` Show hidden (${hiddenN})`) : null);
     const loading = !eng.at ? el('p', { class: 'note', text: 'Reading the project list…' }) : null;
-    swap(box, toggle, loading, el('ul', { class: 'proj-tiles' }, ...loose.map(looseTile), ...sorted.map(tile)),
+    const drawn = swap(box, toggle, loading, el('ul', { class: 'proj-tiles' }, ...loose.map(looseTile), ...sorted.map(tile)),
       eng.at && !sorted.length && !loose.length ? el('p', { class: 'empty', text: 'No projects yet. Add a working folder under Settings.' }) : null);
+    if (drawn && focusKey) box.querySelector(focusKey)?.focus();
   };
 
   /** Projects open: every local copy the office started, in a window opened from "N projects open · View all" on the top

@@ -284,7 +284,17 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .proj-tiles { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
 .proj { display: grid; gap: 4px; align-content: start; min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--card); }
 .proj.is-running { border-left: 4px solid var(--working); }
-.proj-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+/* A tile's top: the staff's faces (two to a row) on the left, title, description and meta beside them on the right.
+   Run or Stop sits on the title line, left of the port. */
+.proj-top { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; align-items: start; }
+.proj-text { display: grid; gap: 4px; min-width: 0; }
+.proj-top .staff-row { max-width: 72px; min-height: 0; justify-content: flex-start; }
+.proj-top .staff-row .note { font-size: 12px; line-height: 1.3; }
+/* Beside Run/Stop and the port on a narrow tile, a long name takes a second line rather than being cut. */
+.proj-head .proj-name { white-space: normal; overflow-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+/* Narrower marks on a tile, so Browser fits on their line; a long mark (No audit, Live address) still wraps it. */
+.proj .marks .mark { padding: 1px 6px; }
+.proj-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .proj-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .run-dot { color: var(--working); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .proj-sub, .proj-meta { min-width: 0; color: var(--soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1.35em; }
