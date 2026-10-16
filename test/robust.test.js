@@ -138,9 +138,14 @@ async function main() {
     for (let i = 0; i < 50 && !(await portOpen(PORT)); i++) await sleep(200);
     const BASE = 'http://127.0.0.1:' + PORT;
     const key = ((await (await fetch(BASE + '/')).text()).match(/name="aho-key" content="([0-9a-f]+)"/) || [])[1];
-    const api = async (p, body, raw) => {
+    const post = async (p, body, raw) => {
       const res = await fetch(BASE + p, { method: body !== undefined ? 'POST' : 'GET', headers: { 'X-AHO-Key': key, 'Content-Type': 'application/json' }, body: raw || (body !== undefined ? JSON.stringify(body) : undefined) });
       return { status: res.status, json: await res.json().catch(() => ({})) };
+    };
+    // Run asks first for a command not seen before: these made-up projects are the test's own, so the helper says yes.
+    const api = async (p, body, raw) => {
+      const r = await post(p, body, raw);
+      return p === '/api/start' && r.json && r.json.needsTrust ? post(p, { ...body, trust: r.json.needsTrust.fp }) : r;
     };
     const list = async () => (await api('/api/projects?fresh=1')).json.projects;
     const idOf = async folder => (await list()).find(p => p.folder === folder).id;
@@ -208,9 +213,11 @@ async function main() {
       const port = await freePort();
       make('double-run', { '.claude/launch.json': launch({ name: 'x', runtimeExecutable: NODE, runtimeArgs: ['-e', "require('http').createServer((q, s) => s.end('ok')).listen(" + port + ", '127.0.0.1')"], port }) });
       const id = await idOf('double-run');
+      // The yes to its first-run question, taken first (the question itself starts nothing).
+      const trust = (await post('/api/start', { id, key: '0', open: false })).json.needsTrust.fp;
       // Two separate connections, sent together (one connection would carry them one after the other).
       const startOnOwnConnection = () => new Promise((resolve, reject) => {
-        const body = JSON.stringify({ id, key: '0', open: false });
+        const body = JSON.stringify({ id, key: '0', open: false, trust });
         const req = http.request(BASE + '/api/start', { method: 'POST', agent: false, headers: { 'X-AHO-Key': key, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, res => {
           let t = ''; res.on('data', c => { t += c; }); res.on('end', () => { try { resolve(JSON.parse(t)); } catch (e) { reject(e); } });
         });
@@ -311,6 +318,38 @@ async function main() {
     const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'platform', 'windows', 'link-start.js'), 'utf8').replace(/\/\/.*$/gm, '');
     assert(!/process\.argv|process\.env\.(?!SystemRoot)/.test(src), 'link-start.js reads its arguments or the environment');
     assert(/\['\/d', '\/c', path\.join\(folder, 'start\.cmd'\), 'quiet'\]/.test(src), 'start.cmd is started with the fixed word quiet only');
+  });
+
+  await check('data files: a save cut short leaves the old file as it was; a damaged file is set aside, never wiped', () => {
+    const { saveJson, loadJson } = require('../lib/settings');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-save-'));
+    try {
+      const f = path.join(dir, 'judged.json');
+      saveJson(f, { projects: { a: [1] } });
+      assert.throws(() => saveJson(f, { big: 1n }), 'a value that cannot be written');
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(f, 'utf8')), { projects: { a: [1] } }, 'the old file is untouched');
+      assert.deepStrictEqual(fs.readdirSync(dir), ['judged.json'], 'no temporary file left behind');
+      fs.writeFileSync(f, '{"projects": {"a": [1');
+      assert.strictEqual(loadJson(f, null), null);
+      const aside = fs.readdirSync(dir).filter(n => /^judged\.damaged-.*\.json$/.test(n));
+      assert.strictEqual(aside.length, 1, 'the damaged file is copied aside before anything replaces it');
+      assert.strictEqual(fs.readFileSync(path.join(dir, aside[0]), 'utf8'), '{"projects": {"a": [1');
+      assert.strictEqual(loadJson(path.join(dir, 'none.json'), 'fallback'), 'fallback', 'a file not there is simply empty');
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  await check('logs: a local copy\'s log past its limit is cut back, with a note saying so', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-logcap-'));
+    try {
+      const log = path.join(dir, 'site.log');
+      fs.writeFileSync(log, 'x'.repeat(5000));
+      // In its own process with its own data folder: loading the office's state writes a settings file.
+      const script = "const { state } = require('./lib/state'); state.running.set('t', { log: process.argv[1] }); require('./lib/runner').capLogs(1000);";
+      const r = require('child_process').spawnSync(NODE, ['-e', script, log], { cwd: path.join(__dirname, '..'), env: { ...process.env, AHO_DATA: dir, AHO_ROOT: dir }, encoding: 'utf8' });
+      assert.strictEqual(r.status, 0, r.stderr);
+      const text = fs.readFileSync(log, 'utf8');
+      assert(text.length < 300 && /cut this log at/.test(text) && !text.includes('xxx'), text.slice(0, 200));
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   });
 
   try { fs.rmSync(WS, { recursive: true, force: true }); fs.rmSync(DATA, { recursive: true, force: true }); } catch {}

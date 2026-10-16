@@ -179,12 +179,17 @@
     if (!s.details.length) list.append(line(null));
     return [
       el('p', { text: 'What should never appear in a project you publish: your email, phone, street, full name, a customer\'s name. Every audit looks for them in the files git would publish, the git history, commit emails and release zips.' }),
-      el('p', { class: 'note', text: 'Kept on this PC only, in the office\'s data folder. A finding shows the label, never the detail, so a report is safe to paste into an AI. Once saved, a detail is not shown again.' }),
+      el('p', { class: 'note', text: 'A finding shows the label, never the detail, so a report is safe to paste into an AI. Once saved, a detail is not shown again here.' }),
+      // Where they are kept, plainly: a file on this PC that is not locked away, and how to remove it.
+      el('p', { class: 'note', text: `Kept on this PC only, as plain text in ${s.file}. The office never sends them anywhere and git never publishes that folder, but anyone who can open it (or a copy or backup of it) can read them. Delete all removes the file.` }),
       list,
       el('div', { class: 'row' }, btn('Add detail', () => { const r = line(null); list.append(r); r.querySelector('input').focus(); }), btn('Save', async () => {
         const details = [...list.querySelectorAll('.pd-row')].map((r) => ({ id: r.dataset.id || undefined, label: r.querySelector('.pd-label').value, value: r.querySelector('.pd-value').value })).filter((d) => d.id || d.label.trim() || d.value.trim());
         try { const r = await app.engine('/api/private-details', { details }); say(r.details.length ? `Saved ${plural(r.details.length, 'private detail', 'private details')}. The next audit of each project looks for them.` : 'No private details saved; the audit still looks for this PC\'s own.'); show('private'); } catch (e) { say(fault(e)); }
-      }, true)),
+      }, true), s.stored ? btn('Delete all', async () => {
+        if (!confirm(`Delete every private detail you saved? The file ${s.file} is removed. Audits then look only for this PC's own details and your project names, until you add them again.`)) return;
+        try { await app.engine('/api/private-details/delete', {}); say('Every saved private detail is deleted: the file is gone.'); show('private'); } catch (e) { say(fault(e)); }
+      }) : null),
       el('p', { class: 'note', text: `Also looked for, read from this PC each time: ${s.auto.join(', ')}; and the names of your other projects.` }),
     ];
   }

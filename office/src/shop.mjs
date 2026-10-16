@@ -48,7 +48,11 @@ function fileOf(office) { return path.join(office.dataDir, 'office.json'); }
 /** Purchases as kept, oldest first; unknown items dropped. */
 export function boughtOf(office) {
   let raw = {};
-  try { raw = JSON.parse(fs.readFileSync(fileOf(office), 'utf8')); } catch { raw = {}; }
+  try { raw = JSON.parse(fs.readFileSync(fileOf(office), 'utf8')); } catch (e) {
+    raw = {};
+    // There but unreadable: copied aside first, so the next purchase cannot wipe what was bought before.
+    if (e.code !== 'ENOENT') try { fs.copyFileSync(fileOf(office), fileOf(office).replace(/\.json$/, '') + '.damaged-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json'); } catch {}
+  }
   const list = Array.isArray(raw.bought) ? raw.bought : [];
   return list.filter((b) => b && SHOP.some((i) => i.id === b.item)).map((b) => ({ item: b.item, price: Math.max(0, Math.round(Number(b.price) || 0)), at: String(b.at || '').slice(0, 40) }));
 }

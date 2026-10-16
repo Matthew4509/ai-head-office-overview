@@ -91,9 +91,14 @@ async function main() {
   // The page comes in its theme (none chosen yet: the default, Auto, already light or dark by the sun), so it never
   // flashes light before turning dark.
   assert.ok(/<html lang="en" data-theme-choice="light" data-theme="light">/.test(page), 'the page is served with its theme on <html>: light (day) until one is chosen');
-  const api = async (p, body, headers = {}) => {
+  const raw = async (p, body, headers = {}) => {
     const res = await fetch(BASE + p, { method: body ? 'POST' : 'GET', headers: { 'X-AHO-Key': key, 'Content-Type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined });
     return { status: res.status, json: await res.json() };
+  };
+  // Run asks first for a command not seen before: the tests' made-up projects are their own, so the helper says yes.
+  const api = async (p, body, headers) => {
+    const r = await raw(p, body, headers);
+    return p === '/api/start' && r.json && r.json.needsTrust ? raw(p, { ...body, trust: r.json.needsTrust.fp }, headers) : r;
   };
 
   // ----- the guards -----
@@ -240,6 +245,22 @@ async function main() {
     assert(r.json.ok === false && /No start command/.test(r.json.error), JSON.stringify(r.json));
   });
 
+  await check('Run asks first: the whole command is shown and nothing starts until the person says yes', async () => {
+    const p = byFolder('beta-site');
+    const first = (await raw('/api/start', { id: p.id, key: p.commands[0].key, open: false })).json;
+    assert(first.ok && first.needsTrust && /^[0-9a-f]{40}$/.test(first.needsTrust.fp) && first.needsTrust.exe === NODE, JSON.stringify(first));
+    assert(first.needsTrust.args.some(a => /site\.js$/.test(a)) && /project\.json/.test(first.needsTrust.from), 'program, arguments and the file it comes from are shown');
+    assert(!(await api('/api/projects')).json.projects.find(x => x.id === p.id).running, 'nothing started on the first ask');
+    const wrong = (await raw('/api/start', { id: p.id, key: p.commands[0].key, open: false, trust: 'f'.repeat(40) })).json;
+    assert(wrong.needsTrust, 'a fingerprint for another command is not a yes');
+    const yes = (await raw('/api/start', { id: p.id, key: p.commands[0].key, open: false, trust: first.needsTrust.fp })).json;
+    assert(yes.ok && yes.url && !yes.needsTrust, JSON.stringify(yes));
+    await raw('/api/stop', { id: p.id });
+    const again = (await raw('/api/start', { id: p.id, key: p.commands[0].key, open: false })).json;
+    assert(again.ok && !again.needsTrust, 'the yes is kept for the same command');
+    await raw('/api/stop', { id: p.id });
+  });
+
   // ----- a port held by another program: reported, not fought over -----
   const alpha = byFolder('alpha-site'), acmd = alpha.commands[0];
   const hold = port => spawn(NODE, ['-e', "require('http').createServer((q,s)=>s.end('hog')).listen(" + port + ",'127.0.0.1')"], { stdio: 'ignore' });
@@ -272,7 +293,11 @@ async function main() {
     assert(!(await api('/api/private-details', { details: 'x' })).json.ok, 'a non-list was accepted');
     const a = (await api('/api/audit', { id: alpha.id })).json.audit;
     assert(a.disclosure === true, 'the disclosure pass did not run');
-    await api('/api/private-details', { details: [] });
+    // Delete all: the file itself goes, not just the list in it.
+    const file = path.join(DATA, 'private-details.json');
+    assert(fs.existsSync(file) && s.json.stored === true && s.json.file === file, 'the page is told where they are kept');
+    const d = (await api('/api/private-details/delete', {})).json;
+    assert(d.ok && d.stored === false && !d.details.length && !fs.existsSync(file), JSON.stringify(d));
   });
   await check('Stop ends the process and frees the port', async () => {
     await api('/api/stop', { id: alpha.id });

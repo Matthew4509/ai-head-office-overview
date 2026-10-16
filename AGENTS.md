@@ -63,8 +63,9 @@ Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Nod
   setup on or off (a copy is saved first; code: `office/src/setup.mjs`); shortcuts and the start link only through
   setup (`lib/setup.js`).
 - **Runs:** a project's own start command from that project's `.claude/launch.json` or `project.json` (never text
-  from the page; code: `lib/projects.js`, `lib/runner.js`), `git` read-only commands, and PowerShell helpers in
-  `lib/platform/windows/`.
+  from the page; code: `lib/projects.js`, `lib/runner.js`), and only after the person has seen the whole command in a
+  first-run window and said yes (asked again when the command changes; `trustCheck` in `lib/runner.js`); `git`
+  read-only commands; and PowerShell helpers in `lib/platform/windows/`.
 - **Sends:** nothing about the user. The only requests that leave the PC are plain GETs to the live addresses the user
   adds (`lib/live.js`, `lib/audit.js`) and, only if ticked under About, one request a day to GitHub for the newest Git
   version (`lib/git-program.js`), and, when the user opens Settings › Update, one `git fetch` of this repository

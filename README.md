@@ -1,4 +1,4 @@
-# AI Head Office Overview 0.1.2 (Windows)
+# AI Head Office Overview (Windows)
 
 Your AI coding threads as staff in a little office, beside the projects they work on. Each thread is a person at their
 project's desk: working, thinking, standing with a question for you, or gone home. Next to them, each project has
@@ -7,9 +7,13 @@ its own tile: run its local copy, open its folder, a terminal or the browser, an
 holds everything waiting for you: threads with a question, live sites down, serious audit findings, and work not yet
 saved or pushed in git.
 
-It runs only on your PC. It reads the AI app's transcripts already on your PC and never changes or sends them; the
-only requests that leave your PC are plain page requests to the live addresses you add (and, only if you turn it on,
-a daily check with GitHub for the newest Git version).
+It runs only on your PC. It reads the AI app's transcripts already on your PC and never changes or sends them. The
+only requests that leave your PC: plain page requests to the live addresses you add (their checks, and the audit's
+look at the live site), a `git fetch` of this repository when you open Settings › Update, and, only if you turn it
+on, a daily check with GitHub for the newest Git version. The version you have is under Settings › About.
+
+Free for **noncommercial** use under the PolyForm Noncommercial License 1.0.0 (see [Licence](#licence)). For any
+commercial use, ask the owner first, through this repository on GitHub.
 
 ![The office with its staff and Needs attention](screenshots/office.png)
 
@@ -114,7 +118,9 @@ running).
   the office stay).
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
-  beside the port. When another program holds its port, Run becomes **Re-allocate**: it starts the project on the
+  beside the port. The first time a start command runs, or after it changes, Run asks first: a window shows the program,
+  its arguments, the folder and the file it comes from, because it runs with your Windows permissions (check it for a
+  project you downloaded). Its output goes to a log in the office's data folder, cut back past 5 MB. When another program holds its port, Run becomes **Re-allocate**: it starts the project on the
   next clean port (one no other project uses) instead of stopping that program, and keeps that port for next time while
   the old one stays taken, so moves stay rare; the start port is always tried first. Under them: its **Audit / Git /
   Live** marks with **Browser** and **More** at their end (a project with no live site shows **+ Live URL**). **More**
@@ -193,7 +199,9 @@ Each mark opens its window:
   gone-home time, how often live sites are checked, the **Thoughts chat** (Everything, Work only or Off), and **Show
   the Project planner tab** (off to start with).
 - **Private details**: what an audit looks for in what you would publish (your email, phone, street, full name). Typed
-  once and never shown again; a finding shows only its label.
+  once and never shown again; a finding shows only its label. They are kept as plain text in the office's data folder
+  (`data/private-details.json`): never sent and never published, but readable by anyone who can open that folder or a
+  copy of it. **Delete all** removes the file.
 - **Help** and **About** (the version, the Git program's own security state, Quit, Uninstall).
 
 ### Easy or advanced setup

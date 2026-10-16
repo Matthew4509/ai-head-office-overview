@@ -654,6 +654,54 @@
     }
   });
 
+  // The windows (Settings, Edit, and every project window): Tab and Shift+Tab stay inside the open one, and closing it
+  // (Close, Escape, a click beside it) puts the focus back where it was, on what opened it, for keyboard and screen
+  // reader use. One place for all of them, so a new window gets it too.
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+  let lastOutside = null;
+  document.addEventListener('focusin', (e) => { if (!e.target.closest?.('.sheet')) lastOutside = e.target; });
+  // What opened it is also taken from the click (Enter and Space on a button click it too), so it is known even when
+  // the window has not had the keyboard focus yet.
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest?.('button, a[href], summary, [tabindex]');
+    if (b && !b.closest('.sheet')) lastOutside = b;
+  }, true);
+  for (const id of ['setup', 'edit', 'check']) {
+    const sheet = document.getElementById(id);
+    if (!sheet) continue;
+    const isOpen = () => !sheet.hidden && sheet.childElementCount > 0;
+    let wasOpen = isOpen();
+    let back = null;
+    new MutationObserver(() => {
+      const open = isOpen();
+      if (open && !wasOpen) back = lastOutside;
+      if (!open && wasOpen) {
+        const was = back;
+        back = null;
+        // A tile drawn again meanwhile has a new button in the old one's place, found by what it does and for whom; one
+        // greyed for a moment (Starting…) is waited for, up to two seconds.
+        const sel = was?.dataset?.act ? `[data-act="${CSS.escape(was.dataset.act)}"][data-id="${CSS.escape(was.dataset.id || '')}"]` : '';
+        const giveBack = (tries) => {
+          if (document.querySelector('.sheet:not([hidden]) .sheet-box')) return;
+          const to = was?.isConnected ? was : sel ? document.querySelector(sel) : null;
+          if (to?.isConnected && !to.disabled) to.focus();
+          else if (tries > 0 && (to || sel)) setTimeout(() => giveBack(tries - 1), 200);
+        };
+        giveBack(10);
+      }
+      wasOpen = open;
+    }).observe(sheet, { attributes: true, attributeFilter: ['hidden'], childList: true });
+    sheet.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const items = [...sheet.querySelectorAll(FOCUSABLE)].filter((n) => n.offsetParent !== null);
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (!sheet.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+  }
+
   refresh();
   setInterval(refresh, 3000);
 })();

@@ -544,7 +544,12 @@
     return pathTo(x, y, tx, ty);
   }
   /** One step along o's path at `speed`; true when the last point is reached. */
+  /** Less motion (Windows' "Show animations" off, or the browser's reduced-motion setting): people and helpers go
+   * straight to their place instead of walking, and nobody jumps, spins or bobs. */
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const calm = () => !!reduceMotion?.matches;
   function move(o, dt, speed) {
+    if (calm()) speed = 1e6;
     const [x, y] = o.path[0];
     const dx = x - o.x;
     const dy = y - o.y;
@@ -1801,18 +1806,18 @@
     const list = [...world.people.values(), ...couriers, ...(tech ? [tech] : []), ...(fitter ? [fitter] : [])].filter((p) => !p.out || p.path.length).sort((a, b) => a.y - b.y);
     const size = labelSize(c);
     for (const p of list) {
-      const walk = p.path.length > 0;
+      const walk = p.path.length > 0 && !calm();
       const y = p.y;
       if (world.selected === p.id) oval(c, p.x, p.y + 12, 22, 11, '#f8d878', null);
       const look = p.look ?? (L ? L.fromId(p.id) : null);
       if (look && !walk && p.waveUntil > world.time) {
         // A thank-you for a treat: turned to face you, waving.
         L.sprite(c, look, p.x, y, 'south', { time: world.time, seed: p.seed % 10, wave: true });
-      } else if (look && !walk && p.target?.area === 'party') {
+      } else if (look && !walk && p.target?.area === 'party' && !calm()) {
         // In a room just opened: jumping, and every other one spinning round as they jump.
         const spin = ['south', 'east', 'north', 'west'][Math.floor(world.time * 4 + p.seed) % 4];
         L.sprite(c, look, p.x, y - Math.abs(Math.sin(world.time * 7 + p.seed)) * 12, p.seed % 2 ? spin : 'south', { walk: true, time: world.time, seed: p.seed % 10 });
-      } else if (look && !walk && (p.target?.area === 'stretch' || p.target?.area === 'volley' || p.target?.rest?.gym)) {
+      } else if (look && !walk && !calm() && (p.target?.area === 'stretch' || p.target?.area === 'volley' || p.target?.rest?.gym)) {
         // On the spot: stretching, on the gym kit, or on their toes at the volleyball net (facing the other side).
         L.sprite(c, look, p.x, y - Math.abs(Math.sin(world.time * 5 + p.seed)) * 6, p.target?.area === 'volley' ? p.face : 'south', { walk: true, time: world.time, seed: p.seed % 10 });
       } else if (look) L.sprite(c, look, p.x, y, p.face, { walk, time: world.time, seed: p.seed % 10 });

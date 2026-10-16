@@ -513,3 +513,5 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .recent-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; border-bottom: 1px solid var(--line); padding: 2px 0; }
 /* The Projects open window's foot: what these copies are, on the left of its buttons. */
 .foot-note { margin-right: auto; flex: 1 1 260px; }
+/* The first-run window: the command shown as code. */
+.trust-code { font: 13px/1.4 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; background: var(--page); border-radius: 4px; padding: 1px 4px; }

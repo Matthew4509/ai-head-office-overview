@@ -210,7 +210,10 @@ async function main() {
   }
   for (const s of SITES.filter(x => x.start === 'office')) {
     const p = byFolder(s.folder);
-    const r = await call(key, '/api/start', { id: p.id, key: p.commands[0].key, scan: true, open: false });
+    const body = { id: p.id, key: p.commands[0].key, scan: true, open: false };
+    let r = await call(key, '/api/start', body);
+    // Run asks first (the office shows the command); the demo's own made-up projects get its yes.
+    if (r.needsTrust) r = await call(key, '/api/start', { ...body, trust: r.needsTrust.fp });
     console.log('  started ' + s.name + ': ' + (r.ok ? r.url : r.error));
   }
   for (const s of SITES.filter(x => x.fault || x.folder === 'tidewater-yoga')) {

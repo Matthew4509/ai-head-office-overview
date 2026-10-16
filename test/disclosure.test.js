@@ -341,6 +341,15 @@ async function main() {
     check('SEC-012: once pushed it is Critical and says so', () => assert(h2.length === 1 && h2[0].sev === 'Critical' && /already on the remote/.test(h2[0].title), JSON.stringify(h2)));
   }
 
+  // The self-check below uses this PC's real folders. A projects folder named with an everyday word ("work") once made it
+  // fail on every ordinary "work": such a name (or a short one) now counts only written against a path or an @.
+  check('a projects folder called "work" counts only beside a path or an @, a distinctive name everywhere', () => {
+    const nameOf = dir => autoDetails([dir]).find(d => d.label === 'your projects folder\'s name');
+    assert.strictEqual(nameOf(path.join(tmp, 'work')).near, true);
+    assert.strictEqual(nameOf(path.join(tmp, 'Projects')).near, true);
+    assert(!nameOf(path.join(tmp, 'quill' + 'moor-ledger')).near, 'a distinctive folder name is looked for everywhere');
+  });
+
   const HERE = path.resolve(__dirname, '..');
   // From a second working copy (a git worktree) the projects folder is the one beside the MAIN copy, as for the bake.
   const MAIN = require('../tools/privacy-context').mainCopy(HERE);

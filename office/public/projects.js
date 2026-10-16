@@ -85,6 +85,27 @@
     try { await navigator.clipboard.writeText(text); say(`Copied for ${p.name}: its name and folder. Paste it into the AI you use.`); } catch { say(`The clipboard was blocked. The folder is ${p.dir}`); }
   }
 
+  /** Before a project's start command first runs (or after it changed): the whole command, where it comes from, and a
+   * choice. Resolves true for Run it; false for Cancel, Escape or a click beside the window. Cancel has the focus. */
+  function trustWindow(t) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (yes) => { if (done) return; done = true; clearInterval(watch); if (!sheet.hidden && sheet.firstElementChild === box) app.closeWindow(); resolve(yes); };
+      const quote = (a) => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
+      const fact = (k, v) => el('div', { class: 'fact' }, el('span', { class: 'note', text: k }), el('code', { class: 'trust-code', text: v }));
+      app.openWindow(`Run ${t.name} for the first time?`, [
+        el('p', { text: `Run starts a program from ${t.name}'s own files, with your Windows permissions: it can read and change your files like any program you start. Check it is what you expect, above all for a project you downloaded.` }),
+        fact('Program', t.exe), fact('Arguments', t.args.length ? t.args.map(quote).join(' ') : '(none)'), fact('Folder', t.cwd), fact('From', t.from),
+        el('p', { class: 'note', text: 'The office remembers your yes for this exact command, and asks again if it changes.' })],
+      [el('button', { type: 'button', class: 'btn primary', onclick: () => finish(false) }, 'Cancel'),
+        el('button', { type: 'button', class: 'btn', onclick: () => finish(true) }, 'Run it')]);
+      // Closed another way (Escape, a click beside it, another window): the same as Cancel.
+      const sheet = document.getElementById('check');
+      const box = sheet.firstElementChild;
+      const watch = setInterval(() => { if (sheet.hidden || sheet.firstElementChild !== box) finish(false); }, 250);
+    });
+  }
+
   /** One action on a project; the buttons are looked up again by id at click time, so a redrawn tile never acts on old data. */
   async function act(id, what) {
     const p = eng.projects.find((x) => x.id === id);
@@ -94,7 +115,13 @@
     try {
       if (what === 'run' || what === 'move') {
         // Re-allocate (move): another program holds its port, so it starts on a clean one, kept for next time.
-        const r = await engine('/api/start', { id, key: p.commands[0]?.key, open: true, move: what === 'move' });
+        const body = { id, key: p.commands[0]?.key, open: true, move: what === 'move' };
+        let r = await engine('/api/start', body);
+        // The first run of this command (or a changed one): nothing started; the person sees it and says yes first.
+        if (r.needsTrust) {
+          if (!(await trustWindow(r.needsTrust))) { say(`${p.name} was not started.`); return; }
+          r = await engine('/api/start', { ...body, trust: r.needsTrust.fp });
+        }
         say(r.dryRun ? `Test copy: ${p.name} would start (${r.dryRun}).` : `${p.name} is running${r.url ? ` at ${r.url}` : ''}.${r.note ? ` ${r.note}` : ''}`);
       } else if (what === 'stop') {
         const r = await engine('/api/stop', { id });
