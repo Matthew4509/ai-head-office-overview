@@ -62,6 +62,8 @@ running).
 - **Treats** (pizza, donuts, sandwiches, coffee): each order comes in with its own courier, so pizza, donuts and coffee
   bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something turns to face you
   and waves a thank-you.
+- Above Filter by, **Show names** (the staff's names under them in the office) and **PC name** (this PC's name on the top
+  line): untick either for a screenshot. Remembered in this browser.
 - **Filter by** (left of the office), with a choice of **Project** or **Working folder**. What it picks is what every tab
   shows: the office, the Projects tiles, Favourites and Thoughts (prompts are not per project). Project: **All projects**,
   then each project with someone in today and, in words, who is doing what ("1 working · 1 needs you"). Working folder:

@@ -1464,7 +1464,7 @@
         c.stroke();
       }
       // Every name is shown (the nicknames are the point); at a shared desk they are cut to fit the chair.
-      if (full && !p.delivery) {
+      if (full && !p.delivery && app()?.showNames !== false) {
         const seats = p.target?.desk?.seats.length ?? 1;
         // On a towel the rows are staggered: a name is cut to its own towel's width.
         const max = p.target?.area === 'desk' || p.target?.area === 'needs' ? Math.max(48, 150 / seats) : p.target?.area === 'towel' ? 80 : 140;
@@ -1955,6 +1955,8 @@
 
   window.officeView = {
     update,
+    /** Draws again now (Show names was ticked or unticked). */
+    refresh: () => { for (const v of views) v.drawnAt = 0; wake(); },
     select: (id) => {
       world.selected = id;
       for (const v of views) v.told = '';
