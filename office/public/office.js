@@ -547,13 +547,20 @@
     volley: ['Serve it up!', 'Mine! …not mine.'],
     stretch: ['A good stretch helps the thinking.', 'Back straight, shoulders down.'],
   };
+  /** What the others say when someone is the first out on the deck chairs. */
+  const FIRST_OUT_REPLY = ['I\'m jealous, {who}!', 'I\'ll check it out soon.', 'Save me a chair, {who}!', 'Enjoy it, {who}. Some of us are working!', 'Is the water warm?'];
   function atEase(p) {
     const t = p.target;
     if (!t || (p.seed + Math.floor(world.time / 7)) % 3) return;
     const pick = (list) => list?.[(p.seed + Math.floor(world.time)) % list.length];
     if (t.area === 'break') {
       const others = [...world.people.values()].some((o) => o !== p && o.target?.area === 'break' && !o.path.length);
-      return think(p, others ? pick(AT_EASE.break) : 'I\'m the first one out here!');
+      if (others) return think(p, pick(AT_EASE.break));
+      think(p, 'I\'m the first one out here!');
+      // Two of the others answer from where they are.
+      [...world.people.values()].filter((o) => o !== p && !o.leaving && !o.out && o.row).slice(0, 2)
+        .forEach((o, i) => think(o, FIRST_OUT_REPLY[(o.seed + i) % FIRST_OUT_REPLY.length].replace('{who}', p.row.name)));
+      return;
     }
     think(p, pick(t.pizza ? AT_EASE[foodOf(p)] : AT_EASE[t.rest?.id] ?? AT_EASE[t.area]));
   }
@@ -945,15 +952,16 @@
     if (k.phase === 'working') {
       if (world.time < k.doneAt) return;
       // In place: the piece shows, and everyone cheers and waves a thank-you (whoever was resting tries it out).
-      world.fitting.shift();
+      const piece = world.fitting.shift();
       applyRooms(lessFitting(world.serverRooms ?? world.rooms));
       say(k, 'All set!', 2);
-      for (const p of world.people.values()) {
-        if (p.leaving || p.out) continue;
-        say(p, ['New furniture!', 'Nice!', 'Very smart!'][p.seed % 3], 4);
+      // The first to see it names it ("Hey, we got new deck chairs!"); the rest thank you, each in their own words.
+      const what = PIECE_WORDS[piece] || 'new furniture';
+      [...world.people.values()].filter((p) => !p.leaving && !p.out).forEach((p, i) => {
+        say(p, i === 0 ? `Hey, we got ${what}!` : INSTALLED[(p.seed + i) % INSTALLED.length], 4);
         thank(p);
         if (p.target?.rest) p.restUntil = 0;
-      }
+      });
       if (world.fitting.length) {
         const [x, y] = fitSpot(world.fitting[0]);
         k.phase = 'coming';
@@ -967,6 +975,11 @@
     }
     fitter = null;
   }
+  /** A piece of furniture in words, for the first cheer when it is set up. */
+  const PIECE_WORDS = { table: 'a meeting room table', chairs: 'new chairs', whiteboard: 'a whiteboard', plants: 'plants', armchair: 'an armchair', bookcase: 'a bookcase',
+    sofa: 'a sofa', tv: 'a TV', gym: 'a gym', arcade: 'an arcade machine', deckchair: 'new deck chairs', volleyball: 'a volleyball net' };
+  /** Everyone else, when a piece is set up. */
+  const INSTALLED = ['Thanks, boss!', 'Nice!', 'Very smart!', 'I\'ll try it out soon.', 'Ooh, fancy.', 'Best boss ever.'];
   /** A cardboard box, carried in by the fitter. */
   function parcel(c, p) {
     const dx = p.face === 'west' ? -14 : p.face === 'east' ? 14 : 0;
