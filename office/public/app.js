@@ -111,13 +111,11 @@
   // (app.folder, a path from Settings › Folders). app.filterBy says which list Filter by shows.
   app.filterBy = 'project';
   app.folder = null;
-  // Above Filter by: Show names (the staff's names in the office) and PC name (this PC's name on the top line), both on
-  // until unticked; turned off for a screenshot, say. Kept in this browser only.
+  // Above Filter by: Show names (the staff's names in the office) and PC name (the project's name above each desk's
+  // computer), both on until unticked, to see the staff better or for a screenshot. Kept in this browser only.
   const remembered = (k) => { try { return localStorage.getItem(k) !== 'off'; } catch { return true; } };
   app.showNames = remembered('aho-show-names');
   app.showPcName = remembered('aho-show-pc-name');
-  const showPcName = () => document.body.classList.toggle('hide-pc-name', !app.showPcName);
-  showPcName();
   try { if (localStorage.getItem('aho-filter-by') === 'folder') app.filterBy = 'folder'; } catch { /* fine */ }
   const sameFolder = (a, b) => !!a && !!b && a.replace(/[\\/]+$/, '').toLowerCase() === b.replace(/[\\/]+$/, '').toLowerCase();
   /** Is a desk's folder (and its project, when known) in what is shown? */
@@ -176,7 +174,7 @@
       onchange: (e) => { set(e.target.checked); try { localStorage.setItem(key, e.target.checked ? 'on' : 'off'); } catch { /* fine */ } } }), ` ${label}`);
     const ticks = el('div', { class: 'name-ticks' },
       tick('Show names', app.showNames, 'aho-show-names', (on) => { app.showNames = on; window.officeView?.refresh?.(); }),
-      tick('PC name', app.showPcName, 'aho-show-pc-name', (on) => { app.showPcName = on; showPcName(); }));
+      tick('PC name', app.showPcName, 'aho-show-pc-name', (on) => { app.showPcName = on; window.officeView?.refresh?.(); }));
     swap(nav, ticks, el('div', { class: 'filter-head' }, el('h2', { id: 'filter-title', text: 'Filter by' }), choose),
       el('ul', { class: 'filter-list' }, ...items),
       prs.length ? null : el('p', { class: 'empty', text: 'No threads today yet.' }));

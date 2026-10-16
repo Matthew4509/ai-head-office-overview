@@ -1249,7 +1249,8 @@
         drawScreen(c, x, d.y - 12, mw - 8, sat ? who.row.doing : 'idle');
         box(c, x - mw / 2 + 3, d.y + 7, mw - 6, 7, 2, '#fff7e9', INK, 2);
       });
-      if (full) {
+      // The project's name above its computer, unless PC name is unticked (to see the staff better).
+      if (full && app()?.showPcName !== false) {
         const size = labelSize(c) * 0.85;
         const words = fitText(c, d.name, 150, size);
         c.font = `600 ${size}px Segoe UI, system-ui, sans-serif`;
@@ -1955,7 +1956,7 @@
 
   window.officeView = {
     update,
-    /** Draws again now (Show names was ticked or unticked). */
+    /** Draws again now (Show names or PC name was ticked or unticked). */
     refresh: () => { for (const v of views) v.drawnAt = 0; wake(); },
     select: (id) => {
       world.selected = id;
