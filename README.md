@@ -7,6 +7,9 @@ its own tile: run its local copy, open its folder, a terminal or the browser, an
 holds everything waiting for you: threads with a question, live sites down, serious audit findings, and work not yet
 saved or pushed in git.
 
+This is the head office: the office overview plus tools to manage your projects, scan and preview projects developed
+locally. If you prefer the office overview only, it's [AI Office Overview](https://github.com/Matthew4509/ai-office-overview).
+
 It runs only on your PC. It reads the AI app's transcripts already on your PC and never changes or sends them. The
 only requests that leave your PC: plain page requests to the live addresses you add (their checks, and the audit's
 look at the live site, with a DNS lookup of its mail settings), a `git fetch` of this repository when you open

@@ -721,6 +721,20 @@
       if (who) (i === 0 ? say(who, l.text, 4) : think(who, l.text));
     });
   }
+  /** Payday: on a Thursday (this PC's clock), once, when two or more are in with different earnings today, they compare
+   * pay in the chat (officeBanter.payday). Not straight away: a small chance on each refresh, so it lands during the day. */
+  function paydayChat() {
+    const B = window.officeBanter;
+    const now = new Date();
+    if (!B?.payday || chatMode() !== 'all' || now.getDay() !== 4 || world.paydayOn === now.toDateString()) return;
+    if (clock() - (world.banterAt ?? -Infinity) < BANTER_GAP || Math.random() > 0.05) return;
+    const crew = present().filter((p) => p.row);
+    const lines = B.payday(crew.map((p) => ({ name: p.row.name, today: p.row.today })));
+    if (!lines.length) return;
+    world.paydayOn = now.toDateString();
+    world.banterAt = clock();
+    lines.forEach((l, i) => (i === 0 ? say(crew[l.by], l.text, 4) : think(crew[l.by], l.text)));
+  }
   function atWork(words, doing) {
     if (doing === 'thinking') return 'Thinking it through…';
     const w = String(words || '').trim();
@@ -776,6 +790,7 @@
       idleFor: p.state === 'idle' && p.since ? Math.max(0, (nowMs - p.since) / 1000) : null,
       snag: p.state !== 'home' ? p.snag || null : null,
       event: p.state !== 'home' ? p.event || null : null,
+      today: p.today || 0,
     }));
     placeDesks();
     const ids = new Set(world.staff.map((s) => s.id));
@@ -834,6 +849,7 @@
       if (snap) { world.pairAt[d.key] ??= clock(); continue; }
       if (clock() - (world.pairAt[d.key] ?? -Infinity) > 1800) { world.pairAt[d.key] = clock(); banter(busy[0], { kind: 'pair' }); }
     }
+    if (!snap) paydayChat();
     // Gone home (or not in the project picked): they walk out of the front door; picking a project just hides them.
     for (const [id, p] of world.people) {
       if (ids.has(id) || p.leaving) continue;

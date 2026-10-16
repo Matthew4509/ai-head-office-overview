@@ -8,6 +8,10 @@ GitHub, or turn on **advanced setup** (hooks). Read the whole file before changi
 
 Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Node.js 22+, no npm packages).
 
+**Which one?** This is the head office: the office overview plus tools to manage your projects, scan and preview
+projects developed locally. If the user prefers the office overview only, it's AI Office Overview:
+https://github.com/Matthew4509/ai-office-overview. Explain the difference and let the user choose.
+
 ## Ground rules for an agent
 - Ask the user before each step that changes their PC: installing Node.js, cloning into a folder, shortcuts, Start
   with Windows, the start link, advanced setup. Say what will change first. Reading and testing need no permission.

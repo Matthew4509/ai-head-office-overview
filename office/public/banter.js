@@ -172,6 +172,27 @@
   };
   const fact = (e) => FACTS[e.kind]?.(e) ?? null;
 
+  // Payday (Thursdays, once, two or more in with different earnings today): the top earner is thrilled, the next one
+  // compares, the lowest asks if the rest of them are getting paid, and someone else sees the bright side. The figures
+  // are each one's real tokens today. Returns [{ by, text }], by = an index into `people`; [] when it does not fit.
+  const tok = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n || 0));
+  function payday(people) {
+    const paid = people.map((p, i) => ({ ...p, i })).filter((p) => p.today > 0).sort((a, b) => b.today - a.today);
+    if (paid.length < 2) return [];
+    const top = paid[0], low = paid[paid.length - 1], mid = paid.length > 2 ? paid[1] : null;
+    if (tok(top.today) === tok(low.today) || (mid && (tok(mid.today) === tok(top.today) || tok(mid.today) === tok(low.today)))) return [];
+    const out = [{ by: top.i, text: `I'm excited, I'm getting paid ${tok(top.today)} tokens...` }];
+    if (mid) {
+      out.push({ by: mid.i, text: `Hang on. You're on ${tok(top.today)} and I'm on ${tok(mid.today)}?` });
+      out.push({ by: low.i, text: `${tok(mid.today)}? I'm on ${tok(low.today)}. Wait, you lot are getting paid?` });
+    } else out.push({ by: low.i, text: `${tok(top.today)}? I'm on ${tok(low.today)}. Wait, you're getting paid?` });
+    // The bright side from someone who has not spoken yet, if there is one; else the top earner.
+    const rest = paid.slice(mid ? 2 : 1, -1);
+    const cheer = rest.length ? rest[Math.floor(Math.random() * rest.length)] : top;
+    out.push({ by: cheer.i, text: 'Well, there\'s always the odd pizza.' });
+    return out;
+  }
+
   // Day-specific moments, by the day the event happened on this PC's clock (0 = Sunday): a push on a Friday or at the
   // weekend always gets its own lines; failed tests on a Monday about half the time, so Mondays still hear the rest.
   const DAY_KINDS = {
@@ -213,5 +234,5 @@
     return out;
   }
 
-  window.officeBanter = { CHARACTERS, characterOf, plan, fact, dayKind, LINES, REPLIES, EXCHANGES, COMEBACKS, KINDS: Object.keys(LINES) };
+  window.officeBanter = { CHARACTERS, characterOf, plan, fact, dayKind, payday, LINES, REPLIES, EXCHANGES, COMEBACKS, KINDS: Object.keys(LINES) };
 })();
