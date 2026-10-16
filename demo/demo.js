@@ -171,7 +171,7 @@ async function main() {
   killPidFile(path.join(DATA, 'live-sites.pid')); // the last run's made-up live sites
   await sleep(800);
   // Fresh settings, audits and logs each time; site pictures are kept (they take a few seconds each).
-  for (const f of ['settings.json', 'run.json']) fs.rmSync(path.join(DATA, f), { force: true });
+  for (const f of ['settings.json', 'run.json', 'priorities.json', 'categories.json']) fs.rmSync(path.join(DATA, f), { force: true });
   for (const d of ['audits', 'logs', 'office', 'transcripts']) fs.rmSync(path.join(DATA, d), { recursive: true, force: true });
   build();
   // The made-up office: threads at the projects' desks, read by the office from data-demo/transcripts.
@@ -219,6 +219,34 @@ async function main() {
     const c = r.audit ? r.audit.counts : {};
     console.log('  audited ' + s.name + ': ' + ((c.Critical || 0) + (c.High || 0)) + ' Critical/High, ' + (c.Medium || 0) + ' Medium');
   }
+
+  // The project planner: made-up categories, scores and stages, so the Today band and the tiles show a whole day.
+  const cat = async (name, owner, care) => {
+    const id = (await call(key, '/api/priorities/category/save', { name, owner })).category.id;
+    if (care) await call(key, '/api/priorities/category/care', { id, care, mode: 'all' });
+    return id;
+  };
+  const mine = await cat('My projects', 'mine');
+  const harbourside = await cat('Harbourside clients', 'client');
+  const kestrel = await cat('Kestrel Group', 'client', { handoverDays: 30, handoverMin: 30, checkEvery: 'week', checkMin: 30, paid: true });
+  const marks = (p, d, m, c, k) => ({ p, d, m, c, k });
+  const PLAN = [
+    ['harbour-lane-bakery', marks(8, 8, 8, 8, 8), [harbourside]],
+    ['nimbus-notes', marks(7, 7, 7, 7, 7), [mine]],
+    ['pixel-forge-studio', marks(7, 6, 6, 6, 6), [mine]],
+    ['lumen-analytics', marks(6, 6, 6, 6, 4), [mine, kestrel]],
+    ['field-notes', marks(3, 4, 7, 4, 5), [mine]],
+    ['copper-kettle-cafe', marks(4, 4, 3, 6, 4), [harbourside], { flag: true }],
+    ['atlas-travel-journal', marks(2, 2, 6, 4, 4), [mine]],
+    ['tidewater-yoga', marks(5, 5, 5, 5, 6), [harbourside], { stage: 'ready' }],
+    ['peak-trail-fitness', marks(6, 6, 5, 5, 5), [kestrel], { stage: 'handover' }],
+  ];
+  for (const [folder, scores, categories, more] of PLAN) {
+    const r = await call(key, '/api/priorities/set', { id: byFolder(folder).id, scores, categories, ...(more || {}) });
+    if (!r.ok) console.log('  planner: ' + folder + ': ' + r.error);
+  }
+  await call(key, '/api/priorities/replan', {}); // the last-hour pair from the scores just set
+  console.log('  project planner: 3 categories, 9 projects scored');
 
   if (process.argv.includes('--no-window')) return console.log('\nReady at http://127.0.0.1:' + PORT + '/ (no window opened).');
   const edge = findEdge(), url = 'http://127.0.0.1:' + PORT + '/#projects';

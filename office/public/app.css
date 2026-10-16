@@ -442,3 +442,60 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .more > summary { list-style: none; cursor: pointer; }
 .more > summary::-webkit-details-marker { display: none; }
 .more-menu { position: absolute; right: 0; z-index: 5; display: grid; gap: 4px; padding: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); min-width: 170px; }
+
+/* The project planner (planner.js). Placeholders use the soft ink (4.5:1 or more on a card in both themes), never the
+   browser's pale default. */
+.field-text::placeholder { color: var(--soft); opacity: 1; }
+.proj-bar { margin: 0 0 10px; }
+.proj-bar .proj-search { flex: 1 1 220px; margin: 0; }
+.proj-order-label { display: flex; align-items: center; gap: 6px; }
+.proj-order-label .filter-by { flex: 0 1 auto; }
+/* Today: one line per project of the day, in the day's order, under small headings. Each line has a shape and words,
+   never colour alone. */
+.plan-band { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 10px 14px; margin: 0 0 12px; }
+.plan-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.plan-head h2 { margin: 0; font-size: 18px; }
+.plan-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.plan-note { margin: 4px 0; }
+.plan-rows { list-style: none; margin: 6px 0 0; padding: 0; }
+.plan-sub { color: var(--soft); font-size: 13px; font-weight: 600; margin: 8px 0 2px; }
+.plan-row { display: grid; grid-template-columns: 26px minmax(0, 1.6fr) 44px 64px minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; border-top: 1px solid var(--line); padding: 5px 0; }
+.plan-shape { text-align: center; font-size: 16px; }
+.plan-name { border: 0; background: none; padding: 0; text-align: left; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-name:hover { color: var(--accent); text-decoration: underline; }
+.plan-name .note { font-weight: 400; }
+.plan-time { white-space: nowrap; }
+.plan-what, .plan-when { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.plan-answers { display: flex; flex-wrap: wrap; gap: 4px; }
+.plan-said { font-size: 13px; color: var(--soft); white-space: nowrap; }
+@media (max-width: 1100px) {
+  .plan-row { grid-template-columns: 26px minmax(0, 1fr) 44px 64px; }
+  .plan-what, .plan-when, .plan-row > .plan-answers, .plan-row > .plan-said { grid-column: 2 / -1; }
+}
+.score-chip { display: inline-block; text-align: center; border: 1px solid var(--line); border-radius: 6px; padding: 0 4px; font-weight: 600; font-size: 13px; background: var(--page); }
+/* A tile's score, before its name: a button that opens the score window. */
+.score-badge { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 6px; background: var(--page); color: var(--ink); font-weight: 700; font-size: 13px; padding: 1px 6px; cursor: pointer; }
+.score-badge:hover { border-color: var(--accent); color: var(--accent); }
+.plan-tags { gap: 3px; margin: 0; }
+.tag { border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; font-size: 12px; line-height: 1.6; white-space: nowrap; }
+.tag-today { border-color: var(--accent); color: var(--accent); }
+.tag-cat { color: var(--soft); border-style: dashed; }
+/* The score window: one row per mark (name, slider, "N of 10", points). */
+.mark-rows { display: grid; border-top: 1px solid var(--line); margin: 6px 0; }
+.mark-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(120px, 1fr) 60px 30px; gap: 4px 12px; align-items: center; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.mark-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.mark-hint { display: block; font-size: 12px; }
+.mark-of { font-size: 13px; white-space: nowrap; }
+.mark-pts { text-align: right; }
+.score-line { font-size: 15px; margin: 6px 0; }
+.score-total { font-size: 22px; }
+@media (max-width: 600px) { .mark-row { grid-template-columns: minmax(0, 1fr) 60px 30px; } .mark-row > div:first-child { grid-column: 1 / -1; } }
+/* Categories: one line each, its owner, project count and care plan, with Edit and Delete. */
+.cat-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.cat-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.cat-row .row { margin: 0; flex-wrap: nowrap; }
+.cat-care { display: block; }
+.filter-foot { margin: 8px 0 0; }
+/* A check-in in Needs attention: its name opens the score window, its answers are buttons of their own. */
+.wait-checkin { display: grid; gap: 3px; cursor: default; }
+.wait-checkin .plan-name { white-space: normal; }

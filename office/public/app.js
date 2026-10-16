@@ -107,26 +107,32 @@
   }
   app.api = api;
 
-  // What is shown: everyone, one project (app.project, a desk's folder) or every project in one working folder
-  // (app.folder, a path from Settings › Folders). app.filterBy says which list Filter by shows.
+  // What is shown: everyone, one project (app.project, a desk's folder), every project in one working folder
+  // (app.folder, a path from Settings › Folders) or in one project category (app.category, the planner's; either of a
+  // project's two counts). app.filterBy says which list Filter by shows.
   app.filterBy = 'project';
   app.folder = null;
+  app.category = null;
   // Above Filter by: Show names (the staff's names in the office) and PC name (the project's name above each desk's
   // computer), both on until unticked, to see the staff better or for a screenshot. Kept in this browser only.
   const remembered = (k) => { try { return localStorage.getItem(k) !== 'off'; } catch { return true; } };
   app.showNames = remembered('aho-show-names');
   app.showPcName = remembered('aho-show-pc-name');
-  try { if (localStorage.getItem('aho-filter-by') === 'folder') app.filterBy = 'folder'; } catch { /* fine */ }
+  try { const by = localStorage.getItem('aho-filter-by'); if (by === 'folder' || by === 'category') app.filterBy = by; } catch { /* fine */ }
   const sameFolder = (a, b) => !!a && !!b && a.replace(/[\\/]+$/, '').toLowerCase() === b.replace(/[\\/]+$/, '').toLowerCase();
   /** Is a desk's folder (and its project, when known) in what is shown? */
   function inFilter(folder, project) {
     if (app.folder !== null) return sameFolder(project ? project.workingFolder : app.workingFolderOf?.(folder), app.folder);
+    if (app.category !== null) {
+      const pr = project || app.projectOfFolder?.(folder);
+      return !!pr && (app.plannerCats?.(pr.id) || []).includes(app.category);
+    }
     return app.project === null || folder === app.project;
   }
   app.inFilter = inFilter;
   // Consultants (the projects folder itself) is the folder "", so "all" is written apart from it: picking Consultants is a
   // change of filter, not "everyone left".
-  app.filterKey = () => `${app.project === null ? '*' : `p:${app.project}`}|${app.folder ?? ''}`;
+  app.filterKey = () => `${app.project === null ? '*' : `p:${app.project}`}|${app.folder ?? ''}|${app.category ?? ''}`;
 
   function people() {
     const all = app.data?.people || [];
@@ -155,9 +161,18 @@
     const peopleIn = (list) => list.reduce((k, pr) => k + pr.people.length, 0);
     const choose = el('select', { id: 'filter-by', class: 'filter-by', 'aria-label': 'Filter by', onchange: (e) => setFilterBy(e.target.value) },
       el('option', { value: 'project', selected: app.filterBy === 'project' }, 'Project'),
-      el('option', { value: 'folder', selected: app.filterBy === 'folder' }, 'Working folder'));
+      el('option', { value: 'folder', selected: app.filterBy === 'folder' }, 'Working folder'),
+      el('option', { value: 'category', selected: app.filterBy === 'category' }, 'Category'));
     let items;
-    if (app.filterBy === 'folder') {
+    let foot = null;
+    if (app.filterBy === 'category') {
+      // The project planner's categories: each with how many projects are in it (as the main or the second one).
+      const cats = app.planner?.data?.categories || [];
+      const total = (app.engineData?.projects || []).length;
+      items = [row(app.category === null, () => pickCategory(null), 'All categories', `${n(cats.length, 'category', 'categories')} · ${n(total, 'project', 'projects')}`, 'Show every project'),
+        ...cats.map((c) => row(app.category === c.id, () => pickCategory(c.id), c.name, n(c.count, 'project', 'projects'), `Show only the projects in ${c.name}`))];
+      foot = el('button', { type: 'button', class: 'btn small filter-foot', onclick: () => app.categoriesWindow?.(), title: 'Make, rename or delete categories, and set their care plans' }, 'Categories…');
+    } else if (app.filterBy === 'folder') {
       const folders = app.workingFolders?.() || [];
       const deskIn = (f) => prs.filter((pr) => sameFolder(app.workingFolderOf?.(pr.folder), f));
       items = [row(app.folder === null, () => pickFolder(null), 'All folders', `${n(folders.length, 'working folder', 'working folders')} · ${n(peopleIn(prs), 'person', 'people')}`, 'Show everyone in every working folder'),
@@ -176,23 +191,31 @@
       tick('Show names', app.showNames, 'aho-show-names', (on) => { app.showNames = on; window.officeView?.refresh?.(); }),
       tick('PC name', app.showPcName, 'aho-show-pc-name', (on) => { app.showPcName = on; window.officeView?.refresh?.(); }));
     swap(nav, ticks, el('div', { class: 'filter-head' }, el('h2', { id: 'filter-title', text: 'Filter by' }), choose),
-      el('ul', { class: 'filter-list' }, ...items),
-      prs.length ? null : el('p', { class: 'empty', text: 'No threads today yet.' }));
+      el('ul', { class: 'filter-list' }, ...items), foot,
+      prs.length || app.filterBy === 'category' ? null : el('p', { class: 'empty', text: 'No threads today yet.' }));
   }
 
-  /** Project or Working folder: switching shows everyone again, then the new list to pick from. */
+  /** Project, Working folder or Category: switching shows everyone again, then the new list to pick from. */
   function setFilterBy(by) {
-    app.filterBy = by === 'folder' ? 'folder' : 'project';
+    app.filterBy = ['folder', 'category'].includes(by) ? by : 'project';
     try { localStorage.setItem('aho-filter-by', app.filterBy); } catch { /* fine */ }
     app.project = null;
     app.folder = null;
+    app.category = null;
     draw();
     document.getElementById('filter-by')?.focus();
+  }
+  function pickCategory(id) {
+    app.category = id;
+    app.project = null;
+    app.folder = null;
+    draw();
   }
   app.pickProject = (folder) => pickProject(folder);
   function pickProject(folder) {
     app.project = folder;
     app.folder = null;
+    app.category = null;
     // A desk clicked in the office while the list shows working folders: the list turns to projects, to show which.
     if (folder !== null && app.filterBy !== 'project') { app.filterBy = 'project'; try { localStorage.setItem('aho-filter-by', 'project'); } catch { /* fine */ } }
     draw();
@@ -200,6 +223,7 @@
   function pickFolder(path) {
     app.folder = path;
     app.project = null;
+    app.category = null;
     draw();
   }
 
@@ -247,7 +271,7 @@
     for (const [id, word] of Object.entries(TABS)) {
       const b = document.getElementById(`tab-${id}`);
       b.setAttribute('aria-selected', String(app.sideTab === id));
-      const label = id === 'needs' ? `${word} (${waitingList().length + (app.moreWaiting?.(inFilter) || []).length})` : word;
+      const label = id === 'needs' ? `${word} (${waitingList().length + (app.moreWaiting?.(inFilter) || []).length + (app.plannerCheckins?.(inFilter) || []).length})` : word;
       if (b.textContent !== label) b.textContent = label;
     }
     if (showCard) return;
@@ -299,7 +323,7 @@
     });
     const toggle = hiddenCount || app.showHiddenFavs ? el('label', { class: 'row note' }, el('input', { type: 'checkbox', checked: !!app.showHiddenFavs, onchange: (e) => { app.showHiddenFavs = e.target.checked; draw(); } }), `Show hidden (${hiddenCount})`) : null;
     const intro = el('p', { class: 'note', text: 'Favourites stay on call, so they are either in the office or on the beach until needed.' });
-    const picked = app.project !== null || app.folder !== null;
+    const picked = app.project !== null || app.folder !== null || app.category !== null;
     swap(box, intro, toggle, ...groups, groups.length ? null : el('p', { class: 'empty', text: picked ? 'No favourites in what Filter by shows. Pick All projects to see them all.' : 'No favourites yet. Open someone\'s card and press Favourite, or Favourite project for everyone in that project.' }));
   }
 
@@ -315,8 +339,15 @@
     const more = app.moreWaiting?.(inFilter) || [];
     const moreItems = more.map((m, i) => el('li', {}, el('button', { type: 'button', class: `wait wait-${m.kind}`, 'data-i': String(i), onclick: () => (app.moreWaiting?.(inFilter) || [])[i]?.open() },
       el('b', { class: m.cls, text: m.title }), el('span', { class: 'meta', text: m.sub }))));
-    swap(pane, items.length ? el('ul', { class: 'waiting' }, items) : el('p', { class: 'empty', text: 'Nobody is waiting for an answer.' }),
+    // Today's check-ins from the project planner, each with its answers: Fine for now, Needs work, Park it.
+    const checkins = app.plannerCheckins?.(inFilter) || [];
+    // A focused answer button keeps the focus when the list is drawn again.
+    const had = pane.contains(document.activeElement) ? document.activeElement : null;
+    const focusKey = had?.dataset.act ? `[data-act="${CSS.escape(had.dataset.act)}"][data-id="${CSS.escape(had.dataset.id || '')}"]` : '';
+    const drawn = swap(pane, items.length ? el('ul', { class: 'waiting' }, items) : el('p', { class: 'empty', text: 'Nobody is waiting for an answer.' }),
+      checkins.length ? el('h3', { text: 'Check-ins today' }) : null, checkins.length ? el('ul', { class: 'waiting' }, checkins) : null,
       moreItems.length ? el('h3', { text: 'Projects' }) : null, moreItems.length ? el('ul', { class: 'waiting' }, moreItems) : null);
+    if (drawn && focusKey) pane.querySelector(focusKey)?.focus();
   }
 
   function drawCard(p) {
@@ -569,6 +600,7 @@
     e.preventDefault();
     app.project = null;
     app.folder = null;
+    app.category = null;
     app.picked = null;
     app.editing = false;
     window.officeView?.select?.(null);

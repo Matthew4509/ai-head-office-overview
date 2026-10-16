@@ -623,6 +623,47 @@ async function main() {
     const r = (await api('/api/priorities')).json;
     assert(r.plan && Array.isArray(r.plan.focus) && r.plan.totalMin === 480 && r.categories[0].id === 'unsorted', JSON.stringify(r).slice(0, 300));
     assert.strictEqual(r.plan.focusMin + r.plan.topMin + r.plan.bottomMin, 480);
+    assert(!fs.existsSync(path.join(DATA, 'priorities.json')), 'a fresh office writes no planner file on a read');
+  });
+  await check('project planner: a score, Needs work and a category are saved; bad marks, dates and unknown projects are refused', async () => {
+    const list = (await api('/api/projects')).json.projects;
+    const alpha = list.find(p => p.folder === 'alpha-site'), beta = list.find(p => p.folder === 'beta-site');
+    const cat = (await api('/api/priorities/category/save', { name: '  Company   B ', owner: 'client' })).json;
+    assert(cat.ok && cat.category.name === 'Company B' && cat.category.owner === 'client', JSON.stringify(cat).slice(0, 300));
+    assert(/name/.test((await api('/api/priorities/category/save', { name: '' })).json.error), 'an empty name is refused, with a way out');
+    const r = (await api('/api/priorities/set', { id: alpha.id, scores: { p: 10, d: 10, m: 10, c: 10, k: 10 }, flag: true, categories: [cat.category.id] })).json;
+    assert(r.ok && r.rows[alpha.id].score === 100 && r.rows[alpha.id].flag && r.rows[alpha.id].categories[0] === cat.category.id, JSON.stringify(r).slice(0, 300));
+    assert.strictEqual(r.plan.focus[0].key, r.rows[alpha.id].key, 'the top score is #1');
+    assert.strictEqual(r.categories.find(c => c.id === cat.category.id).count, 1);
+    assert(/whole number/.test((await api('/api/priorities/set', { id: alpha.id, scores: { p: 11 } })).json.error));
+    assert(/not a date/.test((await api('/api/priorities/set', { id: alpha.id, deadline: 'soon' })).json.error));
+    assert(/not on the list/.test((await api('/api/priorities/set', { id: 'nope', scores: {} })).json.error));
+    const saved = JSON.parse(fs.readFileSync(path.join(DATA, 'priorities.json'), 'utf8'));
+    assert.deepStrictEqual(saved.projects[r.rows[alpha.id].key].scores, { p: 10, d: 10, m: 10, c: 10, k: 10 });
+    // Ready to ship takes it out of the focus three; Back to building puts it back.
+    const ready = (await api('/api/priorities/set', { id: beta.id, stage: 'ready' })).json;
+    assert(ready.plan.ready.some(x => x.key === ready.rows[beta.id].key) && !ready.plan.focus.some(x => x.key === ready.rows[beta.id].key));
+    await api('/api/priorities/set', { id: beta.id, stage: 'building' });
+  });
+  await check('project planner: hours a day, a check-in answer, and a care change that names who changes before it changes', async () => {
+    const alpha = (await api('/api/projects')).json.projects.find(p => p.folder === 'alpha-site');
+    let r = (await api('/api/priorities/settings', { hoursPerDay: 6 })).json;
+    assert(r.ok && r.plan.totalMin === 360 && r.plan.focusMin + r.plan.topMin + r.plan.bottomMin === 360, JSON.stringify(r.plan).slice(0, 200));
+    assert(/1 to 16/.test((await api('/api/priorities/settings', { hoursPerDay: 30 })).json.error));
+    r = (await api('/api/priorities/answer', { id: alpha.id, what: 'fine' })).json;
+    assert(r.ok && r.rows[alpha.id].lastChecked === r.today && !r.rows[alpha.id].flag, 'Fine for now starts the wait again and takes the flag off');
+    assert(/Answer/.test((await api('/api/priorities/answer', { id: alpha.id, what: 'maybe' })).json.error));
+    const catId = r.rows[alpha.id].categories[0];
+    const care = { handoverDays: 30, handoverMin: 15, checkEvery: 'week', checkMin: 30, paid: true };
+    const look = (await api('/api/priorities/category/care', { id: catId, care })).json;
+    assert(look.ok && look.follows.length === 1 && look.follows[0] === alpha.name && look.from.checkMin === 15, JSON.stringify(look));
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(DATA, 'categories.json'), 'utf8')).categories[0].care, undefined, 'looking changes nothing');
+    assert(/not complete/.test((await api('/api/priorities/category/care', { id: catId, care: { checkMin: 30 } })).json.error));
+    r = (await api('/api/priorities/category/care', { id: catId, care, mode: 'all' })).json;
+    assert(r.ok && r.changed === 1 && r.rows[alpha.id].care.checkMin === 30 && r.rows[alpha.id].care.paid, JSON.stringify(r).slice(0, 300));
+    r = (await api('/api/priorities/category/remove', { id: catId })).json;
+    assert(r.ok && r.rows[alpha.id].categories.length === 0, 'its projects go back to Not sorted');
+    await api('/api/priorities/settings', { hoursPerDay: 8 });
   });
   await check('prompts: a star is kept, taken off again, and refused for a prompt that is gone', async () => {
     const first = (await api('/api/prompts')).json.prompts[3];

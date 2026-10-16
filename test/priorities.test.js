@@ -196,5 +196,56 @@ check('answers: Fine for now starts the wait again, Needs work flags it, Park it
   assert.throws(() => P.answer(e, 'maybe', TODAY));
 });
 
+check('the last-hour pair is kept all day (answering it never swaps it); the focus follows the scores; a pick that went is filled again', () => {
+  // Nine projects: a-c focus, d-f medium band, g-i low band. i has waited longest of the low band (30 days).
+  const keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+  const waited = { d: 3, e: 9, f: 5, g: 10, h: 20, i: 30 };
+  const projects = keys.map(k => ({ key: k, name: k, updated: at(TODAY) - (waited[k] || 0) * DAY }));
+  const entries = Object.fromEntries(keys.map((k, i) => [k, { scores: scored(90 - i * 5) }]));
+  const first = P.planDay({ projects, entries, today: TODAY });
+  assert.deepStrictEqual([first.picks.focus, first.picks.medium, first.picks.low], [['a', 'b', 'c'], 'e', 'i']);
+  const day = { ...first.picks, answers: {} };
+  // Fine for now on i: its wait starts again, which would make h the longest waiting; the kept day keeps i.
+  entries.i = P.answer(entries.i, 'fine', TODAY);
+  day.answers.i = 'fine';
+  const later = P.planDay({ projects, entries, today: TODAY, day });
+  assert.strictEqual(later.low.key, 'i');
+  assert.strictEqual(later.low.answer, 'fine', 'the answer shows on the kept row');
+  assert.strictEqual(P.planDay({ projects, entries, today: TODAY }).low.key, 'h', 'without the kept day it would have moved');
+  // b is parked: d, the next up, joins the focus; the medium (e) and low (i) stay.
+  entries.b = { ...entries.b, stage: 'parked' };
+  const parked = P.planDay({ projects, entries, today: TODAY, day });
+  assert.deepStrictEqual(parked.focus.map(f => f.key), ['a', 'c', 'd']);
+  assert.deepStrictEqual([parked.medium.key, parked.low.key], ['e', 'i']);
+  // A new score shows at once: g scored up to 95 takes #1, and the kept pair stays.
+  entries.g = { scores: scored(95) };
+  const rescored = P.planDay({ projects, entries, today: TODAY, day });
+  assert.deepStrictEqual(rescored.focus.map(f => f.key), ['g', 'a', 'c']);
+  assert.deepStrictEqual([rescored.medium.key, rescored.low.key], ['e', 'i']);
+  delete entries.g;
+  // Tomorrow the kept day no longer counts: the picks are made afresh.
+  assert.notStrictEqual(P.planDay({ projects, entries, today: '2026-10-17', day }).low.answer, 'fine');
+});
+
+check('the score window: marks 0-10, a deadline, Needs work, two categories at most, and stages (Sold moves it)', () => {
+  const cats = [{ id: 'unsorted', name: 'Not sorted' }, { id: 'mine', name: 'My projects' }, { id: 'b', name: 'Company B', owner: 'client' }];
+  let r = P.setEntry({}, { scores: { p: 8, d: 7 }, deadline: '2026-11-03', flag: true, categories: ['mine'] }, cats, TODAY);
+  assert(r.ok, r.error);
+  assert.deepStrictEqual(r.entry, { scores: { p: 8, d: 7 }, flag: 'needs', deadline: '2026-11-03', flaggedAt: TODAY, categories: ['mine'] });
+  assert(/whole number from 0 to 10/.test(P.setEntry({}, { scores: { p: 11 } }, cats, TODAY).error));
+  assert(/not a date/.test(P.setEntry({}, { deadline: '2026-02-30' }, cats, TODAY).error));
+  assert(/two categories at most/.test(P.setEntry({}, { categories: ['mine', 'b', 'x'] }, cats, TODAY).error));
+  assert(/not on the list/.test(P.setEntry({}, { categories: ['gone'] }, cats, TODAY).error));
+  const cleared = P.setEntry(r.entry, { deadline: '', flag: false, categories: [] }, cats, TODAY).entry;
+  assert.deepStrictEqual(cleared, { scores: { p: 8, d: 7 } });
+  r = P.setEntry({ categories: ['mine'] }, { stage: 'ready' }, cats, TODAY);
+  assert.deepStrictEqual([r.entry.stage, r.entry.stageSince], ['ready', TODAY]);
+  const sold = P.setEntry({ categories: ['mine', 'b'] }, { stage: 'sold', soldTo: 'b' }, cats, TODAY).entry;
+  assert.deepStrictEqual(sold, { stage: 'handover', stageSince: TODAY, soldOn: TODAY, soldFrom: 'My projects', categories: ['b'] }, 'sold: the buyer is the main category, the old one is kept on the record');
+  assert(/already/.test(P.setEntry({ categories: ['b'] }, { stage: 'sold', soldTo: 'b' }, cats, TODAY).error));
+  assert(/buyer|bought/.test(P.setEntry({}, { stage: 'sold', soldTo: 'unsorted' }, cats, TODAY).error));
+  assert.strictEqual(P.setEntry({ stage: 'handover', stageSince: '2026-10-01' }, { stage: 'handover' }, cats, TODAY).entry.stageSince, '2026-10-01', 'the same stage again keeps its start day');
+});
+
 console.log(failures ? failures + ' failed' : 'all passed');
 process.exit(failures ? 1 : 0);

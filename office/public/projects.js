@@ -200,46 +200,55 @@
     return p ? el('div', { class: 'card-project' }, el('h3', { class: 'proj-heading' }, `Project: ${p.name}`, star || null), app.checkMarks?.(p)) : null;
   };
 
-  /** The Projects tab: a tile per project, its staff on it; the projects with someone in today come first. */
+  /** The Projects tab: the search box and the order, today's plan (the project planner's Today band), then a tile per
+   * project with its staff on it; the projects with someone in today come first, or the highest score By priority. */
   app.drawProjectTiles = (box, people) => {
+    // The search box and the order are built once and stay put (app.plannerBar), so typing in them is never interrupted;
+    // only the part under them is drawn again.
+    let body = box.querySelector(':scope > .proj-body');
+    if (!body) { body = el('div', { class: 'proj-body' }); box.replaceChildren(...[app.plannerBar?.(), body].filter(Boolean)); }
     const byFolder = new Map();
     for (const p of people) { if (!byFolder.has(p.folder)) byFolder.set(p.folder, []); byFolder.get(p.folder).push(p); }
     const links = app.data?.links || {};
     const folderOfId = Object.fromEntries(Object.entries(links).map(([f, id]) => [id, f]));
-    // Only what Filter by shows: one project, one working folder, or all of them.
-    const shown = eng.projects.filter((p) => (app.showHidden || !p.hiddenView) && (app.inFilter?.(folderOfId[p.id] ?? p.folder, p) ?? true));
+    // Only what Filter by and the search show: one project, one working folder or category, or all of them.
+    const inView = (p) => (app.inFilter?.(folderOfId[p.id] ?? p.folder, p) ?? true) && (app.plannerMatch?.(p) ?? true);
+    const shown = eng.projects.filter((p) => (app.showHidden || !p.hiddenView) && inView(p));
     const staffOf = (p) => byFolder.get(folderOfId[p.id]) || [];
-    const sorted = [...shown].sort((a, b) => (staffOf(b).length > 0) - (staffOf(a).length > 0) || (!!b.running - !!a.running) || String(b.updated || '').localeCompare(String(a.updated || '')));
+    const sorted = app.plannerSort?.(shown) || [...shown].sort((a, b) => (staffOf(b).length > 0) - (staffOf(a).length > 0) || (!!b.running - !!a.running) || String(b.updated || '').localeCompare(String(a.updated || '')));
     const face = (p) => el('button', { type: 'button', class: `staff state-${p.state}`, title: `${p.name}: ${p.words || p.state}`, onclick: () => app.pick(p.key) }, app.face(p, 30));
     // The tiles are drawn again as tokens and times change: an open More menu stays open, and a focused tile button keeps
     // the focus, so Terminal, Hide and Remove are not pulled from under the pointer or the keyboard.
-    const openMore = new Set([...box.querySelectorAll('details.more[open]')].map((d) => d.dataset.id));
-    const had = box.contains(document.activeElement) ? document.activeElement : null;
+    const openMore = new Set([...body.querySelectorAll('details.more[open]')].map((d) => d.dataset.id));
+    const had = body.contains(document.activeElement) ? document.activeElement : null;
     const focusKey = had?.dataset.act ? `[data-act="${CSS.escape(had.dataset.act)}"][data-id="${CSS.escape(had.dataset.id || '')}"]` : '';
     // The top of a tile: its staff's faces on the left, its title, description and meta lines beside them.
     const top = (head, sub, meta, faces) => el('div', { class: 'proj-top' }, el('div', { class: 'staff-row' }, faces),
       el('div', { class: 'proj-text' }, head, el('span', { class: 'proj-sub', text: sub }), el('span', { class: 'proj-meta', text: meta })));
     const tile = (p) => {
       const staff = staffOf(p);
+      // The planner's score (it opens the score window) leads the title; its marks (today, Needs work, stage,
+      // deadline, waiting, categories) sit under the description.
       return el('li', { class: `proj${p.running ? ' is-running' : ''}` },
-        top(el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: p.name, title: p.name }), app.projectStar?.(folderOfId[p.id] || p.folder, p.name),
+        top(el('div', { class: 'proj-head' }, app.plannerBadge?.(p), el('b', { class: 'proj-name', text: p.name, title: p.name }), app.projectStar?.(folderOfId[p.id] || p.folder, p.name),
           runButton(p), p.running ? el('span', { class: 'run-dot', title: `Running on port ${p.running.port}` }, `● ${p.running.port}`) : null),
         p.description || p.folder, [p.tokens ? `${tokens(p.tokens)} tokens` : '', p.updated ? `updated ${ago(p.updated)}` : ''].filter(Boolean).join(' · '),
         staff.length ? staff.map(face) : el('span', { class: 'note', text: 'Nobody in today' })),
-        app.checkMarks?.(p, browserButton(p), moreMenu(p, openMore.has(p.id))), portLine(p));
+        app.plannerTags?.(p), app.checkMarks?.(p, browserButton(p), moreMenu(p, openMore.has(p.id))), portLine(p));
     };
     // Desks with no project on the list (the projects folder itself: Consultants, or a folder elsewhere) keep a plain tile.
     const linked = new Set(Object.keys(links));
-    const loose = [...byFolder.keys()].filter((f) => (!linked.has(f) || !eng.projects.some((p) => p.id === links[f])) && (app.inFilter?.(f) ?? true));
+    const loose = [...byFolder.keys()].filter((f) => (!linked.has(f) || !eng.projects.some((p) => p.id === links[f])) && (app.inFilter?.(f) ?? true) && (app.plannerMatch?.(null, f) ?? true));
     const looseTile = (f) => el('li', { class: 'proj' }, top(el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: f || 'Consultants' })),
       f ? 'Not on the project list' : 'Threads in the projects folder itself', '', byFolder.get(f).map(face)));
     const hiddenN = eng.projects.filter((p) => p.hiddenView).length;
     const toggle = el('div', { class: 'row note' }, el('label', {}, el('input', { type: 'checkbox', checked: app.showAll, onchange: (e) => { app.showAll = e.target.checked; app.draw(); } }), ' Show everyone, not only today'),
       hiddenN ? el('label', {}, el('input', { type: 'checkbox', checked: !!app.showHidden, onchange: (e) => { app.showHidden = e.target.checked; app.draw(); } }), ` Show hidden (${hiddenN})`) : null);
     const loading = !eng.at ? el('p', { class: 'note', text: 'Reading the project list…' }) : null;
-    const drawn = swap(box, toggle, loading, el('ul', { class: 'proj-tiles' }, ...loose.map(looseTile), ...sorted.map(tile)),
-      eng.at && !sorted.length && !loose.length ? el('p', { class: 'empty', text: eng.projects.length ? 'No project in what Filter by shows. Pick All projects to see them all.' : 'No projects yet. Add a working folder under Settings.' }) : null);
-    if (drawn && focusKey) box.querySelector(focusKey)?.focus();
+    const searching = app.projSearch?.trim();
+    const drawn = swap(body, eng.at ? app.plannerBand?.(inView) : null, toggle, loading, el('ul', { class: 'proj-tiles' }, ...loose.map(looseTile), ...sorted.map(tile)),
+      eng.at && !sorted.length && !loose.length ? el('p', { class: 'empty', text: !eng.projects.length ? 'No projects yet. Add a working folder under Settings.' : searching ? `No project's name or category has "${searching}" in it. Clear the search to see them all.` : 'No project in what Filter by shows. Pick All projects to see them all.' }) : null);
+    if (drawn && focusKey) body.querySelector(focusKey)?.focus();
   };
 
   /** Projects open: every local copy the office started, in a window opened from "N projects open · View all" on the top

@@ -64,10 +64,12 @@ running).
   and waves a thank-you.
 - Above Filter by, **Show names** (the staff's names under them in the office) and **PC name** (the project's name above each desk's
   computer): untick either to see the staff better, or for a screenshot. Remembered in this browser.
-- **Filter by** (left of the office), with a choice of **Project** or **Working folder**. What it picks is what every tab
-  shows: the office, the Projects tiles, Favourites and Thoughts (prompts are not per project). Project: **All projects**,
-  then each project with someone in today and, in words, who is doing what ("1 working · 1 needs you"). Working folder:
-  each folder from Settings › Folders with its projects and people today. Click one to see only that.
+- **Filter by** (left of the office), with a choice of **Project**, **Working folder** or **Category**. What it picks is
+  what every tab shows: the office, the Projects tiles, Favourites and Thoughts (prompts are not per project). Project:
+  **All projects**, then each project with someone in today and, in words, who is doing what ("1 working · 1 needs you").
+  Working folder: each folder from Settings › Folders with its projects and people today. Category: the project
+  planner's categories (below), each with how many projects are in it, and **Categories…** to manage them. Click one to
+  see only that.
 - **Office** tab: the office seen from above. Each thread is a person at their project's desk (the project folder they
   write files in, or the one their first message says START HERE in); a thread that works in two or more projects is
   a **Consultant** at the projects folder's own desk. Working is at the desk; a thread that stopped to ask you
@@ -91,14 +93,36 @@ running).
   (its name and full folder, to paste into the AI you use; the office never starts an AI itself), **Folder**,
   **Terminal**, **Hide** (stays on the list, out of view until **Show hidden** is ticked) and **Remove from list** (its
   folder and files are never touched; Settings › Folders brings it back).
+- **The project planner**, on the Projects tab: so no project is forgotten and the important ones get real time.
+  - **Today**, at the top: the day split from your hours a day. Ready to ship first (built, waiting only for an upload;
+    no time), then paid care, then the **focus three** with their time (#1 gets half; #2 and #3 share the rest by
+    score), then the end of the day: one medium project for 40 min, the check-ins due, and one low project for a
+    20-minute "still works?" check. The medium and low ones are those that have waited longest, never picked at
+    random, and they stay for the day once picked (**Plan again** picks them afresh). Check-ins are answered with
+    **Fine for now** (its wait starts again), **Needs work** (+20 to its score until someone works on it) or **Park it**
+    (off the board), here or under Needs attention.
+  - **The score**, the number before each tile's name: it opens the score window. Five sliders (profit 30, demand 25,
+    what it means to you 20, few competitors 15, little marketing needed 10; a project not scored yet counts 50),
+    Needs work, a deadline (a hard date puts it at the top), up to two categories, and the stage: **Ready to ship**,
+    **Shipped** or **Handed over** (its handover starts), **Sold** (moved to the buyer's category, its handover starts),
+    **Back to building**, and **Park it** / **Bring it back**. Each tile also shows today's part, Needs work, its stage
+    ("Handover · day 12 of 30"), a deadline, how long it has waited and its categories, each in words.
+  - **Categories** (Today › Categories…, or Filter by › Category): who projects are for ("My projects", a client), with
+    the owner and the care plan their finished projects get (handover days and minutes, then weekly, daily or no
+    check-ins, and whether the owner pays: paid care goes at the top of the day). Changing a care plan first names
+    every project it changes, with **Change all**, **Only projects added from now on** or **Cancel**.
+  - **Hours and rules…**: hours a day (default 8), calendar or working days for a handover, a handover for your own
+    sites too, and whether paid care also lifts a score.
+  - The search box above the tiles finds a project by its name or either category; **Order** puts them **By priority**.
 - **Favourites** tab: your starred people and projects.
 - **Prompts** tab: prompts you use again and again, a tile per category. Inside one, the prompts are tiles a third wide,
   each with a **star** (☆/★: starred prompts come first, and show under **Starred** above the categories), **Copy**,
   **Edit** (which can move it), **Remove**; **New category**, **Add prompt**, **Rename** and **Delete category**; search across them all. Words in
   [brackets] are yours to fill in.
 - **Right panel:** **Needs attention** (threads with a question first, then projects: a live site down, Critical or
-  High audit findings, git waiting for a save or push; click a row to open it) and **Staff rewards** (spend the purse:
-  coffee, plants, furniture, room keys).
+  High audit findings, git waiting for a save or push; click a row to open it; and today's **check-ins** from the project
+  planner, each with Fine for now, Needs work and Park it) and **Staff rewards** (spend the purse: coffee, plants,
+  furniture, room keys).
 - **A person's card:** a star beside their name and one on their project's heading (click to make them, or the whole
   project, a favourite; point at a star to read what that does), **EDIT** (their name and look; both belong to the
   seat, so the next thread at that desk is the same person) and under it **Actions** (Run or Stop, Copy prompt, Folder,
