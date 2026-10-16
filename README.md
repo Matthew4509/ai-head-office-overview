@@ -75,9 +75,12 @@ running).
   is doing ("PHP in progress… thinking about loops?", at most one a minute each). Click someone to see them instead.
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
-  beside the port. Under them: its **Audit / Git / Live** marks with **Browser** and **More** at their end (a
-  project with no live site shows **+ Live URL**), then, when needed, **Free port N** (another program holds its port: it
-  names that program and asks before stopping it). **More** holds: **Copy prompt**
+  beside the port. When another program holds its port, Run becomes **Re-allocate**: it starts the project on the
+  next clean port (one no other project uses) instead of stopping that program, and keeps that port for next time while
+  the old one stays taken, so moves stay rare; the start port is always tried first. Under them: its **Audit / Git /
+  Live** marks with **Browser** and **More** at their end (a project with no live site shows **+ Live URL**). **More**
+  holds: **Free port N** when another program holds its port (it names that program and asks before stopping it),
+  **Copy prompt**
   (its name and full folder, to paste into the AI you use; the office never starts an AI itself), **Folder**,
   **Terminal**, **Hide** (stays on the list, out of view until **Show hidden** is ticked) and **Remove from list** (its
   folder and files are never touched; Settings › Folders brings it back).

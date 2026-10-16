@@ -92,9 +92,10 @@
     eng.busy.add(id);
     app.draw();
     try {
-      if (what === 'run') {
-        const r = await engine('/api/start', { id, key: p.commands[0]?.key, open: true });
-        say(r.dryRun ? `Test copy: ${p.name} would start (${r.dryRun}).` : `${p.name} is running${r.url ? ` at ${r.url}` : ''}.`);
+      if (what === 'run' || what === 'move') {
+        // Re-allocate (move): another program holds its port, so it starts on a clean one, kept for next time.
+        const r = await engine('/api/start', { id, key: p.commands[0]?.key, open: true, move: what === 'move' });
+        say(r.dryRun ? `Test copy: ${p.name} would start (${r.dryRun}).` : `${p.name} is running${r.url ? ` at ${r.url}` : ''}.${r.note ? ` ${r.note}` : ''}`);
       } else if (what === 'stop') {
         const r = await engine('/api/stop', { id });
         say(r.note ? `${p.name}: ${r.note}` : `${p.name} stopped.`);
@@ -134,27 +135,36 @@
   /** A small button on a project's tile, greyed while that project is busy. */
   const tileBtn = (p, what, label, title, primary) => el('button', { type: 'button', class: `btn small${primary ? ' primary' : ''}`, disabled: eng.busy.has(p.id), title, 'data-act': what, 'data-id': p.id,
     onclick: (e) => { const menu = e.currentTarget.closest('details'); if (menu) menu.open = false; act(p.id, what); } }, label);
-  /** Run or Stop, on the tile's title line left of the port; nothing there when it has no start command. */
+  /** What Run does now: [what, label, title]. Re-allocate when another program holds its port (it starts on a clean
+   * port instead of stopping that program; the move is kept, so it stays rare); null with no start command. */
+  function runOf(p) {
+    if (!p.commands.length) return null;
+    const busy = eng.busy.has(p.id);
+    if (p.portInUse) return ['move', busy ? 'Starting…' : 'Re-allocate', `Another program holds port ${p.portInUse}. Re-allocate starts ${p.name} on a clean port instead (the same one again next time, while ${p.portInUse} stays taken). To stop that program instead: Free port, under More.`];
+    return ['run', busy ? 'Starting…' : 'Run', `Start ${p.name}'s local copy (${p.commands[0].name || 'its start command'}${p.commands[0].port ? `, port ${p.commands[0].port}` : ''}) and open it`];
+  }
+  /** Free port: stops the program holding the project's port (it asks first). Kept under More: Re-allocate comes first. */
+  const freePortOf = (p) => (p.portInUse && !p.running ? ['free-port', `Free port ${p.portInUse}`, `Stop the program holding port ${p.portInUse} so ${p.name} can use its own port (it names the program and asks first)`] : null);
+  /** Run, Re-allocate or Stop, on the tile's title line left of the port; nothing there when it has no start command. */
   function runButton(p) {
     if (p.running) return tileBtn(p, 'stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`);
-    if (!p.commands.length) return null;
-    return tileBtn(p, 'run', eng.busy.has(p.id) ? 'Starting…' : 'Run', `Start ${p.name}'s local copy (${p.commands[0].name || 'its start command'}${p.commands[0].port ? `, port ${p.commands[0].port}` : ''}) and open it`, true);
+    const r = runOf(p);
+    return r ? tileBtn(p, ...r, true) : null;
   }
   /** Browser, at the end of the Audit / Git / Live marks: only when the project has a local address. */
   const browserButton = (p) => (p.running || p.commands.some((c) => c.port) ? tileBtn(p, 'browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null);
-  /** Under the marks, only when there is one: Free port (another program holds its port) or "No start command". */
+  /** Under the marks, only when the project has no start command. */
   function portLine(p) {
-    const port = p.portInUse && !p.running ? tileBtn(p, 'free-port', `Free port ${p.portInUse}`, `Another program holds port ${p.portInUse}: stop it so ${p.name} can run`) : null;
-    const none = p.commands.length ? null : el('span', { class: 'note', title: 'No start command in the project\'s .claude/launch.json or project.json' }, 'No start command');
-    return port || none ? el('div', { class: 'row proj-actions' }, port, none) : null;
+    return p.commands.length ? null : el('div', { class: 'row proj-actions' }, el('span', { class: 'note', title: 'No start command in the project\'s .claude/launch.json or project.json' }, 'No start command'));
   }
-  /** The tile's More menu (Copy prompt, Folder, Terminal, Hide, Remove from list), at the end of the marks line. */
+  /** The tile's More menu (Free port when shown, Copy prompt, Folder, Terminal, Hide, Remove from list), at the end of
+   * the marks line. */
   function moreMenu(p, open) {
     const b = (what, label, title) => tileBtn(p, what, label, title);
     const more = el('details', { class: 'more', open: !!open, 'data-id': p.id,
       onkeydown: (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } } },
     el('summary', { class: 'btn small', title: `More for ${p.name}`, 'data-act': 'more', 'data-id': p.id }, 'More'),
-      el('div', { class: 'more-menu' }, b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
+      el('div', { class: 'more-menu' }, freePortOf(p) ? b(...freePortOf(p)) : null, b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
         b('folder', 'Folder', `Open ${p.name}'s folder`), b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
         p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
         b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`)));
@@ -167,9 +177,8 @@
     const b = (what, label, title) => el('button', { type: 'button', class: 'btn', disabled: busy, title, 'data-act': what, 'data-id': p.id,
       onclick: (e) => { e.currentTarget.closest('details').open = false; act(p.id, what); } }, label);
     const items = [
-      p.running ? b('stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`)
-        : p.commands.length ? b('run', busy ? 'Starting…' : 'Run', `Start ${p.name}'s local copy (${p.commands[0].name || 'its start command'}${p.commands[0].port ? `, port ${p.commands[0].port}` : ''}) and open it`) : null,
-      p.portInUse && !p.running ? b('free-port', `Free port ${p.portInUse}`, `Another program holds port ${p.portInUse}: stop it so ${p.name} can run`) : null,
+      p.running ? b('stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`) : runOf(p) ? b(...runOf(p)) : null,
+      freePortOf(p) ? b(...freePortOf(p)) : null,
       b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
       b('folder', 'Folder', `Open ${p.name}'s folder`),
       b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),

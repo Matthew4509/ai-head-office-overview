@@ -1,0 +1,30 @@
+// Tests for Re-allocate (lib/runner.js onPort): a start command moved to a clean port names the new port wherever it
+// named the old one as a whole number, and nowhere else. Run: node test/port-move.test.js
+'use strict';
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const assert = require('assert');
+// lib/state reads (and on a first run writes) the settings in the data folder: a throwaway one here.
+process.env.AHO_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-move-'));
+const { onPort } = require('../lib/runner');
+
+let failures = 0;
+const check = (name, fn) => { try { fn(); console.log('ok   ' + name); } catch (e) { failures++; console.log('FAIL ' + name + ': ' + e.message); } };
+
+check('the port in the arguments is swapped: alone, after a host, after = and inside a flag', () => {
+  const c = onPort({ exe: 'node', args: ['serve.js', '5307', '127.0.0.1:5307', '--port=5307', '-p', '5307'], port: 5307 }, 5307, 5309);
+  assert.deepStrictEqual(c.args, ['serve.js', '5309', '127.0.0.1:5309', '--port=5309', '-p', '5309']);
+  assert(c.port === 5309 && c.env.PORT === '5309' && c.moved.named === true && c.moved.from === 5307, JSON.stringify(c));
+});
+check('a longer number that only contains the port is left alone', () => {
+  const c = onPort({ args: ['53070', '15307', 'v5307x'], port: 5307 }, 5307, 5309);
+  assert.deepStrictEqual(c.args, ['53070', '15307', 'v5309x']);
+});
+check('a command that does not name its port is moved through PORT only, and says so', () => {
+  const c = onPort({ exe: 'npm', args: ['run', 'dev'], port: 3000 }, 3000, 3001);
+  assert(c.args.join(' ') === 'run dev' && c.env.PORT === '3001' && c.moved.named === false, JSON.stringify(c));
+});
+try { fs.rmSync(process.env.AHO_DATA, { recursive: true, force: true }); } catch { /* left in temp */ }
+console.log(failures ? failures + ' failed' : 'all passed');
+process.exit(failures ? 1 : 0);
