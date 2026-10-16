@@ -52,12 +52,24 @@ export function emptyThread(id, since = '') {
     /** The last snag, for the staff's quips: { at, kind: 'failed' (a command or step that ended in an error) | 'bug'
      * (the AI's own words say it found a bug) }, or null. */
     snag: null,
+    /** When the last few snags happened (newest last), to count a run of them: see snagAt. */
+    snagTimes: [],
   };
 }
 
 /** The AI saying it found a bug or its cause ("Found the bug", "the root cause is"). Plain words only, so a quip
  * follows a real find, not every mention of the word. */
 const BUG_FOUND = /\b(found (the|a|another) (bug|problem|cause)|the bug (is|was)|that'?s the bug|root cause|the cause (is|was)|caught (a|the) bug|a bug in)\b/i;
+/** A big bug: this many snags within SNAG_WINDOW. */
+export const BIG_BUG = 3;
+const SNAG_WINDOW = 15 * 60e3;
+/** A snag at `at`: kept with `run`, how many snags the thread has hit within the last 15 minutes (this one too). */
+function snagAt(t, at, kind) {
+  t.snagTimes = [...(t.snagTimes || []), at].slice(-10);
+  const ms = Date.parse(at);
+  const run = t.snagTimes.filter((x) => ms - Date.parse(x) <= SNAG_WINDOW && Date.parse(x) <= ms).length;
+  t.snag = { at, kind, run };
+}
 /** A tool result that is an error, but not one the person chose (a step they declined or stopped). */
 function failedResult(c) {
   return c.some((x) => x && x.type === 'tool_result' && x.is_error && !/doesn't want to proceed|was rejected|interrupted by user|user declined/i.test(textOf(x.content)));
@@ -176,7 +188,7 @@ export function addLine(t, l) {
     if (isResult) {
       t.last = { kind: 'result', at };
       t.asked = '';
-      if (failedResult(c)) t.snag = { at, kind: 'failed' };
+      if (failedResult(c)) snagAt(t, at, 'failed');
       return;
     }
     if (l.isMeta) return;
@@ -235,7 +247,7 @@ export function addLine(t, l) {
       }
     } else if (b.type === 'text' && b.text) {
       pushMsg(t, at, 'ai', b.text);
-      if (BUG_FOUND.test(b.text)) t.snag = { at, kind: 'bug' };
+      if (BUG_FOUND.test(b.text)) snagAt(t, at, 'bug');
       if (ended) {
         t.last = { kind: 'done', at };
         t.asked = questionIn(b.text);

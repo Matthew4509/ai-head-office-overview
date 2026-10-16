@@ -62,9 +62,11 @@
   app.checkMarks = (p, ...after) => {
     const mark = (l, label, what, title) => el('button', { type: 'button', class: `mark ${l.cls}`, title, 'aria-label': `${label}: ${l.text}`, onclick: () => what(p.id) }, el('span', { 'aria-hidden': 'true' }, l.mark), ` ${l.text}`);
     const a = auditLabel(p.audit), g = gitLabel(p.git), l = liveLabel(p);
+    // On a tile, "No git" sits in its More menu instead (projects.js moreMenu); a person's card, with no More, keeps it here.
+    const gitInMore = p.git?.state === 'none' && after.some((x) => x?.classList?.contains('more'));
     return el('div', { class: 'row marks' },
       mark(a, 'Audit', auditWindow, p.audit ? `Last audit ${when(p.audit.ranAt)}` : 'No audit yet: open to run one'),
-      mark(g, 'Git', gitWindow, g.say),
+      gitInMore ? null : mark(g, 'Git', gitWindow, g.say),
       mark(l, 'Live site', liveWindow, p.liveUrl ? `${hostOf(p.liveUrl)}: ${p.live ? p.live.reason : 'not checked yet'}` : 'Add the address this project is hosted at'), ...after);
   };
 

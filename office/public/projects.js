@@ -164,7 +164,11 @@
     const more = el('details', { class: 'more', open: !!open, 'data-id': p.id,
       onkeydown: (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } } },
     el('summary', { class: 'btn small', title: `More for ${p.name}`, 'data-act': 'more', 'data-id': p.id }, 'More'),
-      el('div', { class: 'more-menu' }, freePortOf(p) ? b(...freePortOf(p)) : null, b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
+      el('div', { class: 'more-menu' }, freePortOf(p) ? b(...freePortOf(p)) : null,
+        // No git: kept in here rather than on the marks line, to tidy the tile; it opens the Git window (how to start one).
+        p.git?.state === 'none' ? el('button', { type: 'button', class: 'btn small', 'data-act': 'git', 'data-id': p.id, title: 'Not in git: no saved history and no backup copy. Opens how to start one',
+          onclick: (e) => { e.currentTarget.closest('details').open = false; app.gitWindow?.(p.id); } }, '○ No git…') : null,
+        b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
         b('folder', 'Folder', `Open ${p.name}'s folder`), b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
         p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
         b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`)));

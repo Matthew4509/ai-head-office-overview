@@ -58,11 +58,19 @@ running).
   online. Point at the auto button to see today's sunrise and sunset.
 - **A room bought** (Staff rewards, or a click on a locked room): the IT tech walks in and unlocks its door, then
   everyone with nothing to do runs in, jumping and spinning, for a few seconds; whoever is busy cheers from their desk.
-  The staff notice the tech once the tech comes in by the front door, not at the moment you buy.
+  The staff notice the tech once the tech comes in by the front door, not at the moment you buy. Both rooms bought
+  together: the tech opens one, then walks on to the other, and each gets its look-round.
 - **Furniture bought:** a fitter carries it in and sets it up, and it shows in the room once they have. Several pieces
   bought together are set up one after another, and a piece bought while the fitter is leaving turns them back. The
   staff notice the fitter at the front door; beach gear (deck chairs, volleyball) goes along the path outside, so they
   notice it once the fitter is on the sand.
+- **Pet rocks** and **Rubber ducks** (Staff rewards › Desks), bought apart: a rock (left) and a duck (right) sit on
+  every computer, each with a name of its own; point at one to see its name and whose desk it is on. The rock never
+  leaves the desk, so whoever works alone always has a friend (now and then they say a word to it, by name). The duck
+  is for explaining a problem to: whoever goes to a meeting carries theirs. A big bug, three snags in a quarter of an hour in one thread (steps that ended in an error, or
+  the AI saying it found a bug), calls **the council of ducks**: the one with the bug, everyone free and anyone thinking
+  there gather round the meeting room table for a minute and a half, their ducks in a ring on it. It needs the meeting
+  room table, and sits at most once every five minutes.
 - **Treats** (pizza, donuts, sandwiches, coffee): each order comes in with its own courier, so pizza, donuts and coffee
   bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something turns to face you
   and waves a thank-you.
@@ -96,6 +104,7 @@ running).
   the old one stays taken, so moves stay rare; the start port is always tried first. Under them: its **Audit / Git /
   Live** marks with **Browser** and **More** at their end (a project with no live site shows **+ Live URL**). **More**
   holds: **Free port N** when another program holds its port (it names that program and asks before stopping it),
+  **No git…** for a project not in git (its Git mark moves in here, to keep the tile tidy; it opens how to start one),
   **Copy prompt**
   (its name and full folder, to paste into the AI you use; the office never starts an AI itself), **Folder**,
   **Terminal**, **Hide** (stays on the list, out of view until **Show hidden** is ticked) and **Remove from list** (its

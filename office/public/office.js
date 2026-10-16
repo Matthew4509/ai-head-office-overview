@@ -133,9 +133,10 @@
   /** Every office starts empty: what is bought comes from the server (src/shop.mjs roomsOf). */
   const EMPTY = { boardroom: { table: false, chairs: 0, whiteboard: false, plants: false }, lounge: { armchair: false, bookcase: false, sofa: false, tv: false, gym: false, arcade: false }, rest: ['coffee', 'vending', 'lunch'], away: ['window'], deckchairs: 0, volleyball: false, locked: { boardroom: true, lounge: true } };
   /** A room still locked (its key not bought yet): its door stays shut with a padlock on it. */
-  // A room just bought stays shut (world.unlocking) until the IT tech has walked over and unlocked it.
-  const lockedRoom = (r) => !!r.lock && (!!world.rooms.locked?.[r.lock] || world.unlocking === r.lock);
-  const world = { desks: [], deckOrder: [], people: new Map(), staff: [], time: 0, selected: null, seenAt: 0, first: true, grid: [], layout: '', table: [], tableAt: 0, thoughts: [], fitting: [], serverRooms: null, rooms: EMPTY, roomsKey: '', purse: null, shop: [], recent: [], blocks: FIXED, filter: undefined, unlocking: null, party: null };
+  // A room just bought stays shut (world.unlocking: the rooms bought, in turn) until the IT tech has walked over and
+  // unlocked it. Two bought together: the tech opens one, then walks on to the other.
+  const lockedRoom = (r) => !!r.lock && (!!world.rooms.locked?.[r.lock] || world.unlocking.includes(r.lock));
+  const world = { desks: [], deckOrder: [], people: new Map(), staff: [], time: 0, selected: null, seenAt: 0, first: true, grid: [], layout: '', table: [], tableAt: 0, thoughts: [], fitting: [], serverRooms: null, rooms: EMPTY, roomsKey: '', purse: null, shop: [], recent: [], blocks: FIXED, filter: undefined, unlocking: [], party: null };
   /** The pieces in the way now: the fixed ones and whatever is bought. */
   const blocksOf = () => [...FIXED, ...Object.entries(PIECES).filter(([k]) => (k === 'table' ? world.rooms.boardroom.table : world.rooms.lounge[k])).map(([, b]) => b), ...(world.rooms.lounge.gym ? GYM : []), ...(world.rooms.boardroom.plants ? PLANTS.map((p) => ({ x: p.x - 14, y: p.y - 14, w: 28, h: 28 })) : [])];
   const views = [];
@@ -265,6 +266,9 @@
       const more = Math.floor(i / TOWELS.length);
       return { key: `towel:${i}`, x: x + more * 14, y: y - more * 6, face: 'south', area: 'towel' };
     }
+    // The council of ducks sits first: a big bug outranks everything else in the office.
+    const council = councilSeat(p);
+    if (council) return council;
     // A room just opened, or a piece just set up with a place for them: those waiting for you go and look too.
     const freeNow = world.staff.filter((x) => x.doing === 'resting' || x.doing === 'needs');
     const partyOn = (!!world.party && world.time < world.party.until)
@@ -398,6 +402,7 @@
   /** Where a piece just set up is tried out: the volleyball court (four places), the newest deck chair, a lounge
    * piece's own spot, or round the meeting room table. */
   function tryOutSpots(piece) {
+    if (piece === 'ducks' || piece === 'rocks') return [];
     if (piece === 'volleyball') return VOLLEY.map(([x, y, face]) => ({ x, y, face, area: 'volley' }));
     if (piece === 'deckchair') {
       const i = Math.max(0, Math.min(world.rooms.deckchairs, DECK.length) - 1);
@@ -412,6 +417,48 @@
 
   /** Favourites on a towel, in a steady order (so nobody swaps towels when someone else arrives). */
   const towelers = () => world.staff.filter((x) => x.doing === 'towel').sort((a, b) => (a.id < b.id ? -1 : 1));
+
+  /** The council of ducks: a big bug (BIG_BUG snags in a quarter of an hour, measured from the thread) calls the one
+   * with it and everyone free (and anyone thinking in the meeting room) round the table for COUNCIL_SECONDS, their ducks
+   * in a ring on it. Needs the ducks and the table; at most one every COUNCIL_GAP seconds. */
+  const BIG_BUG = 3;
+  const COUNCIL_SECONDS = 90;
+  const COUNCIL_GAP = 300;
+  const COUNCIL_CALL = ['This bug is too big for one duck. Assemble the council!', 'Three snags in a row? Summon the council of ducks!', 'I need more ducks. Council, to the meeting room!'];
+  const COUNCIL_JOIN = ['The council of ducks is in session.', 'Bringing my duck!', 'Quack. I mean: coming.', 'The ducks will hear this.'];
+  const COUNCIL_DONE = ['The council has spoken. Back to it!', 'The ducks have listened. I know what to try.', 'Thank you, council. Meeting closed.'];
+  const councilOn = () => !!world.council && world.time < world.council.until && world.rooms.boardroom.table && world.rooms.ducks;
+  /** Round the table, in order: the one with the bug, those thinking there, then the free. */
+  function councilList() {
+    if (!councilOn()) return [];
+    const here = (x) => { const o = world.people.get(x.id); return o && !o.leaving && x.doing !== 'towel'; };
+    const thinkers = new Set(boardroomThinkers().map((x) => x.id));
+    const lead = world.staff.filter((x) => x.id === world.council.id && here(x));
+    const rest = world.staff.filter((x) => x.id !== world.council.id && here(x) && (x.doing === 'resting' || thinkers.has(x.id)));
+    return [...lead, ...rest].slice(0, MEETING.length + STANDING.length);
+  }
+  function councilSeat(p) {
+    const i = councilList().findIndex((x) => x.id === p.id);
+    if (i < 0) return null;
+    const seat = i < MEETING.length ? MEETING[seatOrder()[i]] : STANDING[(i - MEETING.length) % STANDING.length];
+    return { key: `council:${i}`, x: seat[0], y: seat[1], face: seat[2], area: 'boardroom', council: true, chair: i < world.rooms.boardroom.chairs };
+  }
+  function callCouncil(p) {
+    if (!world.rooms.ducks || councilOn() || clock() - (world.councilAt ?? -Infinity) < COUNCIL_GAP) return;
+    world.councilAt = clock();
+    if (!world.rooms.boardroom.table) { say(p, 'This one needs the council of ducks… if only the meeting room had a table.', 4); return; }
+    world.council = { id: p.id, until: world.time + COUNCIL_SECONDS };
+    say(p, COUNCIL_CALL[(p.seed + (world.councils = (world.councils || 0) + 1)) % COUNCIL_CALL.length], 4);
+    present().filter((o) => o !== p && o.row?.doing === 'resting').slice(0, 2).forEach((o, i) => say(o, COUNCIL_JOIN[(o.seed + i + world.councils) % COUNCIL_JOIN.length], 3));
+    for (const o of world.people.values()) o.targetKey = '';
+    wake();
+  }
+  function endCouncil() {
+    const lead = world.people.get(world.council.id);
+    if (lead && !lead.leaving) say(lead, COUNCIL_DONE[(lead.seed + (world.councils || 0)) % COUNCIL_DONE.length], 4);
+    world.council = null;
+    for (const o of world.people.values()) if (o.target?.council) o.targetKey = '';
+  }
 
   /** Who is in the meeting room thinking now; nobody without a table. */
   function thinkersNow() {
@@ -602,6 +649,8 @@
     'Waiting on the test runner…',
     'Running {low}. Kettle on while it goes.',
   ];
+  /** A word with the pet rock, for someone alone at their desk. */
+  const ROCK_LINES = ['Just me and {rock}. Best team in the office.', 'You get me, {rock}.', '{rock} says the code looks fine. {rock} is a rock.', 'Never alone with {rock} here.', 'Morning, {rock}. Ready to ship?'];
   /** Quips at a real snag in the thread: the AI saying it found a bug, or a step that ended in an error. */
   const QUIPS = {
     bug: [
@@ -702,13 +751,15 @@
       // A real snag in their thread (a step that ended in an error, or the AI saying it found a bug): a quip, out loud
       // and in the chat, at most one every 3 minutes each, and only for a snag of the last 2 minutes.
       const snagAt = s.snag?.at || '';
-      if (p.row && !snap && snagAt && snagAt !== p.row.snag?.at && nowMs - Date.parse(snagAt) < 120000 && clock() - (p.quipAt ?? -Infinity) > 180) {
+      const freshSnag = p.row && !snap && snagAt && snagAt !== p.row.snag?.at && nowMs - Date.parse(snagAt) < 120000;
+      if (freshSnag && clock() - (p.quipAt ?? -Infinity) > 180) {
         const lines = QUIPS[s.snag.kind] || QUIPS.failed;
         const line = lines[(p.seed + (world.quips = (world.quips || 0) + 1)) % lines.length];
         say(p, line, 4);
         think(p, line);
         p.quipAt = clock();
       }
+      if (freshSnag && s.snag.run >= BIG_BUG) callCouncil(p);
       p.row = s;
       // A new step in their work: a thought about it (at most one a minute each, so the list is not all work).
       if (s.doingText !== wasWords && clock() - (p.workThoughtAt ?? -Infinity) > 60) {
@@ -760,6 +811,7 @@
       }
       if (p.target?.rest && world.time > p.restUntil) retarget(p);
     }
+    if (world.council && world.time > world.council.until) endCouncil();
     stepCourier(dt);
     stepTech(dt);
     stepFitter(dt);
@@ -919,7 +971,12 @@
     return { x: edge + (i % 2 === 0 ? 26 : -26), y: i < 2 ? 190 : 610, face: i % 2 === 0 ? 'west' : 'east' };
   }
   function callTech(lock) {
-    world.unlocking = lock;
+    if (!world.unlocking.includes(lock)) world.unlocking.push(lock);
+    // Already here for another room: this one is next (on the way out, the tech turns back for it).
+    if (tech) {
+      if (tech.phase === 'leaving') nextRoom(tech);
+      return;
+    }
     const d = doorOf(lock);
     const look = L ? { ...L.fromId('it-tech'), top: 'sky', headwear: 'none', glasses: 'none' } : null;
     tech = { id: 'tech', row: { name: 'IT tech', doing: 'courier' }, lock, x: GONE[0], y: GONE[1], face: 'east', look, seed: 7, phase: 'coming', bubble: '', bubbleUntil: 0, path: route(GONE[0], GONE[1], d.x, d.y) };
@@ -944,15 +1001,25 @@
       if (world.time < k.doneAt) return;
       openRoom(k.lock);
       say(k, 'All yours!', 3);
-      k.phase = 'leaving';
-      k.path = route(k.x, k.y, GONE[0], GONE[1]);
+      if (world.unlocking.length) nextRoom(k);
+      else {
+        k.phase = 'leaving';
+        k.path = route(k.x, k.y, GONE[0], GONE[1]);
+      }
       return;
     }
     tech = null;
   }
+  /** The tech walks on to the next room bought, from wherever they are. */
+  function nextRoom(k) {
+    const d = doorOf(world.unlocking[0]);
+    Object.assign(k, { lock: world.unlocking[0], phase: 'coming', noticed: false, path: route(k.x, k.y, d.x, d.y) });
+    say(k, 'And the next one!', 3);
+    wake();
+  }
   /** The door opens: the lights come on, the way in is walkable, and everyone free runs in (the busy ones cheer). */
   function openRoom(lock) {
-    world.unlocking = null;
+    world.unlocking = world.unlocking.filter((l) => l !== lock);
     background = null;
     regrid();
     world.party = { lock, until: world.time + PARTY_SECONDS };
@@ -981,6 +1048,8 @@
       else if (id in r.lounge) r.lounge[id] = false;
       else if (id === 'deckchair') r.deckchairs = Math.max(0, r.deckchairs - 1);
       else if (id === 'volleyball') r.volleyball = false;
+      else if (id === 'ducks') r.ducks = false;
+      else if (id === 'rocks') r.rocks = false;
     }
     const has = (spot) => !SPOT_PIECE[spot] || r.lounge[SPOT_PIECE[spot]];
     r.rest = r.rest.filter(has);
@@ -993,6 +1062,8 @@
     const spots = {
       table: [905, 300], chairs: [905, 300], whiteboard: [1090, 185], plants: [705, 85],
       armchair: [765, 660], bookcase: [735, 545], sofa: [1020, 645], tv: [1030, 575], gym: [860, 625], arcade: [1095, 540],
+      ducks: [270, 140],
+      rocks: [270, 140],
       deckchair: [(DECK[Math.min(world.rooms.deckchairs, DECK.length - 1)] ?? DECK[0])[0], 826], volleyball: [NET.x - 25, 866],
     };
     return spots[id] ?? [905, 610];
@@ -1082,9 +1153,9 @@
   }
   /** A piece of furniture in words, for the first cheer when it is set up. */
   const PIECE_WORDS = { table: 'a meeting room table', chairs: 'new chairs', whiteboard: 'a whiteboard', plants: 'plants', armchair: 'an armchair', bookcase: 'a bookcase',
-    sofa: 'a sofa', tv: 'a TV', gym: 'a gym', arcade: 'an arcade machine', deckchair: 'new deck chairs', volleyball: 'a volleyball net' };
+    sofa: 'a sofa', tv: 'a TV', gym: 'a gym', arcade: 'an arcade machine', deckchair: 'new deck chairs', volleyball: 'a volleyball net', ducks: 'rubber ducks', rocks: 'pet rocks' };
   /** A piece's short name ("Trying the new deck chair"). */
-  const PIECE_NAME = { table: 'table', chairs: 'chairs', whiteboard: 'whiteboard', plants: 'plants', armchair: 'armchair', bookcase: 'bookcase', sofa: 'sofa', tv: 'TV', gym: 'gym', arcade: 'arcade machine', deckchair: 'deck chair', volleyball: 'volleyball net' };
+  const PIECE_NAME = { table: 'table', chairs: 'chairs', whiteboard: 'whiteboard', plants: 'plants', armchair: 'armchair', bookcase: 'bookcase', sofa: 'sofa', tv: 'TV', gym: 'gym', arcade: 'arcade machine', deckchair: 'deck chair', volleyball: 'volleyball net', ducks: 'rubber ducks', rocks: 'pet rocks' };
   /** Everyone else, when a piece is set up. */
   const INSTALLED = ['Thanks, boss!', 'Nice!', 'Very smart!', 'I\'ll try it out soon.', 'Ooh, fancy.', 'Best boss ever.'];
   /** A cardboard box, carried in by the fitter. */
@@ -1125,9 +1196,12 @@
   }
 
   /** What someone has in their hands (press them to see it). */
+  /** Their rubber duck goes with them to a meeting (at the council it sits on the table). */
+  const carriesDuck = (p) => world.rooms.ducks && p.target?.area === 'boardroom' && !p.carry && (!p.target.council || p.path.length > 0);
   function holding(p) {
     const items = [];
     const still = !p.path.length;
+    if (carriesDuck(p)) items.push('their rubber duck');
     if (p.coffee === 'have' && world.time < p.coffeeUntil) items.push('a coffee (your treat)');
     if (p.slice && world.time < p.sliceUntil) items.push(`${FOOD[p.slice].holding}, brought over (your treat)`);
     else if (p.target?.pizza && still) items.push(FOOD[foodOf(p)].holding);
@@ -1152,6 +1226,11 @@
       thank(p);
     }
     if (p.targetKey === 'gone') p.out = true;
+    if (world.rooms.rocks && p.target?.area === 'desk' && !p.leaving && (p.target.desk?.crew.length ?? 1) <= 1 && clock() - (p.rockAt ?? -Infinity) > 600) {
+      p.rockAt = clock();
+      const rock = friendName('rock', p.target.desk?.key ?? '', Number(String(p.targetKey).split(':').pop()) || 0);
+      think(p, ROCK_LINES[(p.seed + (world.rockLines = (world.rockLines || 0) + 1)) % ROCK_LINES.length].replaceAll('{rock}', rock));
+    }
     if (p.target?.area === 'volley' && !p.volleyUntil) p.volleyUntil = world.time + VOLLEY_GAME + Math.random() * VOLLEY_GAME;
   }
 
@@ -1160,6 +1239,7 @@
     const s = p.row;
     const t = p.target;
     if (t?.pizza) return p.path.length ? FOOD[foodOf(p)].going : FOOD[foodOf(p)].having;
+    if (t?.council) return p.path.length ? 'Off to the council of ducks, duck in hand' : p.id === world.council?.id ? 'Explaining the bug to the council of ducks' : 'Sitting on the council of ducks';
     if (t?.helping) {
       const lead = thinkersNow()[0]?.name ?? 'someone';
       return p.path.length ? `Off to the meeting room to help ${lead} think` : `Helping ${lead} think`;
@@ -1444,6 +1524,25 @@
   }
 
   /** Each desk's screens (what the person at it is doing) and its project's name above it. */
+  /** A desk's rubber ducks and pet rocks: one of each per seat (once bought), on top of its computer, the rock on the
+   * left and the duck on the right; the duck is away while its owner is in a meeting. Each has a name of its own, kept
+   * by the desk and seat, shown when the pointer is on it. */
+  const DUCK_NAMES = ['Sir Quacks-a-lot', 'Quackers', 'Duckworth', 'Captain Quack', 'Puddles', 'Professor Paddles', 'Waddles', 'Bill'];
+  const ROCK_NAMES = ['Rocky', 'Pebbles', 'Dwayne', 'Sandy', 'Boulder', 'Rockefeller', 'Stoney', 'Flint'];
+  const friendName = (kind, deskKey, i) => (kind === 'duck' ? DUCK_NAMES : ROCK_NAMES)[hash(`${kind}:${deskKey}:${i}`) % 8];
+  const FRIEND_SIZE = 1;
+  function friendsOf(d) {
+    const n = d.seats.length;
+    const mw = n === 1 ? 40 : n === 2 ? 36 : 26;
+    const out = [];
+    d.seats.forEach((off, i) => {
+      const x = d.x + off;
+      const who = world.people.get(d.crew[i]);
+      if (world.rooms.rocks) out.push({ kind: 'rock', x: x - mw / 2 + 5, y: d.y - 19, i, who, name: friendName('rock', d.key, i) });
+      if (world.rooms.ducks && who?.target?.area !== 'boardroom') out.push({ kind: 'duck', x: x + mw / 2 - 5, y: d.y - 20, i, who, name: friendName('duck', d.key, i) });
+    });
+    return out;
+  }
   function drawDesks(c, full) {
     for (const d of world.desks) {
       const n = d.seats.length;
@@ -1456,6 +1555,7 @@
         drawScreen(c, x, d.y - 12, mw - 8, sat ? who.row.doing : 'idle');
         box(c, x - mw / 2 + 3, d.y + 7, mw - 6, 7, 2, '#fff7e9', INK, 2);
       });
+      for (const fr of friendsOf(d)) (fr.kind === 'duck' ? duck(c, fr.x, fr.y, FRIEND_SIZE, 'west') : petRock(c, fr.x, fr.y, FRIEND_SIZE));
       // The project's name above its computer, unless PC name is unticked (to see the staff better).
       if (full && app()?.showPcName !== false) {
         const size = labelSize(c) * 0.85;
@@ -1592,6 +1692,28 @@
     c.stroke();
     line(c, x - r * 0.45, y + r * 0.35, x + r * 0.45, y + r * 0.35, '#7cc47f', 1.5);
   }
+  /** A pet rock at (x, y): a grey pebble with two googly eyes. `s` times the size of one on a desk. */
+  function petRock(c, x, y, s = 1) {
+    oval(c, x, y, 5.5 * s, 3.8 * s, '#9aa1a8', INK, 1.2);
+    for (const dx of [-1.8, 1.8]) {
+      oval(c, x + dx * s, y - 1 * s, 1.5 * s, 1.5 * s, '#ffffff', INK, 0.8);
+      oval(c, x + dx * s + 0.4 * s, y - 0.8 * s, 0.6 * s, 0.6 * s, INK, null);
+    }
+  }
+  /** A rubber duck at (x, y), `s` times the size of one on a desk, looking east or west. */
+  function duck(c, x, y, s = 1, face = 'east') {
+    const d = face === 'west' ? -1 : 1;
+    oval(c, x, y, 6 * s, 4.2 * s, '#ffd23f', INK, 1.2);
+    oval(c, x + d * 3.6 * s, y - 4.4 * s, 3.2 * s, 3 * s, '#ffd23f', INK, 1.2);
+    c.beginPath();
+    c.moveTo(x + d * 6.4 * s, y - 5 * s);
+    c.lineTo(x + d * 9.4 * s, y - 4 * s);
+    c.lineTo(x + d * 6.4 * s, y - 3 * s);
+    c.closePath();
+    c.fillStyle = tone('#f08a24');
+    c.fill();
+    oval(c, x + d * 4.4 * s, y - 5.2 * s, 0.7 * s, 0.7 * s, INK, null);
+  }
   function donut(c, x, y, r, icing) {
     oval(c, x, y, r, r, '#d39a5a', INK, 1.2);
     oval(c, x, y, r * 0.72, r * 0.72, icing, null);
@@ -1656,6 +1778,7 @@
       else if (p.coffee === 'have' && world.time < p.coffeeUntil) coffeeHeld(c, { ...p, y });
       else if (breakOf(p) && !walk) drinkHeld(c, { ...p, y });
       if (p.slice && world.time < p.sliceUntil && !p.carry) sliceHeld(c, { ...p, y }, p.slice);
+      else if (carriesDuck(p)) duck(c, p.x + (p.face === 'west' ? 15 : -15), y - 2, 0.8, p.face === 'west' ? 'west' : 'east');
       if (full && p.bubbleUntil > world.time) bubble(c, { ...p, y }, size);
       else drawIcon(c, { ...p, y });
       if (world.selected === p.id) {
@@ -1747,10 +1870,17 @@
     for (const r of ROOMS.filter(lockedRoom)) {
       padlock(c, r.x + r.w / 2, r.y + r.h / 2 - 22, 2.6, '#c9d3dc');
       const key = world.shop.find((i) => i.unlocks === r.lock);
-      if (full) text(c, world.unlocking === r.lock ? 'Bought: the IT tech is on the way to unlock it' : `Locked: click to unlock${key ? ` (${big(key.price)} tokens)` : ''}`, r.x + r.w / 2, r.y + r.h / 2 + 50, labelSize(c) * 0.9, '#e8eef4', 'center');
+      if (full) text(c, world.unlocking.includes(r.lock) ? 'Bought: the IT tech is on the way to unlock it' : `Locked: click to unlock${key ? ` (${big(key.price)} tokens)` : ''}`, r.x + r.w / 2, r.y + r.h / 2 + 50, labelSize(c) * 0.9, '#e8eef4', 'center');
     }
     if (full && !world.people.size) text(c, 'Nobody in yet: start a thread in Claude and they come in.', 290, 200, labelSize(c), floorSoft(), 'center');
     drawDesks(c, full);
+    if (councilOn()) {
+      const n = Math.max(5, councilList().length);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        duck(c, 905 + Math.cos(a) * 95, 197 + Math.sin(a) * 30, 1.3, Math.cos(a) > 0 ? 'west' : 'east');
+      }
+    }
     for (const p of world.people.values()) if (p.target?.area === 'towel' && !p.path.length && !p.leaving) towel(c, p.target.x, p.target.y, p.seed);
     // The food on the kitchen table: one box in the middle, or two or three side by side (smaller, to fit the table).
     const SPOTS = [[[305, 1]], [[268, 0.9], [342, 0.9]], [[257, 0.66], [305, 0.66], [353, 0.66]]][Math.min(world.table.length, 3) - 1] ?? [];
@@ -1860,9 +1990,11 @@
     return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H];
   }
   const personAt = (x, y) => [...world.people.values()].filter((p) => !p.out).sort((a, b) => b.y - a.y).find((p) => Math.hypot(p.x - x, p.y - 10 - y) < 28);
+  /** A duck or rock under the pointer, or null. */
+  const friendUnder = (x, y) => world.desks.flatMap(friendsOf).find((fr) => Math.hypot(fr.x - x, fr.y - 3 - y) < 9) ?? null;
   const deskUnder = (x, y) => world.desks.find((d) => x > d.x - d.w / 2 - 6 && x < d.x + d.w / 2 + 6 && y > d.y - 45 && y < d.y + 20);
   /** A locked room under the pointer: the room itself, or its padlocked door on the corridor side. */
-  const lockedUnder = (x, y) => ROOMS.filter((r) => lockedRoom(r) && world.unlocking !== r.lock).find((r) => x > r.x - 40 && x < r.x + r.w && y > r.y && y < r.y + r.h);
+  const lockedUnder = (x, y) => ROOMS.filter((r) => lockedRoom(r) && !world.unlocking.includes(r.lock)).find((r) => x > r.x - 40 && x < r.x + r.w && y > r.y && y < r.y + r.h);
 
   /**
    * A locked room was clicked: say what unlocking it costs and how far the purse is from it, under the office and in
@@ -1894,6 +2026,10 @@
     cv.addEventListener('pointermove', (e) => {
       const [x, y] = at(view, e);
       cv.style.cursor = personAt(x, y) || deskUnder(x, y) || lockedUnder(x, y) ? 'pointer' : '';
+      // A duck or a pet rock: its name, and whose desk it sits on.
+      const fr = !personAt(x, y) && friendUnder(x, y);
+      const tip = fr ? `${fr.kind === 'duck' ? 'Rubber duck' : 'Pet rock'}: ${fr.name}${fr.who?.row?.name ? ` (${fr.who.row.name}'s)` : ''}` : '';
+      if (cv.title !== tip) cv.title = tip;
     });
     cv.addEventListener('click', (e) => {
       const [x, y] = at(view, e);
@@ -1929,6 +2065,8 @@
   /** What the shop list said when its cards were last drawn. */
   let shopItemsKey = '';
   const SHOP_WORDS = {
+    rocks: { label: 'Pet rocks', title: 'A pet rock with googly eyes on every desk. It never leaves, so whoever works alone always has a friend there' },
+    ducks: { label: 'Rubber ducks', title: 'A rubber duck on every desk, to explain a problem to. They carry it to meetings, and a big bug (three snags in a quarter of an hour) calls the council of ducks to the meeting room table' },
     pizza: { label: 'Pizza', title: 'A pizza comes to the kitchen table: whoever has finished gathers round it, and whoever is busy is brought a slice where they are (free)' },
     coffee: { label: 'Coffee', title: 'A coffee delivery comes in by the front door and hands each of them a coffee, wherever they are, busy or not' },
     donuts: { label: 'Donuts', title: 'A box of donuts comes to the kitchen table: whoever has finished gathers round it, and whoever is busy is brought one where they are' },
@@ -2021,6 +2159,13 @@
       box(c, 74, 24, 10, 28, 3, INK);
       box(c, 26, 28, 7, 20, 2, '#9ab6c7', INK, 1.5);
       box(c, 67, 28, 7, 20, 2, '#9ab6c7', INK, 1.5);
+    } else if (id === 'rocks') {
+      petRock(c, 34, 46, 2.4);
+      petRock(c, 66, 50, 2);
+    } else if (id === 'ducks') {
+      duck(c, 30, 50, 2, 'east');
+      duck(c, 70, 50, 2, 'west');
+      duck(c, 50, 34, 1.6, 'east');
     } else if (id === 'deckchair') {
       c.save();
       c.translate(36, 46);
@@ -2030,7 +2175,7 @@
     }
   }
   /** The shop's sections: [title, [[room heading, item ids, the room's lock (if it has one)]]]. */
-  const SECTIONS = [['Treat the team', [['', ['pizza', 'coffee', 'donuts', 'sandwiches']]]], ['Improve the office', [['Meeting room', ['table', 'chairs', 'whiteboard', 'plants'], 'boardroom'], ['Lounge', ['armchair', 'bookcase', 'sofa', 'tv', 'gym', 'arcade'], 'lounge'], ['Beach', ['deckchair', 'volleyball']]]]];
+  const SECTIONS = [['Treat the team', [['', ['pizza', 'coffee', 'donuts', 'sandwiches']]]], ['Improve the office', [['Desks', ['rocks', 'ducks']], ['Meeting room', ['table', 'chairs', 'whiteboard', 'plants'], 'boardroom'], ['Lounge', ['armchair', 'bookcase', 'sofa', 'tv', 'gym', 'arcade'], 'lounge'], ['Beach', ['deckchair', 'volleyball']]]]];
   const PIZZA_ITEM = { id: 'pizza', name: 'Pizza', price: 0, room: 'treats', keeps: false, most: 0, have: 0, owned: false, waits: false };
   const shopSaid = el('p', { class: 'note', 'aria-live': 'polite' });
   const purseLine = el('span', { class: 'note' });
@@ -2121,7 +2266,8 @@
       } else {
         // Nothing said yet: a couple notice the fitter at the front door, or at the spot for beach gear (stepFitter),
         // and the thanks come once it is set up.
-        shopSaid.textContent = `${item.name} bought (${big(item.price)} tokens): the fitter is bringing it in.`;
+        // "Rubber ducks", "Indoor plants": bringing them in.
+        shopSaid.textContent = `${item.name} bought (${big(item.price)} tokens): the fitter is bringing ${/s$/.test(item.name) ? 'them' : 'it'} in.`;
       }
       wake();
     } catch (e) {
@@ -2182,6 +2328,8 @@
         tell(v);
       }
     },
+    /** The IT tech now (for checks): the room they are on, what they are doing and where, and the rooms waiting. */
+    techNow: () => ({ tech: tech && { lock: tech.lock, phase: tech.phase, x: Math.round(tech.x), y: Math.round(tech.y), path: tech.path.length }, waiting: [...world.unlocking], party: world.party?.lock ?? null }),
     where: (id) => {
       const p = world.people.get(id);
       return p ? { x: p.x, y: p.y, walking: p.path.length > 0, area: p.target?.area, words: wordsOf(p) } : null;

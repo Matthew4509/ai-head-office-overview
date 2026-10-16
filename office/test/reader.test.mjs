@@ -89,9 +89,13 @@ test('a snag for the quips: a step that ended in an error, or the AI saying it f
   addLine(t, result('2026-10-16T10:01:00Z', true, "The user doesn't want to proceed with this tool use."));
   assert.equal(t.snag, null, 'a step the person declined is their choice, not a snag');
   addLine(t, result('2026-10-16T10:02:00Z', true, 'Exit code 1\nFAIL'));
-  assert.deepEqual(t.snag, { at: '2026-10-16T10:02:00Z', kind: 'failed' });
+  assert.deepEqual(t.snag, { at: '2026-10-16T10:02:00Z', kind: 'failed', run: 1 });
   addLine(t, said('2026-10-16T10:03:00Z', 'Found the bug: the list was read before it was sorted.'));
-  assert.deepEqual(t.snag, { at: '2026-10-16T10:03:00Z', kind: 'bug' });
+  assert.deepEqual(t.snag, { at: '2026-10-16T10:03:00Z', kind: 'bug', run: 2 });
   addLine(t, said('2026-10-16T10:04:00Z', 'No bugs here, the tests pass.'));
   assert.equal(t.snag.at, '2026-10-16T10:03:00Z', 'a mention of the word alone is not a find');
+  addLine(t, result('2026-10-16T10:09:00Z', true, 'FAIL again'));
+  assert.equal(t.snag.run, 3, 'three snags in 15 minutes: a big bug (the council of ducks)');
+  addLine(t, result('2026-10-16T10:40:00Z', true, 'FAIL'));
+  assert.equal(t.snag.run, 1, 'a snag long after the others starts a new run');
 });

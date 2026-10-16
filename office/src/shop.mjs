@@ -9,6 +9,8 @@ export const SHOP = [
   { id: 'coffee', name: 'Coffee round', the: 'the coffee round', price: 200_000, keeps: false, most: 0, room: 'treats' },
   { id: 'donuts', name: 'Box of donuts', the: 'the box of donuts', price: 500_000, keeps: false, most: 0, room: 'treats' },
   { id: 'sandwiches', name: 'Sandwich platter', the: 'the sandwich platter', price: 400_000, keeps: false, most: 0, room: 'treats' },
+  { id: 'rocks', name: 'Pet rocks', the: 'the pet rocks', price: 200_000, keeps: true, most: 1, room: 'desks' },
+  { id: 'ducks', name: 'Rubber ducks', the: 'the rubber ducks', price: 300_000, keeps: true, most: 1, room: 'desks' },
   { id: 'boardroom_key', name: 'Unlock the meeting room', the: 'the meeting room key', price: 20_000_000, keeps: true, most: 1, room: 'boardroom', unlocks: 'boardroom' },
   { id: 'lounge_key', name: 'Unlock the lounge', the: 'the lounge key', price: 10_000_000, keeps: true, most: 1, room: 'lounge', unlocks: 'lounge' },
   { id: 'table', name: 'Meeting room table', the: 'the meeting room table', price: 1_500_000, keeps: true, most: 1, room: 'boardroom' },
@@ -25,7 +27,7 @@ export const SHOP = [
   { id: 'volleyball', name: 'Beach volleyball set', the: 'the beach volleyball set', price: 2_000_000, keeps: true, most: 1, room: 'beach' },
 ];
 
-const PLACE = { treats: 'the kitchen', boardroom: 'the meeting room', lounge: 'the lounge', beach: 'on the beach' };
+const PLACE = { desks: 'on the desks', treats: 'the kitchen', boardroom: 'the meeting room', lounge: 'the lounge', beach: 'on the beach' };
 const LOUNGE_SPOTS = { nap: 'armchair', library: 'bookcase', chat: 'sofa', tv: 'tv', treadmill: 'gym', weights: 'gym', arcade: 'arcade' };
 const countOf = (bought, id) => bought.filter((b) => b.item === id).length;
 const n = (x) => Number(x || 0).toLocaleString('en-GB');
@@ -67,6 +69,8 @@ export function roomsOf(bought) {
     away: lounge.length ? lounge : ['window'],
     deckchairs: Math.min(6, countOf(bought, 'deckchair')),
     volleyball: has('volleyball'),
+    ducks: has('ducks'),
+    rocks: has('rocks'),
     locked: locksOf(bought),
   };
 }
