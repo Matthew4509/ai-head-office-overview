@@ -619,6 +619,11 @@ async function main() {
     for (const c of r.categories) assert.strictEqual(r.prompts.filter(p => p.category === c.id).length, 5, c.name);
     assert.deepStrictEqual((await api('/api/prompts')).json, r, 'reading twice gives the same list');
   });
+  await check('project planner: today\'s plan comes from the projects on the list, and reading it writes nothing', async () => {
+    const r = (await api('/api/priorities')).json;
+    assert(r.plan && Array.isArray(r.plan.focus) && r.plan.totalMin === 480 && r.categories[0].id === 'unsorted', JSON.stringify(r).slice(0, 300));
+    assert.strictEqual(r.plan.focusMin + r.plan.topMin + r.plan.bottomMin, 480);
+  });
   await check('prompts: a star is kept, taken off again, and refused for a prompt that is gone', async () => {
     const first = (await api('/api/prompts')).json.prompts[3];
     assert.strictEqual((await api('/api/prompts/star', { id: first.id, on: true })).json.prompt.starred, true);
