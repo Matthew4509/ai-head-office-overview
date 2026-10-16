@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Office } from '../src/office.mjs';
-import { shopOf, buy, SHOP } from '../src/shop.mjs';
+import { shopOf, buy, SHOP, trophyOf, roomsOf } from '../src/shop.mjs';
 import { tempHome, lines, ROOT } from './helpers.mjs';
 
 const BASE = Date.parse('2026-10-12T00:00:00Z');
@@ -133,4 +133,20 @@ test('a room furnished before the locks came stays open: what was paid for stays
   } finally {
     h.done();
   }
+});
+
+test('the trophy case comes only once every room is unlocked, every piece bought and the team treated; dated by the last of them', () => {
+  const all = [];
+  let minute = 0;
+  const add = (item) => all.push({ item, price: 1, at: new Date(BASE + (minute += 1) * 60000).toISOString() });
+  for (const i of SHOP.filter((x) => x.keeps)) for (let n = 0; n < i.most; n++) add(i.id);
+  assert.equal(trophyOf(all), null, 'everything bought, but the team not treated yet');
+  add('coffee');
+  add('donuts');
+  assert.equal(roomsOf(all).trophy, null, 'one treat still to go');
+  add('sandwiches');
+  const done = all.at(-1).at;
+  add('coffee');
+  assert.deepEqual(trophyOf(all), { at: done }, 'dated by the purchase that finished it, not by later ones');
+  assert.equal(trophyOf(all.filter((b, i) => !(b.item === 'deckchair' && i === all.findIndex((x) => x.item === 'deckchair')))), null, 'one deck chair short: no trophy');
 });

@@ -59,6 +59,24 @@ export function purseOf(earned, bought) {
   return { earned: e, spent, left: Math.max(0, e - spent) };
 }
 
+/** The treats that count for "taking care of the team" (pizza is free, so it is not kept). */
+const TREATS = ['coffee', 'donuts', 'sandwiches'];
+/** Everything done: every room unlocked, every piece bought as many times as the office holds, and the team treated
+ * to each treat at least once. */
+function allDone(bought) {
+  const locked = locksOf(bought);
+  return Object.values(locked).every((l) => !l)
+    && SHOP.filter((i) => i.keeps && !i.unlocks).every((i) => countOf(bought, i.id) >= i.most)
+    && TREATS.every((id) => countOf(bought, id) > 0);
+}
+/** The trophy case (World's Best Boss): earned with the purchase that finished everything, and dated by it; null until
+ * then. It is never sold: it comes by itself. */
+export function trophyOf(bought) {
+  if (!allDone(bought)) return null;
+  for (let k = 1; k <= bought.length; k++) if (allDone(bought.slice(0, k))) return { at: bought[k - 1].at };
+  return null;
+}
+
 export function roomsOf(bought) {
   const has = (id) => countOf(bought, id) > 0;
   const lounge = Object.entries(LOUNGE_SPOTS).filter(([, id]) => has(id)).map(([spot]) => spot);
@@ -71,6 +89,7 @@ export function roomsOf(bought) {
     volleyball: has('volleyball'),
     ducks: has('ducks'),
     rocks: has('rocks'),
+    trophy: trophyOf(bought),
     locked: locksOf(bought),
   };
 }

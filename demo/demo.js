@@ -249,7 +249,7 @@ async function main() {
   console.log('  project planner: 3 categories, 9 projects scored');
 
   if (process.argv.includes('--no-window')) return console.log('\nReady at http://127.0.0.1:' + PORT + '/ (no window opened).');
-  const edge = findEdge(), url = 'http://127.0.0.1:' + PORT + '/#projects';
+  const edge = findEdge(), url = 'http://127.0.0.1:' + PORT + '/';
   if (edge) spawn(edge, ['--app=' + url, '--window-size=1440,900'], { detached: true, stdio: 'ignore' }).unref();
   else spawn('rundll32.exe', ['url.dll,FileProtocolHandler', url], { detached: true, stdio: 'ignore' }).unref();
   console.log('\nThe demo window is open. Press "Play demo" on its status line for the tour.');

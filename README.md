@@ -71,6 +71,10 @@ running).
   the AI saying it found a bug), calls **the council of ducks**: the one with the bug, everyone free and anyone thinking
   there gather round the meeting room table for a minute and a half, their ducks in a ring on it. It needs the meeting
   room table, and sits at most once every five minutes.
+- **The trophy case:** never for sale. It comes by itself once every room is unlocked, every piece is bought as many
+  times as the office holds, and the team has been treated to coffee, donuts and sandwiches at least once. The fitter
+  carries it to the far end of the corridor between the computer room and the kitchen, and everyone comes to admire
+  it. Click it to read its plaque: **World's Best Boss**, and the date it was earned.
 - **Treats** (pizza, donuts, sandwiches, coffee): each order comes in with its own courier, so pizza, donuts and coffee
   bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something turns to face you
   and waves a thank-you.
@@ -84,7 +88,7 @@ running).
   words, who is doing what ("1 working · 1 needs you"). Working folder: each folder from Settings › Folders with its
   projects and people today. Category: the project planner's categories (below), each with how many projects are in
   it, and **Categories…** to manage them. Click one to see only that.
-- **Office** tab: the office seen from above. Each thread is a person at their project's desk (the project folder they
+- **Office** tab (where the page always opens; an address such as /#projects opens another tab): the office seen from above. Each thread is a person at their project's desk (the project folder they
   write files in, or the one their first message says START HERE in); a thread that works in two or more projects is
   a **Consultant** at the projects folder's own desk. Working is at the desk; a thread that stopped to ask you
   something stands with a "?"; a long think goes to the meeting room once it has one; after an hour with nothing

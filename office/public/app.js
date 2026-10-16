@@ -618,7 +618,6 @@
     document.getElementById('favs-view').hidden = v !== 'favs';
     document.getElementById('prompts-view').hidden = v !== 'prompts';
     document.getElementById('planner-view').hidden = v !== 'planner';
-    try { localStorage.setItem('aho-view', v); } catch { /* fine */ }
     draw();
   }
   document.getElementById('tab-office').addEventListener('click', () => setView('office'));
@@ -639,8 +638,8 @@
   document.getElementById('tab-prompts').addEventListener('click', () => setView('prompts'));
   document.getElementById('tab-planner').addEventListener('click', () => setView('planner'));
   app.setView = setView;
+  // The page always opens on the office; only an address that names a tab opens another (the last one is not reopened).
   let saved = 'office';
-  try { saved = localStorage.getItem('aho-view') || 'office'; } catch { /* fine */ }
   // An address can name the tab: /#projects, /#prompts, /#favourites, /#planner (when shown) or /#office.
   saved = { '#projects': 'list', '#prompts': 'prompts', '#favourites': 'favs', '#planner': 'planner', '#office': 'office' }[location.hash] || saved;
   if (saved === 'planner' && !app.plannerOn?.()) saved = 'list';

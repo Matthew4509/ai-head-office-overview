@@ -72,6 +72,8 @@
   const COFFEE_HELD = 120;
   /** The gym in the lounge once bought: a treadmill and a weights bench, and the spots in front of them. */
   const GYM = [{ x: 778, y: 566, w: 70, h: 36 }, { x: 872, y: 566, w: 64, h: 36 }];
+  /** The trophy case (World's Best Boss), once earned: at the far end of the corridor between the computer room and the kitchen. */
+  const TROPHY = { x: 24, y: 366, w: 48, h: 68 };
   /** What is always there to walk round (the kitchen), and the pieces bought for the meeting room and lounge. */
   const FIXED = [{ x: 80, y: 475, w: 180, h: 43 }, { x: 465, y: 480, w: 60, h: 65 }, { x: 230, y: 600, w: 150, h: 45 }];
   const PIECES = { table: { x: 760, y: 145, w: 290, h: 100 }, bookcase: { x: 680, y: 475, w: 110, h: 35 }, tv: { x: 950, y: 485, w: 160, h: 50 }, sofa: { x: 920, y: 720, w: 200, h: 32 }, arcade: { x: 1118, y: 452, w: 46, h: 52 } };
@@ -138,7 +140,7 @@
   const lockedRoom = (r) => !!r.lock && (!!world.rooms.locked?.[r.lock] || world.unlocking.includes(r.lock));
   const world = { desks: [], deckOrder: [], people: new Map(), staff: [], time: 0, selected: null, seenAt: 0, first: true, grid: [], layout: '', table: [], tableAt: 0, thoughts: [], fitting: [], serverRooms: null, rooms: EMPTY, roomsKey: '', purse: null, shop: [], recent: [], blocks: FIXED, filter: undefined, unlocking: [], party: null };
   /** The pieces in the way now: the fixed ones and whatever is bought. */
-  const blocksOf = () => [...FIXED, ...Object.entries(PIECES).filter(([k]) => (k === 'table' ? world.rooms.boardroom.table : world.rooms.lounge[k])).map(([, b]) => b), ...(world.rooms.lounge.gym ? GYM : []), ...(world.rooms.boardroom.plants ? PLANTS.map((p) => ({ x: p.x - 14, y: p.y - 14, w: 28, h: 28 })) : [])];
+  const blocksOf = () => [...FIXED, ...Object.entries(PIECES).filter(([k]) => (k === 'table' ? world.rooms.boardroom.table : world.rooms.lounge[k])).map(([, b]) => b), ...(world.rooms.lounge.gym ? GYM : []), ...(world.rooms.boardroom.plants ? PLANTS.map((p) => ({ x: p.x - 14, y: p.y - 14, w: 28, h: 28 })) : []), ...(world.rooms.trophy ? [TROPHY] : [])];
   const views = [];
   let background = null;
   const app = () => window.aiOffice;
@@ -403,6 +405,8 @@
    * piece's own spot, or round the meeting room table. */
   function tryOutSpots(piece) {
     if (piece === 'ducks' || piece === 'rocks') return [];
+    // Everyone comes to admire the trophy case.
+    if (piece === 'trophy') return [[100, 378, 'west'], [100, 422, 'west'], [128, 386, 'west'], [128, 414, 'west'], [156, 400, 'west']].map(([x, y, face]) => ({ x, y, face, area: 'corridor' }));
     if (piece === 'volleyball') return VOLLEY.map(([x, y, face]) => ({ x, y, face, area: 'volley' }));
     if (piece === 'deckchair') {
       const i = Math.max(0, Math.min(world.rooms.deckchairs, DECK.length) - 1);
@@ -598,6 +602,7 @@
   setInterval(postThought, 250);
   /** What they think on settling somewhere with nothing to do (only now and then, so the list is not all the same). */
   const AT_EASE = {
+    corridor: ['Look at that trophy. Best boss in the business.', 'World\'s Best Boss. It says so right there.', 'I\'m going to polish that glass later.'],
     pizza: ['This pizza is wonderful.', 'Best slice all week.', 'Who ordered the pineapple?'],
     donuts: ['These donuts are dangerous.', 'Sprinkles make everything better.', 'Just the one. Maybe two.'],
     sandwiches: ['A proper lunch, at last.', 'Cheese and pickle, my favourite.', 'Crusts on, like a grown-up.'],
@@ -1071,6 +1076,7 @@
       else if (id === 'volleyball') r.volleyball = false;
       else if (id === 'ducks') r.ducks = false;
       else if (id === 'rocks') r.rocks = false;
+      else if (id === 'trophy') r.trophy = null;
     }
     const has = (spot) => !SPOT_PIECE[spot] || r.lounge[SPOT_PIECE[spot]];
     r.rest = r.rest.filter(has);
@@ -1085,6 +1091,7 @@
       armchair: [765, 660], bookcase: [735, 545], sofa: [1020, 645], tv: [1030, 575], gym: [860, 625], arcade: [1095, 540],
       ducks: [270, 140],
       rocks: [270, 140],
+      trophy: [TROPHY.x + TROPHY.w + 22, TROPHY.y + TROPHY.h / 2],
       deckchair: [(DECK[Math.min(world.rooms.deckchairs, DECK.length - 1)] ?? DECK[0])[0], 826], volleyball: [NET.x - 25, 866],
     };
     return spots[id] ?? [905, 610];
@@ -1153,7 +1160,7 @@
       // Each one in turn takes the next line, from a different starting line each time, so neighbours never repeat.
       const start = Math.floor(Math.random() * INSTALLED.length);
       [...world.people.values()].filter((p) => !p.leaving && !p.out).forEach((p, i) => {
-        say(p, i === 0 ? `Hey, we got ${what}!` : INSTALLED[(start + i) % INSTALLED.length], 4);
+        say(p, piece === 'trophy' ? TROPHY_CHEER[(start + i) % TROPHY_CHEER.length] : i === 0 ? `Hey, we got ${what}!` : INSTALLED[(start + i) % INSTALLED.length], 4);
         thank(p);
         if (p.target?.rest) p.restUntil = 0;
       });
@@ -1174,10 +1181,12 @@
   }
   /** A piece of furniture in words, for the first cheer when it is set up. */
   const PIECE_WORDS = { table: 'a meeting room table', chairs: 'new chairs', whiteboard: 'a whiteboard', plants: 'plants', armchair: 'an armchair', bookcase: 'a bookcase',
-    sofa: 'a sofa', tv: 'a TV', gym: 'a gym', arcade: 'an arcade machine', deckchair: 'new deck chairs', volleyball: 'a volleyball net', ducks: 'rubber ducks', rocks: 'pet rocks' };
+    sofa: 'a sofa', tv: 'a TV', gym: 'a gym', arcade: 'an arcade machine', deckchair: 'new deck chairs', volleyball: 'a volleyball net', ducks: 'rubber ducks', rocks: 'pet rocks', trophy: 'a trophy case' };
   /** A piece's short name ("Trying the new deck chair"). */
-  const PIECE_NAME = { table: 'table', chairs: 'chairs', whiteboard: 'whiteboard', plants: 'plants', armchair: 'armchair', bookcase: 'bookcase', sofa: 'sofa', tv: 'TV', gym: 'gym', arcade: 'arcade machine', deckchair: 'deck chair', volleyball: 'volleyball net', ducks: 'rubber ducks', rocks: 'pet rocks' };
+  const PIECE_NAME = { table: 'table', chairs: 'chairs', whiteboard: 'whiteboard', plants: 'plants', armchair: 'armchair', bookcase: 'bookcase', sofa: 'sofa', tv: 'TV', gym: 'gym', arcade: 'arcade machine', deckchair: 'deck chair', volleyball: 'volleyball net', ducks: 'rubber ducks', rocks: 'pet rocks', trophy: 'trophy case' };
   /** Everyone else, when a piece is set up. */
+  /** Everyone, when the trophy case goes in. */
+  const TROPHY_CHEER = ['World\'s best boss!', 'Speech! Speech!', 'You earned it, boss.', 'Best office ever.', 'Three cheers for the boss!'];
   const INSTALLED = ['Thanks, boss!', 'Nice!', 'Very smart!', 'I\'ll try it out soon.', 'Ooh, fancy.', 'Best boss ever.'];
   /** A cardboard box, carried in by the fitter. */
   function parcel(c, p) {
@@ -1203,7 +1212,11 @@
     world.purse = shop.purse ?? null;
     world.shop = shop.items ?? [];
     world.recent = Array.isArray(shop.recent) ? shop.recent : [];
-    if (shop.rooms) world.serverRooms = shop.rooms;
+    if (shop.rooms) {
+      // The trophy case just earned (not on first load): the fitter carries it in like any piece.
+      if (world.serverRooms && !world.serverRooms.trophy && shop.rooms.trophy) callFitter('trophy');
+      world.serverRooms = shop.rooms;
+    }
     applyRooms(world.serverRooms ? lessFitting(world.serverRooms) : world.rooms);
     // While the shop is open, rebuilding the tiles under the pointer loses the click: they are drawn again only when
     // what they say changes (the list arrives after the tab was opened, something was bought, or "more to go" moved).
@@ -1268,7 +1281,7 @@
     const thinkHere = s.doing === 'thinking' && !world.rooms.boardroom.table;
     if (p.path.length && !p.out) {
       if (t?.waiting) return `Off to try ${t.visit} while waiting for you`;
-      if (t?.trying) return `Off to try the new ${PIECE_NAME[t.trying] || 'furniture'}`;
+      if (t?.trying) return t.trying === 'trophy' ? 'Off to admire the trophy case' : `Off to try the new ${PIECE_NAME[t.trying] || 'furniture'}`;
       if (t?.area === 'needs' && p.from && p.from !== 'needs' && p.from !== 'desk') return 'Back to the desk: still waiting for you';
       if (t?.area === 'gone') return 'Going home: the thread has gone quiet';
       if (t?.area === 'break') return 'Off out for a break in a deck chair';
@@ -1305,8 +1318,7 @@
   function oval(c, x, y, rx, ry, fill, stroke = INK, width = 2) {
     c.beginPath();
     c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-    c.fillStyle = tone(fill);
-    c.fill();
+    if (fill) { c.fillStyle = tone(fill); c.fill(); }
     if (stroke) { c.strokeStyle = tone(stroke); c.lineWidth = width; c.stroke(); }
   }
   function line(c, x, y, xx, yy, col = INK, width = 3) {
@@ -1713,6 +1725,18 @@
     c.stroke();
     line(c, x - r * 0.45, y + r * 0.35, x + r * 0.45, y + r * 0.35, '#7cc47f', 1.5);
   }
+  /** The trophy case: wood, glass, a gold cup and a plaque. */
+  function trophyCase(c) {
+    const { x, y, w, h } = TROPHY;
+    box(c, x, y, w, h, 4, '#9a6a3c', INK, 2);
+    box(c, x + 5, y + 5, w - 10, h - 22, 3, '#dfeef5', INK, 1.2);
+    oval(c, x + w / 2, y + 22, 9, 8, '#f2c230', INK, 1.4);
+    box(c, x + w / 2 - 2, y + 29, 4, 8, 1, '#e0ad1c', INK, 1);
+    box(c, x + w / 2 - 8, y + 37, 16, 4, 1, '#e0ad1c', INK, 1);
+    oval(c, x + w / 2 - 10, y + 20, 3, 5, null, '#e0ad1c', 1.6);
+    oval(c, x + w / 2 + 10, y + 20, 3, 5, null, '#e0ad1c', 1.6);
+    box(c, x + 8, y + h - 14, w - 16, 8, 2, '#f2c230', INK, 1);
+  }
   /** A pet rock at (x, y): a grey pebble with two googly eyes. `s` times the size of one on a desk. */
   function petRock(c, x, y, s = 1) {
     oval(c, x, y, 5.5 * s, 3.8 * s, '#9aa1a8', INK, 1.2);
@@ -1895,6 +1919,7 @@
     }
     if (full && !world.people.size) text(c, 'Nobody in yet: start a thread in Claude and they come in.', 290, 200, labelSize(c), floorSoft(), 'center');
     drawDesks(c, full);
+    if (world.rooms.trophy) trophyCase(c);
     if (councilOn()) {
       const n = Math.max(5, councilList().length);
       for (let i = 0; i < n; i++) {
@@ -2015,6 +2040,7 @@
   const personAt = (x, y) => [...world.people.values()].filter((p) => !p.out).sort((a, b) => b.y - a.y).find((p) => Math.hypot(p.x - x, p.y - 10 - y) < 28);
   /** A duck or rock under the pointer, or null. */
   const friendUnder = (x, y) => world.desks.flatMap(friendsOf).find((fr) => Math.hypot(fr.x - x, fr.y - 3 - y) < 9) ?? null;
+  const trophyUnder = (x, y) => !!world.rooms.trophy && x > TROPHY.x - 4 && x < TROPHY.x + TROPHY.w + 4 && y > TROPHY.y - 4 && y < TROPHY.y + TROPHY.h + 4;
   const deskUnder = (x, y) => world.desks.find((d) => x > d.x - d.w / 2 - 6 && x < d.x + d.w / 2 + 6 && y > d.y - 45 && y < d.y + 20);
   /** A locked room under the pointer: the room itself, or its padlocked door on the corridor side. */
   const lockedUnder = (x, y) => ROOMS.filter((r) => lockedRoom(r) && !world.unlocking.includes(r.lock)).find((r) => x > r.x - 40 && x < r.x + r.w && y > r.y && y < r.y + r.h);
@@ -2044,14 +2070,25 @@
     tell(view);
   }
 
+  /** The trophy case clicked: its plaque, under the office. */
+  function showTrophy(view) {
+    const t = world.rooms.trophy;
+    if (!t) return;
+    const day = new Date(t.at).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+    view.lockNote = { key: `trophy:${t.at}`, until: clock() + 20, parts: [el('b', { text: '🏆 World\'s Best Boss' }), el('br'), el('span', { text: `Earned ${day}.` }), el('br'),
+      el('span', { class: 'note', text: 'Every room unlocked, every piece bought, and the team looked after.' })] };
+    view.told = '';
+    world.selected = null;
+    tell(view);
+  }
   function hookPointer(view) {
     const cv = view.canvas;
     cv.addEventListener('pointermove', (e) => {
       const [x, y] = at(view, e);
-      cv.style.cursor = personAt(x, y) || deskUnder(x, y) || lockedUnder(x, y) ? 'pointer' : '';
+      cv.style.cursor = personAt(x, y) || deskUnder(x, y) || lockedUnder(x, y) || trophyUnder(x, y) ? 'pointer' : '';
       // A duck or a pet rock: its name, and whose desk it sits on.
       const fr = !personAt(x, y) && friendUnder(x, y);
-      const tip = fr ? `${fr.kind === 'duck' ? 'Rubber duck' : 'Pet rock'}: ${fr.name}${fr.who?.row?.name ? ` (${fr.who.row.name}'s)` : ''}` : '';
+      const tip = trophyUnder(x, y) ? 'Trophy case: World\'s Best Boss (click to read it)' : fr ? `${fr.kind === 'duck' ? 'Rubber duck' : 'Pet rock'}: ${fr.name}${fr.who?.row?.name ? ` (${fr.who.row.name}'s)` : ''}` : '';
       if (cv.title !== tip) cv.title = tip;
     });
     cv.addEventListener('click', (e) => {
@@ -2063,6 +2100,7 @@
         app()?.pick(p.id);
         return;
       }
+      if (trophyUnder(x, y)) return showTrophy(view);
       const d = deskUnder(x, y);
       if (d) return app()?.pickProject?.(d.key);
       const r = lockedUnder(x, y);
