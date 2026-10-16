@@ -572,9 +572,14 @@
   /** Messages waiting to be posted: they go into the chat one at a time, 1 to 2 seconds apart, as if typed. */
   const chatQueue = [];
   let chatNextAt = 0;
-  /** Something a person said or thought, queued for the chat. Their same words again within 10 minutes are left out. */
-  function think(p, text) {
+  /** The chat setting (Settings › Office): 'all', 'work' (work lines and plain facts only) or 'off'. */
+  const chatMode = () => app()?.chatMode?.() ?? 'all';
+  /** Something a person said or thought, queued for the chat. Their same words again within 10 minutes are left out.
+   * kind 'work': a line about their work (kept in Work only); anything else is the office chat. */
+  function think(p, text, kind = 'chat') {
     if (!text || !p?.row || world.people.get(p.id) !== p || p.leaving) return;
+    const mode = chatMode();
+    if (mode === 'off' || (mode === 'work' && kind !== 'work')) return;
     const now = Date.now();
     const said = (t) => t.id === p.id && t.text === text;
     if (chatQueue.some(said) || world.thoughts.some((t) => said(t) && now - t.at < 600000)) return;
@@ -651,26 +656,27 @@
   ];
   /** A word with the pet rock, for someone alone at their desk. */
   const ROCK_LINES = ['Just me and {rock}. Best team in the office.', 'You get me, {rock}.', '{rock} says the code looks fine. {rock} is a rock.', 'Never alone with {rock} here.', 'Morning, {rock}. Ready to ship?'];
-  /** Quips at a real snag in the thread: the AI saying it found a bug, or a step that ended in an error. */
-  const QUIPS = {
-    bug: [
-      'Whoever wrote this code got this wrong. …Oh. It was me.',
-      'Found a bug! Whoever wrote this got it wrong. Please don\'t check the history.',
-      'Aha, there you are, little bug.',
-      'Bug found. Squashing it before anyone notices.',
-      'Found the problem. It was hiding in plain sight.',
-      'A bug! Kettle on, this could take a minute.',
-      'Who wrote this? Never mind, I know who wrote this.',
-    ],
-    failed: [
-      'Well, that didn\'t work. Trying again.',
-      'Red, not green. Back to it.',
-      'The computer says no. Let\'s see why.',
-      'That went bang. Nobody panic.',
-      'Plan B it is.',
-      'Error! Totally meant to do that.',
-    ],
-  };
+  /** Office chat for something that happened to p (window.officeBanter has the characters and lines). Most moments get
+   * one line out loud, some a reply or two from those nearby (their own desk first), some nothing; the same kind from the
+   * same person waits KIND_GAP seconds, and the office as a whole BANTER_GAP. Work only: the plain fact instead. */
+  const BANTER_GAP = 25;
+  const KIND_GAP = 180;
+  function banter(p, e) {
+    const B = window.officeBanter;
+    if (!B || !p?.row || p.leaving) return;
+    if (chatMode() === 'work') { const f = B.fact(e); if (f) think(p, f, 'work'); return; }
+    if (chatMode() === 'off') return;
+    p.banterAt = p.banterAt || {};
+    if (clock() - (p.banterAt[e.kind] ?? -Infinity) < KIND_GAP || clock() - (world.banterAt ?? -Infinity) < BANTER_GAP) return;
+    const near = present().filter((o) => o !== p && o.row).sort((a, b) => (b.row.pcId === p.row.pcId) - (a.row.pcId === p.row.pcId)).slice(0, 3);
+    const lines = B.plan(e, B.characterOf(p.seed), near.map((o) => ({ character: B.characterOf(o.seed), name: o.row.name })), p.row.name);
+    if (!lines.length) return;
+    p.banterAt[e.kind] = world.banterAt = clock();
+    lines.forEach((l, i) => {
+      const who = l.by < 0 ? p : near[l.by];
+      if (who) (i === 0 ? say(who, l.text, 4) : think(who, l.text));
+    });
+  }
   function atWork(words, doing) {
     if (doing === 'thinking') return 'Thinking it through…';
     const w = String(words || '').trim();
@@ -725,6 +731,7 @@
       doingText: p.words,
       idleFor: p.state === 'idle' && p.since ? Math.max(0, (nowMs - p.since) / 1000) : null,
       snag: p.state !== 'home' ? p.snag || null : null,
+      event: p.state !== 'home' ? p.event || null : null,
     }));
     placeDesks();
     const ids = new Set(world.staff.map((s) => s.id));
@@ -752,22 +759,36 @@
       // and in the chat, at most one every 3 minutes each, and only for a snag of the last 2 minutes.
       const snagAt = s.snag?.at || '';
       const freshSnag = p.row && !snap && snagAt && snagAt !== p.row.snag?.at && nowMs - Date.parse(snagAt) < 120000;
-      if (freshSnag && clock() - (p.quipAt ?? -Infinity) > 180) {
-        const lines = QUIPS[s.snag.kind] || QUIPS.failed;
-        const line = lines[(p.seed + (world.quips = (world.quips || 0) + 1)) % lines.length];
-        say(p, line, 4);
-        think(p, line);
-        p.quipAt = clock();
-      }
+      if (freshSnag) banter(p, { kind: s.snag.kind === 'bug' ? 'bug' : 'failed' });
       if (freshSnag && s.snag.run >= BIG_BUG) callCouncil(p);
+      // Something measured in their thread: tests passed or failed, a commit or a push (on a Friday, its own lines), the
+      // same file edited again, a reply you stopped.
+      const eventAt = s.event?.at || '';
+      if (p.row && !snap && eventAt && eventAt !== p.row.event?.at && nowMs - Date.parse(eventAt) < 120000) {
+        banter(p, s.event.kind === 'push' && new Date(eventAt).getDay() === 5 ? { ...s.event, kind: 'push-friday' } : s.event);
+      }
+      // Working late (11 pm to 5 am on this PC's clock): once a night each.
+      const night = new Date(Date.now() - 5 * 3600e3).toDateString();
+      const hour = new Date().getHours();
+      if (p.row && !snap && s.doing === 'typing' && (hour >= 23 || hour < 5) && p.lateNight !== night) {
+        p.lateNight = night;
+        banter(p, { kind: 'late' });
+      }
       p.row = s;
       // A new step in their work: a thought about it (at most one a minute each, so the list is not all work).
       if (s.doingText !== wasWords && clock() - (p.workThoughtAt ?? -Infinity) > 60) {
         const line = atWork(s.doingText, s.doing);
-        if (line) { think(p, line); p.workThoughtAt = clock(); }
+        if (line) { think(p, line, 'work'); p.workThoughtAt = clock(); }
       }
       p.look = L?.lookOf(s.id, s.look) ?? null;
       retarget(p, snap);
+    }
+    world.pairAt = world.pairAt || {};
+    for (const d of world.desks) {
+      const busy = d.crew.map((id) => world.people.get(id)).filter((o) => o?.row?.doing === 'typing' && !o.leaving);
+      if (busy.length < 2) continue;
+      if (snap) { world.pairAt[d.key] ??= clock(); continue; }
+      if (clock() - (world.pairAt[d.key] ?? -Infinity) > 1800) { world.pairAt[d.key] = clock(); banter(busy[0], { kind: 'pair' }); }
     }
     // Gone home (or not in the project picked): they walk out of the front door; picking a project just hides them.
     for (const [id, p] of world.people) {
@@ -1958,7 +1979,7 @@
       return;
     }
     // Nobody picked: the latest thoughts (drawn again when one is added, and each minute for the "ago").
-    const key = p ? `${p.id}|${wordsOf(p)}|${holding(p)}|${p.row.name}` : `all|${world.people.size}|${world.thoughts.at(-1)?.at}|${Math.floor(Date.now() / 60000)}|${app()?.filterKey?.()}`;
+    const key = p ? `${p.id}|${wordsOf(p)}|${holding(p)}|${p.row.name}` : `all|${world.people.size}|${world.thoughts.at(-1)?.at}|${Math.floor(Date.now() / 60000)}|${app()?.filterKey?.()}|${chatMode()}`;
     if (key === v.told) return;
     v.told = key;
     if (p) {
@@ -1978,8 +1999,10 @@
     };
     const list = world.thoughts.filter((t) => shownIn(t.folder)).slice(-THOUGHTS_SHOWN).map((t) => el('li', { class: `chat-msg${Date.now() - t.at < 1500 ? ' new' : ''}` }, head(t),
       el('div', { class: 'chat-body' }, el('div', {}, el('b', { text: t.who }), el('span', { class: 'note', text: ` ${ago(t.at)}` })), el('div', { text: t.text }))));
+    const off = chatMode() === 'off';
     v.strip.replaceChildren(el('b', { text: 'Thoughts' }),
-      list.length ? el('ul', { class: 'thoughts' }, ...list) : el('p', { class: 'note', text: 'Quiet for now: what they say and think shows here.' }),
+      off ? el('p', { class: 'note', text: 'The chat is off. Turn it on under Settings › Office.' })
+        : list.length ? el('ul', { class: 'thoughts' }, ...list) : el('p', { class: 'note', text: 'Quiet for now: what they say and think shows here.' }),
       el('span', { class: 'note', text: 'Click a person to see what they are doing.' }));
   }
 
@@ -2329,6 +2352,8 @@
       }
     },
     /** The IT tech now (for checks): the room they are on, what they are doing and where, and the rooms waiting. */
+    /** A person's character in the office chat ("Pun lover"), for their card. */
+    character: (id) => window.officeBanter?.characterOf(hash(id))?.name ?? '',
     techNow: () => ({ tech: tech && { lock: tech.lock, phase: tech.phase, x: Math.round(tech.x), y: Math.round(tech.y), path: tech.path.length }, waiting: [...world.unlocking], party: world.party?.lock ?? null }),
     where: (id) => {
       const p = world.people.get(id);

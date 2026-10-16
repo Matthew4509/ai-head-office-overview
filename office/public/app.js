@@ -113,6 +113,10 @@
   app.filterBy = 'project';
   app.folder = null;
   app.category = null;
+  /** The Thoughts chat (Settings › Office): 'all' (work lines and the office chat), 'work' (what the threads do, and
+   * plain facts) or 'off'. Kept in this browser. */
+  app.chatMode = () => { try { const m = localStorage.getItem('aho-chat'); return m === 'work' || m === 'off' ? m : 'all'; } catch { return 'all'; } };
+  app.setChatMode = (m) => { try { localStorage.setItem('aho-chat', m); } catch { /* fine */ } window.officeView?.refresh?.(); draw(); };
   /** Is the project planner shown (Settings › Office)? Off until ticked; kept in this browser. */
   app.plannerOn = () => { try { return localStorage.getItem('aho-planner') === 'on'; } catch { return false; } };
   // Above Filter by: Show names (the staff's names in the office) and PC name (the project's name above each desk's
@@ -362,7 +366,9 @@
     const waiting = (app.data.waiting || []).find((w) => w.person === p.key);
     const dl = el('dl', {},
       el('dt', { text: 'Now' }), el('dd', {}, stateTag(p.state), p.state === 'home' ? '' : ` ${p.words}`, p.since ? el('span', { class: 'note' }, ` · for ${lasted(p.since)}`) : ''),
-      el('dt', { text: 'Thread' }), el('dd', { text: t ? t.title : (p.lastAt ? `None open; last seen ${ago(Date.parse(p.lastAt))}` : 'None yet') }));
+      el('dt', { text: 'Thread' }), el('dd', { text: t ? t.title : (p.lastAt ? `None open; last seen ${ago(Date.parse(p.lastAt))}` : 'None yet') }),
+      // Their voice in the office chat, the same for good (it belongs to the seat).
+      window.officeView?.character ? el('dt', { text: 'Character' }) : null, window.officeView?.character ? el('dd', { text: window.officeView.character(p.key) }) : null);
     // Earnings: helpers and tokens, folded under one line that says today's figure; open, it stays open as the card ticks.
     const live0 = side.dataset.card === p.key ? side.querySelector(':scope > .card-live') : null;
     const earnOpen = !!live0?.querySelector('details.earnings[open]');

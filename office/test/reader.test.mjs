@@ -99,3 +99,27 @@ test('a snag for the quips: a step that ended in an error, or the AI saying it f
   addLine(t, result('2026-10-16T10:40:00Z', true, 'FAIL'));
   assert.equal(t.snag.run, 1, 'a snag long after the others starts a new run');
 });
+
+test('events for the chat: tests passed or failed, a commit or push that worked, the same file again, a stopped reply', () => {
+  const t = emptyThread('a');
+  const step = (at, id, name, input) => addLine(t, { type: 'assistant', timestamp: at, message: { id: at, content: [{ type: 'tool_use', id, name, input }] } });
+  const result = (at, id, is_error) => addLine(t, { type: 'user', timestamp: at, message: { content: [{ type: 'tool_result', tool_use_id: id, is_error, content: 'output' }] } });
+  step('2026-10-16T10:00:00Z', 't1', 'Bash', { command: 'node tools/test-all.js', description: 'Run the tests' });
+  assert.equal(t.event, null, 'nothing until the result is in');
+  result('2026-10-16T10:01:00Z', 't1', false);
+  assert.deepEqual(t.event, { at: '2026-10-16T10:01:00Z', kind: 'tests-passed' });
+  step('2026-10-16T10:02:00Z', 't2', 'Bash', { command: 'npm test' });
+  result('2026-10-16T10:03:00Z', 't2', true);
+  assert.equal(t.event.kind, 'tests-failed');
+  step('2026-10-16T10:04:00Z', 't3', 'Bash', { command: 'git commit -m "Save"' });
+  result('2026-10-16T10:05:00Z', 't3', true);
+  assert.equal(t.event.kind, 'tests-failed', 'a commit that failed is not a commit');
+  step('2026-10-16T10:06:00Z', 't4', 'Bash', { command: 'git push origin main' });
+  result('2026-10-16T10:07:00Z', 't4', false);
+  assert.equal(t.event.kind, 'push');
+  for (let i = 0; i < 3; i++) step(`2026-10-16T10:1${i}:00Z`, `e${i}`, 'Edit', { file_path: 'C:/work/site/app.js' });
+  assert.deepEqual(t.event, { at: '2026-10-16T10:12:00Z', kind: 'again', file: 'app.js', n: 3 });
+  addLine(t, { type: 'user', timestamp: '2026-10-16T10:13:00Z', message: { content: '[Request interrupted by user]' } });
+  assert.equal(t.event.kind, 'stopped');
+  assert.ok(!JSON.stringify(t.event).includes('work/site'), 'only a file\'s short name is kept');
+});

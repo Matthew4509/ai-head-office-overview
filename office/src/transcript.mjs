@@ -54,6 +54,13 @@ export function emptyThread(id, since = '') {
     snag: null,
     /** When the last few snags happened (newest last), to count a run of them: see snagAt. */
     snagTimes: [],
+    /** The last thing worth a word in the office chat, measured from the thread: { at, kind, file?, n? } (see eventAt).
+     * Kinds: tests-passed, tests-failed, commit, push, again (the same file edited a 3rd, 6th or 10th time), stopped. */
+    event: null,
+    /** Steps waiting for their result, by tool id: 'test', 'commit' or 'push'. */
+    pending: {},
+    /** How many times each file was edited (by full path). */
+    edits: {},
   };
 }
 
@@ -69,6 +76,19 @@ function snagAt(t, at, kind) {
   const ms = Date.parse(at);
   const run = t.snagTimes.filter((x) => ms - Date.parse(x) <= SNAG_WINDOW && Date.parse(x) <= ms).length;
   t.snag = { at, kind, run };
+}
+/** A shell step the chat may react to once its result is in: a test run, a commit, a push (from its words only). */
+function watchedStep(input) {
+  const cmd = String(input?.command || '');
+  const words = `${input?.description || ''} ${cmd}`;
+  if (/\bgit\b[^\n|;&]*\bcommit\b/.test(cmd)) return 'commit';
+  if (/\bgit\b[^\n|;&]*\bpush\b/.test(cmd)) return 'push';
+  if (/\b(tests?|test-all|spec|pytest|jest|vitest|mocha|phpunit)\b/i.test(words)) return 'test';
+  return null;
+}
+/** A measured event for the chat: only its kind, a file's short name and a count are kept, never text from the thread. */
+function eventAt(t, at, kind, more = {}) {
+  t.event = { at, kind, ...more };
 }
 /** A tool result that is an error, but not one the person chose (a step they declined or stopped). */
 function failedResult(c) {
@@ -189,12 +209,19 @@ export function addLine(t, l) {
       t.last = { kind: 'result', at };
       t.asked = '';
       if (failedResult(c)) snagAt(t, at, 'failed');
+      for (const x of c) {
+        const what = x && x.type === 'tool_result' && t.pending?.[x.tool_use_id];
+        if (!what) continue;
+        delete t.pending[x.tool_use_id];
+        if (what === 'test') eventAt(t, at, x.is_error ? 'tests-failed' : 'tests-passed');
+        else if (!x.is_error) eventAt(t, at, what);
+      }
       return;
     }
     if (l.isMeta) return;
     const words = textOf(c).trim();
     if (!words) return;
-    if (/^\[Request interrupted/i.test(words)) { t.last = { kind: 'stopped', at }; return; }
+    if (/^\[Request interrupted/i.test(words)) { t.last = { kind: 'stopped', at }; eventAt(t, at, 'stopped'); return; }
     if (/^<(command-|local-command|system-reminder)/.test(words)) return;
     if (!t.firstPrompt) t.firstPrompt = words.slice(0, 2000);
     t.last = { kind: 'prompt', at };
@@ -232,8 +259,19 @@ export function addLine(t, l) {
       const words = wordsFor(b.name, input);
       t.last = { kind: 'tool', at, tool: b.name, words };
       pushStep(t, at, words);
+      const watch = SHELLS.has(b.name) && b.id ? watchedStep(input) : null;
+      if (watch) {
+        t.pending = { ...(t.pending || {}), [b.id]: watch };
+        const ids = Object.keys(t.pending);
+        if (ids.length > 20) delete t.pending[ids[0]];
+      }
       if (WRITERS.has(b.name)) {
         const p = input.file_path || input.notebook_path;
+        if (p) {
+          t.edits = t.edits || {};
+          const n = (t.edits[p] = (t.edits[p] || 0) + 1);
+          if ([3, 6, 10].includes(n)) eventAt(t, at, 'again', { file: String(p).split(/[\\/]/).pop().slice(0, 60), n });
+        }
         if (p && !t.wrote.includes(p)) t.wrote.push(p);
         t.worked = true;
       } else if (SHELLS.has(b.name) && input.command && !onlyLooks(input.command)) {

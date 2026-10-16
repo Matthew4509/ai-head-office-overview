@@ -150,6 +150,13 @@
       el('div', { class: 'row' }, el('span', { text: 'Check every live URL every' }), every, btn('Save', async () => {
         try { const r = await app.engine('/api/live/every', { minutes: Number(every.value) }); say(`Live sites are checked every ${r.every} minutes.`); } catch (e) { say(fault(e)); }
       }, true), btn('Check all now', async () => { try { await app.engine('/api/live/check-all', {}); say('Checking the live sites, one at a time…'); } catch (e) { say(fault(e)); } })),
+      // The Thoughts chat: everything, work only (no office chat), or off. Speech bubbles in the office stay either way.
+      el('h3', { text: 'Thoughts chat' }),
+      el('div', { class: 'row' }, el('select', { class: 'field-text short', 'aria-label': 'Thoughts chat', onchange: (e) => {
+        app.setChatMode?.(e.target.value);
+        say({ all: 'Thoughts: work lines and the office chat.', work: 'Thoughts: work only. No office chat, just what the threads are doing.', off: 'Thoughts is off.' }[e.target.value]);
+      } }, ...[['all', 'Everything: work and office chat'], ['work', 'Work only: no office chat'], ['off', 'Off']].map(([v, w]) => el('option', { value: v, selected: (app.chatMode?.() ?? 'all') === v }, w)))),
+      el('p', { class: 'note', text: 'The office chat is the staff\'s banter: each has a character of their own, and every line answers something that really happened in a thread (tests, a commit or push, a bug found, the same file again). Work only keeps what the threads are doing and the plain facts. Kept in this browser.' }),
       // The project planner is off until ticked: its tab, its check-ins in Needs attention and Filter by › Category.
       el('h3', { text: 'Project planner' }),
       el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: !!app.plannerOn?.(), onchange: (e) => { app.setPlannerOn?.(e.target.checked); say(e.target.checked ? 'The Project planner tab is shown, beside Prompts.' : 'The Project planner is hidden. Its scores and categories are kept.'); } }),

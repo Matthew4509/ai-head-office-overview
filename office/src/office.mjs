@@ -309,6 +309,7 @@ export class Office {
         outByDay,
         asked: t.asked,
         snag: t.snag || null,
+        event: t.event || null,
         steps: t.steps,
         msgs: t.msgs || [],
         helpers: helpers.length,
@@ -366,6 +367,7 @@ export class Office {
         p.words = x.words;
         p.since = x.since;
         p.snag = x.snag;
+        p.event = x.event;
         p.thread = { id, open: this.appLinks.open(id), title: x.title, startedAt: x.startedAt, lastAt: x.lastAt, asked: x.asked, steps: x.steps, helpers: x.helpers, out: x.out };
       }
     }

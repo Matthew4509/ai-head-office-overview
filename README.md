@@ -93,10 +93,19 @@ running).
   Beside the office, **Thoughts**: a chat, like a team chat. Each message has its writer's small head on the left and
   arrives a moment after the last (1 to 2 seconds apart), newest at the bottom. Cheers and thanks for treats (a coffee
   and a donut together get dunked), a thought when they settle somewhere ("These deck chairs are nice"), and a line
-  about their work, made from what their thread is doing ("PHP in progress… thinking about loops?"). When their thread
-  hits a real snag, they quip about it, out loud and in the chat: a step that ended in an error ("Red, not green. Back to
-  it.") or the AI saying it found a bug ("Whoever wrote this code got this wrong. …Oh. It was me."); at most one every
-  few minutes each. It follows Filter by. Click someone to see them instead.
+  about their work, made from what their thread is doing ("PHP in progress… thinking about loops?"). It follows Filter
+  by. Click someone to see them instead.
+  **The office chat** (banter): each person has a character for good, shown on their card (Pun lover, Dry wit, Sunny,
+  Quiet one, Tired lead, Bold), and every line answers something that really happened, measured from their thread:
+  tests passed or failed, a commit, a push (a Friday push has its own lines), the same file edited a third, sixth or
+  tenth time, a reply you stopped, a step that ended in an error, the AI saying it found a bug; or seen in the office:
+  working late, two at one desk. Most moments get one line, some a reply or two from those nearby (their own desk
+  first), some nothing; the same kind from one person waits three minutes, and the office as a whole 25 seconds. Now
+  and then a little exchange ("Ugh, this needs an AI to sort it out." "You are an AI." "I meant a clever one."), and a
+  few film nods in our own words. Nothing is made up, nothing from a thread is quoted (a file's short name at most),
+  and no AI model is asked: the lines are written in. **Settings › Office › Thoughts chat** turns it off: **Work only**
+  keeps what the threads are doing and the plain facts ("Tests passed."), **Off** stops the chat (the speech bubbles in
+  the office stay).
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
   beside the port. When another program holds its port, Run becomes **Re-allocate**: it starts the project on the
@@ -175,7 +184,8 @@ Each mark opens its window:
   hooks, below.
 - **Office**: the theme (**Auto**, **Light** (the one to start with), **Dark**, or **Match Windows**, which follows
   Windows' own light or dark setting; dark dims the office itself too), the projects folder the desks come from, the
-  gone-home time, how often live sites are checked, and **Show the Project planner tab** (off to start with).
+  gone-home time, how often live sites are checked, the **Thoughts chat** (Everything, Work only or Off), and **Show
+  the Project planner tab** (off to start with).
 - **Private details**: what an audit looks for in what you would publish (your email, phone, street, full name). Typed
   once and never shown again; a finding shows only its label.
 - **Help** and **About** (the version, the Git program's own security state, Quit, Uninstall).
