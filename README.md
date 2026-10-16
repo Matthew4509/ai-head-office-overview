@@ -62,7 +62,8 @@ running).
 - **Treats** (pizza, donuts, sandwiches, coffee): each order comes in with its own courier, so pizza, donuts and coffee
   bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something turns to face you
   and waves a thank-you.
-- **Filter by** (left of the office), with a choice of **Project** or **Working folder**. Project: **All projects**,
+- **Filter by** (left of the office), with a choice of **Project** or **Working folder**. What it picks is what every tab
+  shows: the office, the Projects tiles, Favourites and Thoughts (prompts are not per project). Project: **All projects**,
   then each project with someone in today and, in words, who is doing what ("1 working · 1 needs you"). Working folder:
   each folder from Settings › Folders with its projects and people today. Click one to see only that.
 - **Office** tab: the office seen from above. Each thread is a person at their project's desk (the project folder they
@@ -70,9 +71,11 @@ running).
   a **Consultant** at the projects folder's own desk. Working is at the desk; a thread that stopped to ask you
   something stands with a "?"; a long think goes to the meeting room once it has one; after an hour with nothing
   happening they go home. Favourites wait on a beach towel. Click anyone for their card.
-  Beside the office, **Thoughts**: what the staff say and think, newest first. Cheers and thanks for treats, a thought
-  when they settle somewhere ("These deck chairs are nice"), and a line about their work, made from what their thread
-  is doing ("PHP in progress… thinking about loops?", at most one a minute each). Click someone to see them instead.
+  Beside the office, **Thoughts**: a chat, like a team chat. Each message has its writer's small head on the left and
+  arrives a moment after the last (1 to 2 seconds apart), newest at the bottom. Cheers and thanks for treats (a coffee
+  and a donut together get dunked), a thought when they settle somewhere ("These deck chairs are nice"), and a line
+  about their work, made from what their thread is doing ("PHP in progress… thinking about loops?"). It follows Filter
+  by. Click someone to see them instead.
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
   beside the port. When another program holds its port, Run becomes **Re-allocate**: it starts the project on the

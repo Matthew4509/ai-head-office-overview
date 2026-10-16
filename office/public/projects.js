@@ -206,7 +206,8 @@
     for (const p of people) { if (!byFolder.has(p.folder)) byFolder.set(p.folder, []); byFolder.get(p.folder).push(p); }
     const links = app.data?.links || {};
     const folderOfId = Object.fromEntries(Object.entries(links).map(([f, id]) => [id, f]));
-    const shown = eng.projects.filter((p) => app.showHidden || !p.hiddenView);
+    // Only what Filter by shows: one project, one working folder, or all of them.
+    const shown = eng.projects.filter((p) => (app.showHidden || !p.hiddenView) && (app.inFilter?.(folderOfId[p.id] ?? p.folder, p) ?? true));
     const staffOf = (p) => byFolder.get(folderOfId[p.id]) || [];
     const sorted = [...shown].sort((a, b) => (staffOf(b).length > 0) - (staffOf(a).length > 0) || (!!b.running - !!a.running) || String(b.updated || '').localeCompare(String(a.updated || '')));
     const face = (p) => el('button', { type: 'button', class: `staff state-${p.state}`, title: `${p.name}: ${p.words || p.state}`, onclick: () => app.pick(p.key) }, app.face(p, 30));
@@ -229,7 +230,7 @@
     };
     // Desks with no project on the list (the projects folder itself: Consultants, or a folder elsewhere) keep a plain tile.
     const linked = new Set(Object.keys(links));
-    const loose = [...byFolder.keys()].filter((f) => !linked.has(f) || !eng.projects.some((p) => p.id === links[f]));
+    const loose = [...byFolder.keys()].filter((f) => (!linked.has(f) || !eng.projects.some((p) => p.id === links[f])) && (app.inFilter?.(f) ?? true));
     const looseTile = (f) => el('li', { class: 'proj' }, top(el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: f || 'Consultants' })),
       f ? 'Not on the project list' : 'Threads in the projects folder itself', '', byFolder.get(f).map(face)));
     const hiddenN = eng.projects.filter((p) => p.hiddenView).length;
@@ -237,7 +238,7 @@
       hiddenN ? el('label', {}, el('input', { type: 'checkbox', checked: !!app.showHidden, onchange: (e) => { app.showHidden = e.target.checked; app.draw(); } }), ` Show hidden (${hiddenN})`) : null);
     const loading = !eng.at ? el('p', { class: 'note', text: 'Reading the project list…' }) : null;
     const drawn = swap(box, toggle, loading, el('ul', { class: 'proj-tiles' }, ...loose.map(looseTile), ...sorted.map(tile)),
-      eng.at && !sorted.length && !loose.length ? el('p', { class: 'empty', text: 'No projects yet. Add a working folder under Settings.' }) : null);
+      eng.at && !sorted.length && !loose.length ? el('p', { class: 'empty', text: eng.projects.length ? 'No project in what Filter by shows. Pick All projects to see them all.' : 'No projects yet. Add a working folder under Settings.' }) : null);
     if (drawn && focusKey) box.querySelector(focusKey)?.focus();
   };
 

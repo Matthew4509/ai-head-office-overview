@@ -70,6 +70,16 @@ button { cursor: pointer; }
 .side, .filter { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
 @media (max-width: 1200px) { .filter { position: static; max-height: none; } }
 @media (max-width: 900px) { .side { position: static; max-height: none; } }
+/* On a wide window the page itself never scrolls: it fills the window, and each column scrolls on its own (one scroll bar
+   per column, never a second one for the page). The Office / Projects / Favourites / Prompts tabs stay at the top of the
+   middle column while its content scrolls under them. A narrow window (everything stacked) scrolls as one page. */
+@media (min-width: 901px) {
+  body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  .layout { flex: 1 1 auto; min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+  .middle, .side, .filter { position: static; max-height: none; min-height: 0; overflow: auto; }
+  .middle > .view-tabs { position: sticky; top: -12px; z-index: 3; background: var(--card); margin-top: -12px; padding-top: 12px; }
+}
+@media (min-width: 901px) and (max-width: 1200px) { .layout { grid-template-rows: auto minmax(0, 1fr); } .filter { max-height: 30vh; } }
 
 /* Filter by project: one row per project, its name and, under it in words, who is doing what. The one shown is filled. */
 /* Filter by: the heading and the choice beside it (Project or Working folder), then the list for that choice. */
@@ -163,7 +173,15 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 #office canvas { flex: none; }
 .office-strip { flex: 0 0 240px; margin: 0; }
 /* Nobody picked: the staff's latest thoughts, newest first (three on a narrow screen). */
-.thoughts { list-style: none; margin: 6px 0 8px; padding: 0; display: grid; gap: 6px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.thoughts { list-style: none; margin: 6px 0 8px; padding: 0; display: grid; gap: 8px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+/* A chat message: the writer's small head on the left, their name and when above the words (like a team chat). */
+.chat-msg { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; align-items: start; }
+.chat-msg.new { animation: chat-in .25s ease-out; }
+.chat-head { width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--page); font-weight: 700; font-size: 12px; }
+.chat-head canvas { width: 26px; height: 26px; }
+.chat-body { min-width: 0; }
+@keyframes chat-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .chat-msg.new { animation: none; } }
 @media (max-width: 700px) {
   #office { flex-direction: column; align-items: stretch; }
   .office-strip { flex: none; margin: 6px 0 0; min-height: 4.4em; }

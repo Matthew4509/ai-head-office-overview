@@ -119,7 +119,9 @@
     return app.project === null || folder === app.project;
   }
   app.inFilter = inFilter;
-  app.filterKey = () => `${app.project ?? ''}|${app.folder ?? ''}`;
+  // Consultants (the projects folder itself) is the folder "", so "all" is written apart from it: picking Consultants is a
+  // change of filter, not "everyone left".
+  app.filterKey = () => `${app.project === null ? '*' : `p:${app.project}`}|${app.folder ?? ''}`;
 
   function people() {
     const all = app.data?.people || [];
@@ -264,7 +266,7 @@
    */
   function drawFavs() {
     const box = document.getElementById('favs-view');
-    const favs = (app.data?.people || []).filter((p) => p.fav);
+    const favs = (app.data?.people || []).filter((p) => p.fav && inFilter(p.folder));
     const hiddenCount = favs.filter((p) => p.favHidden && p.state === 'home').length;
     const shown = favs.filter((p) => app.showHiddenFavs || !p.favHidden || p.state !== 'home');
     const folders = [...new Set(shown.map((p) => p.folder))].sort((a, b) => projectName(a).localeCompare(projectName(b)));
@@ -287,7 +289,8 @@
     });
     const toggle = hiddenCount || app.showHiddenFavs ? el('label', { class: 'row note' }, el('input', { type: 'checkbox', checked: !!app.showHiddenFavs, onchange: (e) => { app.showHiddenFavs = e.target.checked; draw(); } }), `Show hidden (${hiddenCount})`) : null;
     const intro = el('p', { class: 'note', text: 'Favourites stay on call, so they are either in the office or on the beach until needed.' });
-    swap(box, intro, toggle, ...groups, groups.length ? null : el('p', { class: 'empty', text: 'No favourites yet. Open someone\'s card and press Favourite, or Favourite project for everyone in that project.' }));
+    const picked = app.project !== null || app.folder !== null;
+    swap(box, intro, toggle, ...groups, groups.length ? null : el('p', { class: 'empty', text: picked ? 'No favourites in what Filter by shows. Pick All projects to see them all.' : 'No favourites yet. Open someone\'s card and press Favourite, or Favourite project for everyone in that project.' }));
   }
 
   function drawWaiting() {

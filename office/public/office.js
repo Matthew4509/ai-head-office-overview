@@ -433,24 +433,34 @@
     p.bubbleUntil = world.time + seconds;
     think(p, text);
   }
-  // ---- Thoughts: what the staff say and think, newest first, in the strip beside the office ----
+  // ---- Thoughts: a chat beside the office, like a team chat: what the staff say and think, a message at a time ----
 
-  /** How many thoughts are kept, and how many the strip shows. */
+  /** How many messages are kept, how many the chat shows, and how many may wait to be posted. */
   const THOUGHTS_KEPT = 30;
   const THOUGHTS_SHOWN = 8;
-  /** Something a person said or thought. The same words from several people within a few seconds share one line. */
+  const THOUGHTS_WAITING = 20;
+  /** Messages waiting to be posted: they go into the chat one at a time, 1 to 2 seconds apart, as if typed. */
+  const chatQueue = [];
+  let chatNextAt = 0;
+  /** Something a person said or thought, queued for the chat. Their same words again within 10 minutes are left out. */
   function think(p, text) {
     if (!text || !p?.row || world.people.get(p.id) !== p || p.leaving) return;
     const now = Date.now();
-    const same = world.thoughts.find((t) => t.text === text && now - t.at < 5000);
-    if (same) {
-      if (!same.ids.includes(p.id)) { same.ids.push(p.id); same.who.push(p.row.name); }
-      return;
-    }
-    if (world.thoughts.some((t) => t.ids.includes(p.id) && t.text === text && now - t.at < 60000)) return;
-    world.thoughts.unshift({ ids: [p.id], who: [p.row.name], text, at: now });
-    world.thoughts.length = Math.min(world.thoughts.length, THOUGHTS_KEPT);
+    const said = (t) => t.id === p.id && t.text === text;
+    if (chatQueue.some(said) || world.thoughts.some((t) => said(t) && now - t.at < 600000)) return;
+    chatQueue.push({ id: p.id, who: p.row.name, look: p.row.look ?? null, folder: p.row.pcId ?? '', text });
+    if (chatQueue.length > THOUGHTS_WAITING) chatQueue.shift();
   }
+  /** Posts the next waiting message when its turn comes (newest at the bottom of the chat). */
+  function postThought() {
+    const now = Date.now();
+    if (!chatQueue.length || now < chatNextAt) return;
+    world.thoughts.push({ ...chatQueue.shift(), at: now });
+    if (world.thoughts.length > THOUGHTS_KEPT) world.thoughts.shift();
+    chatNextAt = now + 1000 + Math.random() * 1000;
+    for (const v of views) tell(v);
+  }
+  setInterval(postThought, 250);
   /** What they think on settling somewhere with nothing to do (only now and then, so the list is not all the same). */
   const AT_EASE = {
     pizza: ['This pizza is wonderful.', 'Best slice all week.', 'Who ordered the pineapple?'],
@@ -656,6 +666,13 @@
     if (job.kind === 'coffee') return nextStop(job);
     return null;
   }
+  /** What someone says with a coffee and a bite in hand at the same time: a joke per food. */
+  const COMBOS = {
+    donuts: ['Dunking donuts! In it goes.', 'Coffee AND a donut? Time to dunk.', 'Dunk, sip, repeat.'],
+    pizza: ['Pizza and coffee: breakfast of coders.', 'Espresso with extra cheese.', 'A slice and a sip. Living the dream.'],
+    sandwiches: ['Lunch and a brew. Perfect.', 'Sandwich in one hand, coffee in the other. Who is typing?', 'Coffee to wash down the crusts.'],
+  };
+  const combo = (food, p) => (COMBOS[food] || COMBOS.pizza)[p.seed % 3];
   /** Hands the next one on the list theirs (a coffee, or a piece of the food), or walks to them; false once the list is done. */
   function handRound(k) {
     const at = nextStop(k.job);
@@ -665,14 +682,17 @@
     }
     const got = at ? world.people.get(k.job.who[k.job.at]) : null;
     if (got) {
+      // A coffee and something to eat at once makes a joke of it (a donut gets dunked), instead of a plain thanks.
+      const hasCoffee = got.coffee === 'have' && world.time < got.coffeeUntil;
+      const hasFood = got.slice && world.time < got.sliceUntil ? got.slice : null;
       if (k.job.kind === 'coffee') {
         got.coffee = 'have';
         got.coffeeUntil = world.time + COFFEE_HELD;
-        say(got, ['Thanks for the coffee!', 'Flat white, perfect!', 'Just what I needed.'][got.seed % 3], 3);
+        say(got, hasFood ? combo(hasFood, got) : ['Thanks for the coffee!', 'Flat white, perfect!', 'Just what I needed.'][got.seed % 3], 3);
       } else {
         got.slice = k.job.kind;
         got.sliceUntil = world.time + PIZZA_SECONDS;
-        say(got, FOOD[k.job.kind].cheer[got.seed % 3], 3);
+        say(got, hasCoffee ? combo(k.job.kind, got) : FOOD[k.job.kind].cheer[got.seed % 3], 3);
       }
       thank(got);
       k.face = got.x < k.x ? 'west' : 'east';
@@ -1465,10 +1485,21 @@
     // page past the bottom of the window: that would be a second scroll bar.
     const middle = box.closest('.middle');
     const layout = middle?.parentElement;
-    const below = middle
-      ? middle.getBoundingClientRect().bottom - cv.getBoundingClientRect().bottom + (layout ? parseFloat(getComputedStyle(layout).paddingBottom) || 0 : 0)
-      : 90;
-    const room = Math.max(260, window.innerHeight - top - Math.ceil(below) - 1);
+    let room;
+    const mcss = middle && getComputedStyle(middle);
+    if (mcss && mcss.overflowY !== 'visible') {
+      // A wide window: the middle column scrolls on its own, so the office fits the column's own height (less what sits
+      // above it inside the column and the padding under the office's section), not the window's.
+      const section = box.closest('section') || box;
+      const contentTop = cv.getBoundingClientRect().top - middle.getBoundingClientRect().top - (parseFloat(mcss.borderTopWidth) || 0) + middle.scrollTop;
+      const under = Math.max(0, section.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom);
+      room = Math.max(260, Math.floor(middle.clientHeight - (parseFloat(mcss.paddingBottom) || 0) - contentTop - under - 1));
+    } else {
+      const below = middle
+        ? middle.getBoundingClientRect().bottom - cv.getBoundingClientRect().bottom + (layout ? parseFloat(getComputedStyle(layout).paddingBottom) || 0 : 0)
+        : 90;
+      room = Math.max(260, window.innerHeight - top - Math.ceil(below) - 1);
+    }
     // The strip beside the office (a wide window) takes its own width and the gap out of the row.
     const css = getComputedStyle(box);
     const beside = css.display === 'flex' && css.flexDirection === 'row' && view.strip ? view.strip.offsetWidth + (parseFloat(css.columnGap) || 0) : 0;
@@ -1589,7 +1620,7 @@
       return;
     }
     // Nobody picked: the latest thoughts (drawn again when one is added, and each minute for the "ago").
-    const key = p ? `${p.id}|${wordsOf(p)}|${holding(p)}|${p.row.name}` : `all|${world.people.size}|${world.thoughts[0]?.at}|${world.thoughts[0]?.who.length}|${Math.floor(Date.now() / 60000)}`;
+    const key = p ? `${p.id}|${wordsOf(p)}|${holding(p)}|${p.row.name}` : `all|${world.people.size}|${world.thoughts.at(-1)?.at}|${Math.floor(Date.now() / 60000)}|${app()?.filterKey?.()}`;
     if (key === v.told) return;
     v.told = key;
     if (p) {
@@ -1601,8 +1632,14 @@
     }
     if (!world.people.size) return v.strip.replaceChildren(el('span', { class: 'note', text: 'Nobody in the office yet.' }));
     const ago = (at) => { const m = Math.floor((Date.now() - at) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ago`; };
-    const names = (who) => (who.length <= 3 ? who.join(who.length === 2 ? ' and ' : ', ').replace(/, ([^,]*)$/, ' and $1') : `${who.slice(0, 2).join(', ')} and ${who.length - 2} more`);
-    const list = world.thoughts.slice(0, THOUGHTS_SHOWN).map((t) => el('li', {}, el('b', { text: `${names(t.who)}:` }), ' ', el('span', { text: t.text }), el('span', { class: 'note', text: ` · ${ago(t.at)}` })));
+    // Only the people Filter by shows; the newest message at the bottom, each with its writer's small head on the left.
+    const shownIn = (f) => app()?.inFilter?.(f) ?? true;
+    const head = (t) => {
+      const pic = L?.portrait?.({ key: t.id, name: t.who, look: t.look }, 26);
+      return el('span', { class: 'chat-head', 'aria-hidden': 'true' }, pic || t.who.charAt(0).toUpperCase());
+    };
+    const list = world.thoughts.filter((t) => shownIn(t.folder)).slice(-THOUGHTS_SHOWN).map((t) => el('li', { class: `chat-msg${Date.now() - t.at < 1500 ? ' new' : ''}` }, head(t),
+      el('div', { class: 'chat-body' }, el('div', {}, el('b', { text: t.who }), el('span', { class: 'note', text: ` ${ago(t.at)}` })), el('div', { text: t.text }))));
     v.strip.replaceChildren(el('b', { text: 'Thoughts' }),
       list.length ? el('ul', { class: 'thoughts' }, ...list) : el('p', { class: 'note', text: 'Quiet for now: what they say and think shows here.' }),
       el('span', { class: 'note', text: 'Click a person to see what they are doing.' }));
