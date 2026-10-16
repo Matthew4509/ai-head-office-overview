@@ -36,6 +36,8 @@ export class Office {
     this.dataDir = o.dataDir;
     this.transcriptsDir = o.transcriptsDir || path.join(os.homedir(), '.claude', 'projects');
     this.now = o.now || (() => Date.now());
+    // Tokens added to the spending balance on top of what the AI wrote: only the demo has any (to try every reward).
+    this.bonus = Math.max(0, Number(o.bonus) || 0);
     this.file = (n) => path.join(this.dataDir, n);
     this.settings = readJson(this.file('settings.json'), {});
     if (!this.settings.openedAt) {
@@ -402,7 +404,7 @@ export class Office {
       projects: Object.values(projects).sort((a, b) => a.name.localeCompare(b.name)),
       favProjects: [...favProjects].sort(),
       waiting,
-      earned: purse,
+      earned: purse + this.bonus,
     };
   }
 }
