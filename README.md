@@ -73,6 +73,8 @@ running).
   a **Consultant** at the projects folder's own desk. Working is at the desk; a thread that stopped to ask you
   something stands with a "?"; a long think goes to the meeting room once it has one; after an hour with nothing
   happening they go home. Favourites wait on a beach towel. Click anyone for their card.
+  Someone waiting for your reply for a while goes to try out what has been bought (a lounge spot, a free deck chair) for
+  a minute, then comes back to the desk, the "?" above them all the while; a few minutes later they may go again.
   Beside the office, **Thoughts**: a chat, like a team chat. Each message has its writer's small head on the left and
   arrives a moment after the last (1 to 2 seconds apart), newest at the bottom. Cheers and thanks for treats (a coffee
   and a donut together get dunked), a thought when they settle somewhere ("These deck chairs are nice"), and a line

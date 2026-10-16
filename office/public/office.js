@@ -262,6 +262,9 @@
       return { key: `towel:${i}`, x: x + more * 14, y: y - more * 6, face: 'south', area: 'towel' };
     }
     if (s.doing === 'needs' && desk) {
+      // Waiting a while for your reply: off to try a room or a deck chair, then back (the "?" goes with them).
+      const visit = waitingVisit(p);
+      if (visit) return visit;
       // Stood up beside the desk, facing you, with a "?": seat 1 on the left end, the others on the right.
       const i = Math.max(0, desk.crew.indexOf(s.id));
       const side = i === 0 ? -1 : 1;
@@ -329,6 +332,36 @@
     const r = p.rest;
     return { key: `rest:${r.id}`, x: r.x + ((p.seed % 5) - 2) * 10, y: r.y + ((p.seed >> 3) % 3) * 6, face: r.face, area: r.area, rest: r };
   }
+
+  /** Waiting for a reply: after VISIT_AFTER seconds they go and try something bought (a lounge spot, a free deck chair)
+   * for VISIT_STAY seconds, then go back to the desk; VISIT_GAP seconds later they may go again. null = at the desk. */
+  const VISIT_AFTER = 40;
+  const VISIT_STAY = 50;
+  const VISIT_GAP = 240;
+  function waitingVisit(p) {
+    const t = world.time;
+    if (p.visit && t < p.visit.until) return p.visit.target;
+    if (p.visit) {
+      p.visit = null;
+      p.visitAgain = t + VISIT_GAP;
+      say(p, ['Back at my desk. Still need you!', 'Nice break. Ready when you are!', 'Back, still waiting on you.'][p.seed % 3], 3);
+      return null;
+    }
+    if (t - (p.needsSince ?? t) < VISIT_AFTER || t < (p.visitAgain ?? 0)) return null;
+    // What there is to try: the lounge's bought spots (not a free one) and the deck chairs nobody is in.
+    const busy = new Set([...world.people.values()].filter((o) => o !== p).map((o) => o.targetKey));
+    const options = REST.filter((r) => r.area === 'lounge' && r.id !== 'window' && world.rooms.rest.includes(r.id) && !busy.has(`rest:${r.id}`) && !busy.has(`visit:${r.id}`))
+      .map((r) => ({ key: `visit:${r.id}`, x: r.x, y: r.y, face: r.face, area: r.area, rest: r, visit: VISIT_WORDS[r.id] || 'the lounge' }));
+    DECK.slice(0, Math.min(world.rooms.deckchairs, DECK.length)).forEach(([x, y], i) => {
+      if (!busy.has(`break:${i}`)) options.push({ key: `break:${i}`, x, y, face: 'south', area: 'break', visit: 'the deck chairs' });
+    });
+    if (!options.length) return null;
+    const pick = options[(p.seed + Math.floor(t / 60)) % options.length];
+    p.visit = { target: { ...pick, waiting: true }, until: t + VISIT_STAY };
+    say(p, `Trying out ${pick.visit} while I wait for you!`, 3);
+    return p.visit.target;
+  }
+  const VISIT_WORDS = { tv: 'the TV', nap: 'the armchair', library: 'the bookcase', chat: 'the sofa', treadmill: 'the treadmill', weights: 'the weights', arcade: 'the arcade machine' };
 
   /** Favourites on a towel, in a steady order (so nobody swaps towels when someone else arrives). */
   const towelers = () => world.staff.filter((x) => x.doing === 'towel').sort((a, b) => (a.id < b.id ? -1 : 1));
@@ -562,6 +595,10 @@
       }
       if (p.row?.doing !== s.doing) {
         p.doingSince = clock();
+        // Waiting starts now (for the visit while waiting); a reply ends any visit under way.
+        p.needsSince = world.time;
+        p.visit = null;
+        p.visitAgain = 0;
         if (s.doing === 'needs' && p.row && !snap) say(p, 'A question for you!', 5);
         if (s.doing === 'typing' && p.row?.doing === 'needs' && !snap) say(p, 'Thanks, on it!', 3);
         if (s.doing === 'towel' && p.row && !snap) say(p, 'Off to the beach!', 4);
@@ -977,6 +1014,8 @@
     }
     const thinkHere = s.doing === 'thinking' && !world.rooms.boardroom.table;
     if (p.path.length && !p.out) {
+      if (t?.waiting) return `Off to try ${t.visit} while waiting for you`;
+      if (t?.area === 'needs' && p.from && p.from !== 'needs' && p.from !== 'desk') return 'Back to the desk: still waiting for you';
       if (t?.area === 'gone') return 'Going home: the thread has gone quiet';
       if (t?.area === 'break') return 'Off out for a break in a deck chair';
       if (t?.area === 'towel') return 'Gone home for now: off to a beach towel (a favourite stays)';
@@ -988,7 +1027,7 @@
       if (t?.area === 'desk') return `Walking to the ${t.desk?.name ?? ''} desk`;
       return `Walking to the ${t?.area ?? 'kitchen'}`;
     }
-    if (s.doing === 'needs') return `Needs you: ${s.doingText}`;
+    if (s.doing === 'needs') return `Needs you: ${s.doingText}${t?.waiting ? ` (trying ${t.visit} while waiting)` : ''}`;
     if (t?.area === 'break') return 'On a break: in a deck chair on the beach';
     if (t?.area === 'towel') return 'Off duty on a beach towel: a favourite, back when their next thread starts';
     if (t?.area === 'volley') return playing() >= 2 ? 'Playing beach volleyball' : 'At the volleyball net, waiting for a partner';
