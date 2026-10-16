@@ -406,11 +406,17 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .prompt-tiles { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
 .ptile { width: 100%; text-align: left; display: grid; gap: 4px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 12px; }
 .ptile:hover { border-color: var(--accent); }
-.prompt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.prompt-row { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; display: grid; gap: 4px; }
+/* A category's prompts as tiles, about a third of the width each (fewer to a row on a narrow window): the name and its
+   star on top, the text under it, Copy / Edit / Remove at the foot. Starred ones come first. */
+.prompt-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(max(220px, 30%), 1fr)); }
+.prompt-row { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; grid-template-rows: 1fr auto; background: var(--card); }
+.prompt-row.starred { border-color: var(--star-line); }
 .prompt-row .row { margin: 4px 0 0; }
+.prompt-name { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.prompt-name .star-btn { font-size: 18px; padding: 0 2px; }
+.prompt-group { font-size: 15px; margin: 0 0 8px; }
 .prompt-txt { display: grid; gap: 2px; min-width: 0; }
-.prompt-text { color: var(--soft); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.prompt-text { color: var(--soft); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .more { position: relative; }
 .more > summary { list-style: none; cursor: pointer; }
 .more > summary::-webkit-details-marker { display: none; }

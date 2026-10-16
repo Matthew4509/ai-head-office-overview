@@ -82,8 +82,9 @@ running).
   **Terminal**, **Hide** (stays on the list, out of view until **Show hidden** is ticked) and **Remove from list** (its
   folder and files are never touched; Settings › Folders brings it back).
 - **Favourites** tab: your starred people and projects.
-- **Prompts** tab: prompts you use again and again, a tile per category: **Copy**, **Edit** (which can move it),
-  **Remove**; **New category**, **Add prompt**, **Rename** and **Delete category**; search across them all. Words in
+- **Prompts** tab: prompts you use again and again, a tile per category. Inside one, the prompts are tiles a third wide,
+  each with a **star** (☆/★: starred prompts come first, and show under **Starred** above the categories), **Copy**,
+  **Edit** (which can move it), **Remove**; **New category**, **Add prompt**, **Rename** and **Delete category**; search across them all. Words in
   [brackets] are yours to fill in.
 - **Right panel:** **Needs attention** (threads with a question first, then projects: a live site down, Critical or
   High audit findings, git waiting for a save or push; click a row to open it) and **Staff rewards** (spend the purse:

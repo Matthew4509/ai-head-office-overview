@@ -619,6 +619,15 @@ async function main() {
     for (const c of r.categories) assert.strictEqual(r.prompts.filter(p => p.category === c.id).length, 5, c.name);
     assert.deepStrictEqual((await api('/api/prompts')).json, r, 'reading twice gives the same list');
   });
+  await check('prompts: a star is kept, taken off again, and refused for a prompt that is gone', async () => {
+    const first = (await api('/api/prompts')).json.prompts[3];
+    assert.strictEqual((await api('/api/prompts/star', { id: first.id, on: true })).json.prompt.starred, true);
+    assert.strictEqual((await api('/api/prompts')).json.prompts.find(p => p.id === first.id).starred, true);
+    await api('/api/prompts/star', { id: first.id, on: false });
+    assert.strictEqual((await api('/api/prompts')).json.prompts.find(p => p.id === first.id).starred, undefined);
+    const gone = await api('/api/prompts/star', { id: 'nope', on: true });
+    assert(gone.json.ok === false && /not on the list/.test(gone.json.error), JSON.stringify(gone.json));
+  });
   await check('prompts: a new category goes at the end; a name already used (any case) or empty is refused', async () => {
     const r = (await api('/api/prompts/category/save', { name: '  My   tests ' })).json;
     assert(r.ok && r.category.name === 'My tests', JSON.stringify(r));

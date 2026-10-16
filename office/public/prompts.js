@@ -1,4 +1,5 @@
-// The Prompts tab: prompts you use again and again, a tile per category. A tile opens its prompts: Copy, Edit (which
+// The Prompts tab: prompts you use again and again, a tile per category (starred prompts above them). A tile opens its
+// prompts, starred first, as tiles a third wide: a star, Copy, Edit (which
 // can move it to another category), Remove. New category and Add prompt sit above the tiles; inside a category,
 // Rename and Delete category. Search looks in names and text. Kept by the engine (/api/prompts) on this PC only.
 'use strict';
@@ -34,15 +35,23 @@
       btn('Add prompt', () => promptWindow(), true),
       cat ? btn('Rename category', () => catWindow(cat)) : btn('New category', () => catWindow()),
       cat ? btn('Delete category', () => removeCat(cat)) : null);
+    // Starred prompts first (in their saved order), then the rest.
+    const starredFirst = (list) => [...list.filter((p) => p.starred), ...list.filter((p) => !p.starred)];
+    const tiles = (list, withCat) => el('ul', { class: 'prompt-list' }, list.map((p) => el('li', { class: `prompt-row${p.starred ? ' starred' : ''}` },
+      el('div', { class: 'prompt-txt' }, el('div', { class: 'prompt-name' }, el('b', { text: p.title }), starBtn(p)),
+        withCat ? el('span', { class: 'note', text: catOf(p.category)?.name || '' }) : null, el('span', { class: 'prompt-text', text: p.text })),
+      el('div', { class: 'row' }, btn('Copy', () => copy(p), true), btn('Edit', () => promptWindow(p)), btn('Remove', () => removePrompt(p))))));
     let body;
     if (!cat && !q) {
-      body = el('ul', { class: 'prompt-tiles' }, st.cats.map((c) => el('li', {}, el('button', { type: 'button', class: 'ptile', onclick: () => { st.cat = c.id; draw(); } }, el('b', { text: c.name }), el('span', { class: 'note', text: plural(inCat(c.id).length, 'prompt', 'prompts') })))));
+      // Starred prompts from every category sit above the category tiles, so a favourite is one click away.
+      const starred = st.prompts.filter((p) => p.starred);
+      body = el('div', {}, starred.length ? [el('h3', { class: 'prompt-group', text: '★ Starred' }), tiles(starred, true), el('h3', { class: 'prompt-group', text: 'Categories' })] : null,
+        el('ul', { class: 'prompt-tiles' }, st.cats.map((c) => el('li', {}, el('button', { type: 'button', class: 'ptile', onclick: () => { st.cat = c.id; draw(); } }, el('b', { text: c.name }),
+          el('span', { class: 'note', text: `${plural(inCat(c.id).length, 'prompt', 'prompts')}${inCat(c.id).some((p) => p.starred) ? ` · ${inCat(c.id).filter((p) => p.starred).length} ★` : ''}` }))))));
     } else {
       const pool = cat ? inCat(cat.id) : st.prompts;
-      const shown = q ? pool.filter((p) => `${p.title}\n${p.text}`.toLowerCase().includes(q)) : pool;
-      body = shown.length ? el('ul', { class: 'prompt-list' }, shown.map((p) => el('li', { class: 'prompt-row' },
-        el('div', { class: 'prompt-txt' }, el('b', { text: p.title }), cat ? null : el('span', { class: 'note', text: catOf(p.category)?.name || '' }), el('span', { class: 'prompt-text', text: p.text })),
-        el('div', { class: 'row' }, btn('Copy', () => copy(p), true), btn('Edit', () => promptWindow(p)), btn('Remove', () => removePrompt(p))))))
+      const shown = starredFirst(q ? pool.filter((p) => `${p.title}\n${p.text}`.toLowerCase().includes(q)) : pool);
+      body = shown.length ? tiles(shown, !cat)
         : el('p', { class: 'empty', text: q ? `No prompt matches "${st.q.trim()}"${cat ? ` in ${cat.name}` : ''}. Search looks in the names and the text.` : `No prompts in ${cat.name} yet. Add prompt saves one.` });
     }
     // The search box is put back in place, not rebuilt: swap() would replace it and lose the cursor.
@@ -51,6 +60,16 @@
     swap(box.querySelector('.prompt-body'), tail);
   }
   app.drawPrompts = () => (st.prompts ? draw() : load());
+
+  /** A prompt's star: starred prompts come first, and show under Starred above the categories. */
+  function starBtn(p) {
+    const on = !!p.starred;
+    return el('button', { type: 'button', class: 'star-btn', 'aria-pressed': String(on), 'aria-label': `Star: ${p.title}`,
+      title: on ? `"${p.title}" is starred: it comes first and shows under Starred. Click to take the star off.` : `Star "${p.title}": it comes first and shows under Starred, above the categories.`,
+      onclick: async () => {
+        try { await app.engine('/api/prompts/star', { id: p.id, on: !on }); p.starred = !on || undefined; draw(); } catch (e) { app.showFault(e); }
+      } }, on ? '★' : '☆');
+  }
 
   async function copy(p) {
     try { await navigator.clipboard.writeText(p.text); app.say(`Prompt "${p.title}" copied. Paste it into the AI you use.`); } catch { app.say('The clipboard was blocked: open Edit and copy the text from there.'); }
