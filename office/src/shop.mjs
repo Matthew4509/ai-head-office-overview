@@ -11,6 +11,8 @@ export const SHOP = [
   { id: 'sandwiches', name: 'Sandwich platter', the: 'the sandwich platter', price: 400_000, keeps: false, most: 0, room: 'treats' },
   { id: 'icecream', name: 'Ice creams', the: 'the ice creams', price: 300_000, keeps: false, most: 0, room: 'treats' },
   { id: 'cake', name: 'Celebration cake', the: 'the celebration cake', price: 600_000, keeps: false, most: 0, room: 'treats' },
+  // Bought at the vending machine in the kitchen (a click on it), not from a tile.
+  { id: 'energy', name: 'Energy drinks', the: 'the energy drinks', price: 1_000_000, keeps: false, most: 0, room: 'treats' },
   { id: 'rocks', name: 'Pet rocks', the: 'the pet rocks', price: 200_000, keeps: true, most: 1, room: 'desks' },
   { id: 'ducks', name: 'Rubber ducks', the: 'the rubber ducks', price: 300_000, keeps: true, most: 1, room: 'desks' },
   { id: 'cactus', name: 'Desk cacti', the: 'the desk cacti', price: 250_000, keeps: true, most: 1, room: 'desks' },

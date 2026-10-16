@@ -87,6 +87,9 @@ running).
   its screen and a control panel under it. Moon Rover drives a buggy over rugged ground from the lander to the outpost:
   low gravity throws it off the crests, so tip it level in the air and land on its wheels, and pick up batteries before
   the power runs out.
+- **The vending machine** (in the kitchen): click it and insert a 1M-token coin for energy drinks. Everyone in the
+  office gets a can and, for a minute, walks three times as fast, buzzes on the spot and talks in quick bursts (the
+  Thoughts chat speeds up to match), then slumps. It is sold only at the machine, not in Staff rewards.
 - **The TV** (Staff rewards › Lounge) stands against the lounge wall and shows a bouncing DVD logo that comes ever so
   close to the corners but never quite hits one.
 - **Inflatable flamingo** (Staff rewards › Beach): a pink flamingo floats on the sea, bobbing and drifting a little (it

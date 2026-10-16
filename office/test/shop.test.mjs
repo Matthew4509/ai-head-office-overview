@@ -23,7 +23,7 @@ function opened(h) {
 
 test('the price list: treats, furniture, room keys, sandwiches, plants, arcade machine, volleyball set and the rows filled to three', () => {
   const price = Object.fromEntries(SHOP.map((i) => [i.id, i.price]));
-  assert.deepEqual(price, { coffee: 200_000, donuts: 500_000, sandwiches: 400_000, icecream: 300_000, cake: 600_000, rocks: 200_000, ducks: 300_000, cactus: 250_000, boardroom_key: 20_000_000, lounge_key: 10_000_000, table: 1_500_000, chairs: 500_000, whiteboard: 800_000, plants: 600_000, clock: 400_000, cooler: 700_000, armchair: 600_000, bookcase: 1_000_000, sofa: 1_200_000, tv: 1_500_000, gym: 10_000_000, arcade: 2_500_000, deckchair: 1_000_000, volleyball: 2_000_000, flamingo: 800_000 });
+  assert.deepEqual(price, { coffee: 200_000, donuts: 500_000, sandwiches: 400_000, icecream: 300_000, cake: 600_000, energy: 1_000_000, rocks: 200_000, ducks: 300_000, cactus: 250_000, boardroom_key: 20_000_000, lounge_key: 10_000_000, table: 1_500_000, chairs: 500_000, whiteboard: 800_000, plants: 600_000, clock: 400_000, cooler: 700_000, armchair: 600_000, bookcase: 1_000_000, sofa: 1_200_000, tv: 1_500_000, gym: 10_000_000, arcade: 2_500_000, deckchair: 1_000_000, volleyball: 2_000_000, flamingo: 800_000 });
 });
 
 test('only tokens written after the office opened go into the purse; the rest is shown on the person', () => {
