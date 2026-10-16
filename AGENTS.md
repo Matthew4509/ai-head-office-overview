@@ -36,7 +36,8 @@ Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Nod
    print that it is running; the page is http://127.0.0.1:8880/. The first start reads every transcript once (up to a
    minute); the page says "Loading" meanwhile, and shows a Welcome window the user answers.
 7. Tell the user: Settings (the gear, top right) has Folders (add their projects folder if the list is empty), Setup (shortcuts,
-   and advanced setup for hooks: see below), Help and About (Quit, Uninstall).
+   and advanced setup for hooks: see below), Update (a newer version from GitHub, taken in one click), Help and About
+   (Quit, Uninstall).
 
 ## Update it (pull)
 1. **See what is new before taking it:** in the app's folder,
@@ -47,7 +48,10 @@ Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Nod
 3. **Take it:** `git pull --ff-only`. If git refuses because files were changed here, stop and tell the user: do not
    reset, stash or overwrite their changes without their word.
 4. **Check and start:** `npm test`, then `cmd /c start "" start.cmd` and `node server.js --status`.
-5. The version is in `lib/config.js` (`VERSION`) and Settings › About. The user's data stays as it was; a new version
+5. The user can also press **Update now** in Settings › Update: it does the same fast-forward, refuses when files here
+   were changed or saved here, runs git with hooks off, and restarts the office. Prefer the steps above when asked to
+   review an update first.
+6. The version is in `lib/config.js` (`VERSION`) and Settings › About. The user's data stays as it was; a new version
    reads it as it is.
 
 ## Review it (what it does on this PC)
@@ -63,7 +67,8 @@ Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Nod
   `lib/platform/windows/`.
 - **Sends:** nothing about the user. The only requests that leave the PC are plain GETs to the live addresses the user
   adds (`lib/live.js`, `lib/audit.js`) and, only if ticked under About, one request a day to GitHub for the newest Git
-  version (`lib/git-program.js`). To check: search the code for `fetch(`, `http.get`, `http.request`.
+  version (`lib/git-program.js`), and, when the user opens Settings › Update, one `git fetch` of this repository
+  (`lib/update.js`). To check: search the code for `fetch(`, `http.get`, `http.request`, `git fetch`.
 - **Its own privacy check:** `node tools/disclose.js` scans the folder, its git history and any zip for private
   details, other project names, AI trail and local paths; it prints labels and places only. "Nothing found" is clean;
   a WARNING line and exit code 2 mean it had no private-details list or no project names to check against.

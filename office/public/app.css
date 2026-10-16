@@ -364,11 +364,18 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .df-del { color: var(--bad); }
 .df-hunk { color: var(--thinking); }
 .check-said { min-height: 1.3em; }
+/* In Settings the line under the tabs takes no room until it has something to say, and the first heading sits close
+   under the tabs: no dead space, and a window that fits needs no scroll bar. */
+.sheet-box.wide > .check-said:empty { min-height: 0; margin: 0; }
+.set-body > h3:first-child { margin-top: 4px; }
 @media (max-width: 700px) { .finding, .fact { grid-template-columns: minmax(0, 1fr); } }
 
 /* Settings: section tabs, rows with their buttons on the right, ticks; Private details rows. */
 .set-body { min-height: 200px; }
 .set-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; border-bottom: 1px solid var(--line); padding: 8px 0; }
+/* Settings › Update: what is new on GitHub, newest first, in a short scrolling list. */
+.update-box { padding: 8px 0; }
+.update-list { margin: 6px 0; padding-left: 18px; max-height: 220px; overflow-y: auto; display: grid; gap: 3px; }
 .set-txt { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .set-acts { margin: 0; justify-content: flex-end; }
 .tick-row { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; }

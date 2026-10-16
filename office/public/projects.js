@@ -17,7 +17,7 @@
       : { method: 'POST', headers: { 'x-aho-key': KEY, 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 403) { setTimeout(() => location.reload(), 500); throw { error: { fault: 'The office was restarted.', reason: 'This page is from its earlier run.', wayOut: 'It reloads by itself.' } }; }
     const d = await r.json().catch(() => ({}));
-    if (!r.ok || d.ok === false) throw { error: { fault: typeof d.error === 'string' ? d.error : `The office answered ${r.status}.`, reason: '', wayOut: '' } };
+    if (!r.ok || d.ok === false) throw { error: d.fault ? { fault: d.fault, reason: d.reason || '', wayOut: d.wayOut || '' } : { fault: typeof d.error === 'string' ? d.error : `The office answered ${r.status}.`, reason: '', wayOut: '' } };
     return d;
   }
   app.engine = engine;

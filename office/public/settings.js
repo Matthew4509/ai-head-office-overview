@@ -1,6 +1,7 @@
 // Settings: one window for everything that is not the office itself. Folders (working folders, projects added one by
 // one, projects taken off the list), Setup (the start link, desktop shortcut and Start with Windows; advanced setup,
-// the AI app's hooks, as its last step), Office (theme, projects folder, gone-home time, live checks), Private details, Help
+// the AI app's hooks, as its last step), Office (theme, projects folder, gone-home time, live checks), Private details, Update
+// (a newer version from GitHub, taken in one click), Help
 // and About (version, the Git program, Quit, Uninstall). Opened by Settings at the top. The welcome on the first start
 // is here too.
 'use strict';
@@ -9,7 +10,7 @@
   const app = window.aiOffice;
   const { el } = app;
   const sheet = document.getElementById('setup');
-  const SECTIONS = [['folders', 'Folders'], ['setup', 'Setup'], ['office', 'Office'], ['private', 'Private details'], ['help', 'Help'], ['about', 'About']];
+  const SECTIONS = [['folders', 'Folders'], ['setup', 'Setup'], ['office', 'Office'], ['private', 'Private details'], ['update', 'Update'], ['help', 'Help'], ['about', 'About']];
   let section = 'folders';
   const said = el('p', { class: 'note check-said', role: 'status', 'aria-live': 'polite' });
   const say = (t) => { said.textContent = t; };
@@ -199,7 +200,7 @@
       h3('Prompts'),
       p('Prompts you use again and again, a tile per category: Copy, Edit (which can move it), Remove; New category, Add prompt, Rename and Delete category. Words in [brackets] are yours to fill in. Kept on this PC only.'),
       h3('What leaves this PC'),
-      p('Nothing about you or your projects. The only requests that leave this PC are plain page requests to the live addresses you add, and, only if you tick it under About, one request a day to GitHub for the newest Git version. Transcripts are read, never changed or sent.'),
+      p('Nothing about you or your projects. The only requests that leave this PC are plain page requests to the live addresses you add, and, only if you tick it under About, one request a day to GitHub for the newest Git version, and, when you open Settings › Update, one request to GitHub for the newest office. Transcripts are read, never changed or sent.'),
       h3('If something goes wrong'),
       li('The page says the office is not answering: it stopped. Double-click start.cmd (or the desktop shortcut); the page catches up by itself.',
         '"Needs Node.js 22 or newer": double-click install.cmd; it offers to install it.',
@@ -209,6 +210,51 @@
       h3('Uninstall'),
       p('About › Uninstall (or uninstall.cmd) stops the office and removes its desktop shortcut, Start with Windows and the start link. Your files stay: delete the office\'s folder yourself to remove it completely. Its data folder holds your settings, audits, prompts and the office\'s own records.'),
     ];
+  }
+
+  // ---- Update: asks GitHub for a newer office when this tab is opened (or Check is pressed), and takes it in one click ----
+  async function drawUpdate() {
+    const stats = app.engineData.stats || await app.engine('/api/stats');
+    const box = el('div', { class: 'update-box', 'aria-live': 'polite' }, el('p', { class: 'note', text: 'Asking GitHub for the newest version…' }));
+    const said = (...kids) => box.replaceChildren(...kids.flat().filter(Boolean));
+    // After an update the office starts again; the page waits for it and then reloads itself (a new run, a new key).
+    async function backAgain() {
+      said(el('p', { text: 'Restarting the office with the new version…' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      for (let i = 0; i < 60; i++) {
+        try { if ((await fetch('/', { cache: 'no-store' })).ok) return location.reload(); } catch { /* not back yet */ }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      said(el('p', { text: 'The office did not come back by itself. Double-click start.cmd (or the desktop shortcut) to start it.' }));
+    }
+    async function take(button) {
+      button.disabled = true;
+      said(el('p', { text: 'Taking the update…' }));
+      try {
+        const r = await app.engine('/api/update/pull', {});
+        said(el('p', { text: `Updated${r.newVersion ? ` to ${r.newVersion}` : ''}: ${plural(r.took, 'change', 'changes')} taken (${r.from} to ${r.to}).` }));
+        await app.engine('/api/update/restart', {}).catch(() => null);
+        backAgain();
+      } catch (e) { said(el('p', { text: fault(e) }), el('div', { class: 'row' }, btn('Check again', check))); }
+    }
+    async function check() {
+      said(el('p', { class: 'note', text: 'Asking GitHub for the newest version…' }));
+      let r;
+      try { r = await app.engine('/api/update/check', {}); } catch (e) { return said(el('p', { text: fault(e) }), el('div', { class: 'row' }, btn('Check again', check))); }
+      const again = btn('Check again', check);
+      const where = el('p', { class: 'note', text: `From ${r.remote}, branch ${r.branch}. This copy is at ${r.at}. Checked ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` });
+      if (!r.behind) return said(el('p', {}, el('b', { text: '● You have the newest version.' })), where, el('div', { class: 'row' }, again));
+      const list = el('ul', { class: 'update-list' }, r.commits.map((c) => el('li', {}, el('span', { class: 'note', text: `${c.date} ` }), c.text)));
+      const blocked = r.changed.length ? `Files here were changed (${r.changed.slice(0, 3).join(', ')}${r.changed.length > 3 ? ', …' : ''}), so it will not update until they are kept or undone.`
+        : r.ahead ? `This copy has ${plural(r.ahead, 'saved change', 'saved changes')} of its own, so it cannot simply move forward.` : '';
+      const go = btn('Update now', (e) => take(e.currentTarget), true, { title: 'Takes the new version from GitHub, then restarts the office. Your data folder (settings, audits, prompts, the office) is not touched.' });
+      said(el('p', {}, el('b', { text: `▲ ${r.newVersion && r.newVersion !== stats.version ? `Version ${r.newVersion} is out` : 'A newer version is out'}: ${plural(r.behind, 'change', 'changes')} since yours.` })),
+        list, blocked ? el('p', { text: blocked }) : null, where,
+        el('div', { class: 'row' }, blocked ? null : go, again),
+        el('p', { class: 'note', text: 'Update now takes it and restarts the office (the page reloads itself). Your data folder is never touched, and nothing here is overwritten: an update that would is refused.' }));
+    }
+    check();
+    return [row(`This copy: AI Head Office Overview ${stats.version}`, 'Updates come from GitHub. Opening this tab asks GitHub once; nothing about you or your projects is sent.'), box];
   }
 
   // ---- About ----
@@ -245,7 +291,7 @@
     ];
   }
 
-  const DRAW = { folders: drawFolders, setup: drawSetup, office: drawOffice, private: drawPrivate, help: drawHelp, about: drawAbout };
+  const DRAW = { folders: drawFolders, setup: drawSetup, office: drawOffice, private: drawPrivate, update: drawUpdate, help: drawHelp, about: drawAbout };
 
   // ---- The first start: Start with Windows and a desktop shortcut, offered ticked, asked once ----
   let welcomed = false;

@@ -314,7 +314,8 @@ audit lists the record of every rule it shows that someone has judged.
   requests that leave your PC are plain page requests (GET, no cookies, no sign-in) to the live addresses you add: one
   per site when the office starts and every 5, 10 or 15 minutes (your choice), and up to a dozen, 5 seconds apart, when
   you audit a project that has one. If you tick **Settings › About › Check online for a newer Git**, the office also
-  asks GitHub once a day for the newest Git for Windows version (off until you tick it).
+  asks GitHub once a day for the newest Git for Windows version (off until you tick it). Opening **Settings ›
+  Update** (or pressing Check there) asks GitHub once for the newest office (a `git fetch` of this repository).
 - **Transcripts** (`%USERPROFILE%\.claude\projects`) are read once for both the staff and the token counts per project,
   then only what each one gained; Codex sessions (`%USERPROFILE%\.codex\sessions`) are counted too. They are read,
   never changed or sent. A person's card shows text from your own threads, so a screenshot of it can show private work.
