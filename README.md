@@ -67,6 +67,9 @@ running).
   a **Consultant** at the projects folder's own desk. Working is at the desk; a thread that stopped to ask you
   something stands with a "?"; a long think goes to the meeting room once it has one; after an hour with nothing
   happening they go home. Favourites wait on a beach towel. Click anyone for their card.
+  Beside the office, **Thoughts**: what the staff say and think, newest first. Cheers and thanks for treats, a thought
+  when they settle somewhere ("These deck chairs are nice"), and a line about their work, made from what their thread
+  is doing ("PHP in progress… thinking about loops?", at most one a minute each). Click someone to see them instead.
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
   beside the port. Under them: its **Audit / Git / Live** marks with **Browser** at their end, then **Free port N** when

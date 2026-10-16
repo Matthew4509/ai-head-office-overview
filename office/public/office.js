@@ -131,7 +131,7 @@
   /** A room still locked (its key not bought yet): its door stays shut with a padlock on it. */
   // A room just bought stays shut (world.unlocking) until the IT tech has walked over and unlocked it.
   const lockedRoom = (r) => !!r.lock && (!!world.rooms.locked?.[r.lock] || world.unlocking === r.lock);
-  const world = { desks: [], deckOrder: [], people: new Map(), staff: [], time: 0, selected: null, seenAt: 0, first: true, grid: [], layout: '', table: [], tableAt: 0, fitting: [], serverRooms: null, rooms: EMPTY, roomsKey: '', purse: null, shop: [], recent: [], blocks: FIXED, filter: undefined, unlocking: null, party: null };
+  const world = { desks: [], deckOrder: [], people: new Map(), staff: [], time: 0, selected: null, seenAt: 0, first: true, grid: [], layout: '', table: [], tableAt: 0, thoughts: [], fitting: [], serverRooms: null, rooms: EMPTY, roomsKey: '', purse: null, shop: [], recent: [], blocks: FIXED, filter: undefined, unlocking: null, party: null };
   /** The pieces in the way now: the fixed ones and whatever is bought. */
   const blocksOf = () => [...FIXED, ...Object.entries(PIECES).filter(([k]) => (k === 'table' ? world.rooms.boardroom.table : world.rooms.lounge[k])).map(([, b]) => b), ...(world.rooms.lounge.gym ? GYM : []), ...(world.rooms.boardroom.plants ? PLANTS.map((p) => ({ x: p.x - 14, y: p.y - 14, w: 28, h: 28 })) : [])];
   const views = [];
@@ -431,7 +431,78 @@
   function say(p, text, seconds = 3) {
     p.bubble = text;
     p.bubbleUntil = world.time + seconds;
+    think(p, text);
   }
+  // ---- Thoughts: what the staff say and think, newest first, in the strip beside the office ----
+
+  /** How many thoughts are kept, and how many the strip shows. */
+  const THOUGHTS_KEPT = 30;
+  const THOUGHTS_SHOWN = 8;
+  /** Something a person said or thought. The same words from several people within a few seconds share one line. */
+  function think(p, text) {
+    if (!text || !p?.row || world.people.get(p.id) !== p || p.leaving) return;
+    const now = Date.now();
+    const same = world.thoughts.find((t) => t.text === text && now - t.at < 5000);
+    if (same) {
+      if (!same.ids.includes(p.id)) { same.ids.push(p.id); same.who.push(p.row.name); }
+      return;
+    }
+    if (world.thoughts.some((t) => t.ids.includes(p.id) && t.text === text && now - t.at < 60000)) return;
+    world.thoughts.unshift({ ids: [p.id], who: [p.row.name], text, at: now });
+    world.thoughts.length = Math.min(world.thoughts.length, THOUGHTS_KEPT);
+  }
+  /** What they think on settling somewhere with nothing to do (only now and then, so the list is not all the same). */
+  const AT_EASE = {
+    pizza: ['This pizza is wonderful.', 'Best slice all week.', 'Who ordered the pineapple?'],
+    donuts: ['These donuts are dangerous.', 'Sprinkles make everything better.', 'Just the one. Maybe two.'],
+    sandwiches: ['A proper lunch, at last.', 'Cheese and pickle, my favourite.', 'Crusts on, like a grown-up.'],
+    coffee: ['Coffee first, then code.', 'This machine makes a decent flat white.'],
+    vending: ['Crisps or chocolate? Both.', 'It ate my coin again.'],
+    lunch: ['Lunch away from the desk, for once.', 'Leftovers again.'],
+    tv: ['Just one more episode.', 'Who has the remote?'],
+    nap: ['Five minutes… just five.', 'Resting my eyes.'],
+    library: ['Reading up on something new.', 'This book has better examples than the docs.'],
+    chat: ['Anyone else on a roll today?', 'Did you see that bug? Gone now.'],
+    treadmill: ['Running off that pizza.', 'Ten more minutes.'],
+    weights: ['Leg day.', 'Lifting the mood.'],
+    arcade: ['New high score incoming!', 'One more go.'],
+    window: ['Nice view today.', 'Is that rain coming?'],
+    break: ['These deck chairs are nice.', 'Sun, sea and no bugs.', 'I could get used to this.'],
+    towel: ['Off duty. Bliss.', 'Wake me when it is tomorrow.'],
+    volley: ['Serve it up!', 'Mine! …not mine.'],
+    stretch: ['A good stretch helps the thinking.', 'Back straight, shoulders down.'],
+  };
+  function atEase(p) {
+    const t = p.target;
+    if (!t || (p.seed + Math.floor(world.time / 7)) % 3) return;
+    const pick = (list) => list?.[(p.seed + Math.floor(world.time)) % list.length];
+    if (t.area === 'break') {
+      const others = [...world.people.values()].some((o) => o !== p && o.target?.area === 'break' && !o.path.length);
+      return think(p, others ? pick(AT_EASE.break) : 'I\'m the first one out here!');
+    }
+    think(p, pick(t.pizza ? AT_EASE[foodOf(p)] : AT_EASE[t.rest?.id] ?? AT_EASE[t.area]));
+  }
+  /** What they are thinking at work, from what their thread is doing ("Editing app.php", "Running: Run the tests"). */
+  const AT_WORK = {
+    php: 'PHP in progress… thinking about loops?', js: 'Untangling some JavaScript in {f}.', mjs: 'Untangling some JavaScript in {f}.',
+    ts: 'Types, types, types: {f}.', css: 'Getting the colours just right in {f}.', html: 'Laying out {f}.', md: 'Writing it all down in {f}.',
+    json: 'Sorting out the settings in {f}.', py: 'A bit of Python in {f}.', sql: 'Talking to the database.', cs: 'C# in {f}: braces everywhere.',
+    cmd: 'A little batch file magic.', ps1: 'PowerShell, my old friend.',
+  };
+  function atWork(words, doing) {
+    if (doing === 'thinking') return 'Thinking it through…';
+    const w = String(words || '').trim();
+    const file = /^(?:Editing|Writing|Creating) (.+)$/.exec(w);
+    if (file) {
+      const f = file[1].split(/[\\/]/).pop();
+      return (AT_WORK[f.split('.').pop().toLowerCase()] ?? 'Working on {f}.').replace('{f}', f);
+    }
+    const run = /^Running: (.+)$/.exec(w);
+    if (run) return `${run[1].replace(/\.$/, '')}… fingers crossed.`;
+    if (doing === 'researching') return 'Looking something up.';
+    return null;
+  }
+
   /** Seconds a thank-you wave lasts. */
   const WAVE_SECONDS = 3;
   /** A thank-you: they turn to face you and wave (once they stand still, if they are walking). */
@@ -487,7 +558,13 @@
         if (p.row?.doing === 'towel' && s.doing !== 'towel' && !snap) say(p, 'Back to work!', 4);
       }
       p.idleSince = s.idleFor == null ? -Infinity : clock() - s.idleFor;
+      const wasWords = p.row?.doingText;
       p.row = s;
+      // A new step in their work: a thought about it (at most one a minute each, so the list is not all work).
+      if (s.doingText !== wasWords && clock() - (p.workThoughtAt ?? -Infinity) > 60) {
+        const line = atWork(s.doingText, s.doing);
+        if (line) { think(p, line); p.workThoughtAt = clock(); }
+      }
       p.look = L?.lookOf(s.id, s.look) ?? null;
       retarget(p, snap);
     }
@@ -860,6 +937,7 @@
   function arrived(p) {
     p.face = p.target?.face ?? 'south';
     // At the kitchen table for food that came since they last said thanks: a wave to you first.
+    if (!p.leaving && p.row?.doing !== 'typing') atEase(p);
     if (p.target?.pizza && p.thankedAt !== world.tableAt) {
       p.thankedAt = world.tableAt;
       thank(p);
@@ -1499,7 +1577,7 @@
   }
   document.addEventListener('visibilitychange', wake);
 
-  /** The line under the office: the person picked and what they do there, or how to pick one. */
+  /** The strip beside the office: the person picked and what they do there, or the staff's latest thoughts. */
   function tell(v) {
     const p = world.selected ? world.people.get(world.selected) : null;
     // A locked room just clicked: what it costs and the Unlock button stay under the office a while.
@@ -1510,7 +1588,8 @@
       }
       return;
     }
-    const key = p ? `${p.id}|${wordsOf(p)}|${holding(p)}|${p.row.name}` : `all|${world.people.size}`;
+    // Nobody picked: the latest thoughts (drawn again when one is added, and each minute for the "ago").
+    const key = p ? `${p.id}|${wordsOf(p)}|${holding(p)}|${p.row.name}` : `all|${world.people.size}|${world.thoughts[0]?.at}|${world.thoughts[0]?.who.length}|${Math.floor(Date.now() / 60000)}`;
     if (key === v.told) return;
     v.told = key;
     if (p) {
@@ -1520,7 +1599,13 @@
         el('span', { class: 'note', text: `Holding: ${holding(p)}` }));
       return;
     }
-    v.strip.replaceChildren(el('span', { class: 'note', text: world.people.size ? 'Click a person to see what they are doing.' : 'Nobody in the office yet.' }));
+    if (!world.people.size) return v.strip.replaceChildren(el('span', { class: 'note', text: 'Nobody in the office yet.' }));
+    const ago = (at) => { const m = Math.floor((Date.now() - at) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ago`; };
+    const names = (who) => (who.length <= 3 ? who.join(who.length === 2 ? ' and ' : ', ').replace(/, ([^,]*)$/, ' and $1') : `${who.slice(0, 2).join(', ')} and ${who.length - 2} more`);
+    const list = world.thoughts.slice(0, THOUGHTS_SHOWN).map((t) => el('li', {}, el('b', { text: `${names(t.who)}:` }), ' ', el('span', { text: t.text }), el('span', { class: 'note', text: ` · ${ago(t.at)}` })));
+    v.strip.replaceChildren(el('b', { text: 'Thoughts' }),
+      list.length ? el('ul', { class: 'thoughts' }, ...list) : el('p', { class: 'note', text: 'Quiet for now: what they say and think shows here.' }),
+      el('span', { class: 'note', text: 'Click a person to see what they are doing.' }));
   }
 
   // ---- Pointer: press a person to pick them; press a desk to show only that project ----
@@ -1583,7 +1668,7 @@
 
   function addView(holder) {
     const canvas = el('canvas', { class: 'office-canvas', role: 'img', 'aria-label': 'The office: each Claude thread as a little person at their project\'s desk while it works, standing with a question mark when it needs you, in the meeting room when it thinks a long time (once it has a table), in the kitchen, the lounge or a deck chair when it has finished, and on a beach towel once a favourite has gone home. A locked room is dark: click it to unlock it. The List tab says the same in words.' });
-    const strip = el('p', { class: 'office-strip', 'aria-live': 'off' });
+    const strip = el('div', { class: 'office-strip', 'aria-live': 'off' });
     const view = { canvas, ctx: canvas.getContext('2d'), strip };
     holder.append(canvas, strip);
     hookPointer(view);
