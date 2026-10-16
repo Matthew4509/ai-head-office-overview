@@ -353,9 +353,14 @@ async function main() {
   const HERE = path.resolve(__dirname, '..');
   // From a second working copy (a git worktree) the projects folder is the one beside the MAIN copy, as for the bake.
   const MAIN = require('../tools/privacy-context').mainCopy(HERE);
+  // Scanned against made-up details by default, so a stranger's PC (its user name, its projects folder, its other folders)
+  // cannot make the shipped tests fail. The owner's own check against this PC's real details is
+  // AHO_SELF_CHECK=1 (and tools/disclose.js, which is run before every push).
+  const real = process.env.AHO_SELF_CHECK === '1';
   const projectsDir = path.dirname(MAIN);
-  const siblings = fs.readdirSync(projectsDir, { withFileTypes: true }).filter(e => e.isDirectory() && !/^[._-]/.test(e.name) && e.name !== path.basename(MAIN)).map(e => e.name);
-  const self = await disclosurePass(HERE, { details: autoDetails([projectsDir]), others: siblings, own: [path.basename(HERE), path.basename(MAIN)] });
+  const siblings = real ? fs.readdirSync(projectsDir, { withFileTypes: true }).filter(e => e.isDirectory() && !/^[._-]/.test(e.name) && e.name !== path.basename(MAIN)).map(e => e.name) : ['quill' + 'moor-ledger', 'bramble' + '-tarn'];
+  const madeUp = [{ label: 'your user name on this PC', value: 'wren' + 'ashcombe', auto: true }, { label: 'your home folder', value: 'C:\\Users\\' + 'wren' + 'ashcombe', auto: true }, { label: 'your git email', value: 'wren' + '@ashcombe' + '.test', auto: true }];
+  const self = await disclosurePass(HERE, { details: real ? autoDetails([projectsDir]) : madeUp, others: siblings, own: [path.basename(HERE), path.basename(MAIN)] });
   // Known and allowed: past versions of the museum's disclosure fixtures (committed before T4) hold made-up trail lines
   // written out in full; the files themselves now build them at run time. Nothing else may be found, now or in history.
   const pastFixture = f => f.rule === 'DISC-003' && /^git history: test\/museum\/cases-4-disclosure\.js:\d+$/.test(f.where);
