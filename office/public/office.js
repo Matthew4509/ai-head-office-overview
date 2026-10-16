@@ -265,7 +265,11 @@
       const more = Math.floor(i / TOWELS.length);
       return { key: `towel:${i}`, x: x + more * 14, y: y - more * 6, face: 'south', area: 'towel' };
     }
-    if (s.doing === 'needs' && desk) {
+    // A room just opened, or a piece just set up with a place for them: those waiting for you go and look too.
+    const freeNow = world.staff.filter((x) => x.doing === 'resting' || x.doing === 'needs');
+    const partyOn = (!!world.party && world.time < world.party.until)
+      || (!!world.tryOut && world.time < world.tryOut.until && freeNow.findIndex((x) => x.id === s.id) < tryOutSpots(world.tryOut.piece).length);
+    if (s.doing === 'needs' && desk && !partyOn) {
       // Waiting a while for your reply: off to try a room or a deck chair, then back (the "?" goes with them).
       const visit = waitingVisit(p);
       if (visit) return visit;
@@ -280,7 +284,7 @@
       const seat = MEETING[seatOrder()[i]] ?? STANDING[(i - MEETING.length) % STANDING.length] ?? STANDING[0];
       return { key: `think:${i}`, x: seat[0], y: seat[1], face: seat[2], area: 'boardroom', chair: i < world.rooms.boardroom.chairs };
     }
-    if ((s.doing === 'thinking' && !desk) || (s.doing === 'needs' && !desk)) {
+    if ((s.doing === 'thinking' && !desk) || (s.doing === 'needs' && !desk && !partyOn)) {
       const [x, y] = STRETCH[p.seed % STRETCH.length];
       return { key: `stretch:${x}:${y}`, x, y, face: 'south', area: 'stretch' };
     }
@@ -293,10 +297,17 @@
       return { key: `help:${helper}`, x: seat[0], y: seat[1], face: seat[2], area: 'boardroom', helping: true, chair: helper < chairsLeft.length };
     }
     // A room just opened: everyone with nothing to do runs in to see it, and jumps and spins there a while.
-    if (world.party && world.time < world.party.until && s.doing === 'resting') {
+    if (world.party && world.time < world.party.until && (s.doing === 'resting' || s.doing === 'needs')) {
+      // Those waiting for your reply come too (the "?" goes with them).
       const r = ROOMS.find((x) => x.lock === world.party.lock);
-      const i = world.staff.filter((x) => x.doing === 'resting').findIndex((x) => x.id === s.id);
+      const i = world.staff.filter((x) => x.doing === 'resting' || x.doing === 'needs').findIndex((x) => x.id === s.id);
       return { key: `party:${i}`, x: r.x + 90 + (i % 5) * 90, y: r.y + 110 + (Math.floor(i / 5) % 3) * 70, face: 'south', area: 'party' };
+    }
+    // Something just set up: the free (and those waiting for you) go and try it a while, as many as it has places.
+    if (world.tryOut && world.time < world.tryOut.until && (s.doing === 'resting' || s.doing === 'needs')) {
+      const spots = tryOutSpots(world.tryOut.piece);
+      const i = world.staff.filter((x) => x.doing === 'resting' || x.doing === 'needs').findIndex((x) => x.id === s.id);
+      if (i >= 0 && i < spots.length) return { ...spots[i], key: `try:${world.tryOut.piece}:${i}`, trying: world.tryOut.piece };
     }
     // Food on the kitchen table: everyone with nothing to do gathers round it (whoever works, works on).
     if (world.table.length && s.doing === 'resting') {
@@ -327,7 +338,8 @@
     }
     const spots = REST.filter((r) => world.rooms.rest.includes(r.id));
     if (!p.rest || !spots.includes(p.rest) || (world.time > p.restUntil && !p.path.length)) {
-      const taken = new Set([...world.people.values()].filter((o) => o !== p && o.rest).map((o) => o.rest.id));
+      // Spots in use: others resting there, and anyone trying one out while they wait for a reply.
+      const taken = new Set([...world.people.values()].filter((o) => o !== p && (o.rest || o.visit?.target.rest)).map((o) => (o.rest || o.visit.target.rest).id));
       const free = spots.filter((r) => !taken.has(r.id) && r.id !== p.rest?.id);
       const pick = (free.length ? free : spots)[Math.floor(Math.random() * (free.length || spots.length))];
       p.rest = pick;
@@ -399,6 +411,21 @@
   ];
   const VISIT_WORDS = { tv: 'the TV', nap: 'the armchair', library: 'the bookcase', chat: 'the sofa', treadmill: 'the treadmill', weights: 'the weights', arcade: 'the arcade machine' };
 
+  /** Where a piece just set up is tried out: the volleyball court (four places), the newest deck chair, a lounge
+   * piece's own spot, or round the meeting room table. */
+  function tryOutSpots(piece) {
+    if (piece === 'volleyball') return VOLLEY.map(([x, y, face]) => ({ x, y, face, area: 'volley' }));
+    if (piece === 'deckchair') {
+      const i = Math.max(0, Math.min(world.rooms.deckchairs, DECK.length) - 1);
+      return [{ x: DECK[i][0], y: DECK[i][1], face: 'south', area: 'break' }];
+    }
+    const lounge = REST.filter((r) => SPOT_PIECE[r.id] === piece).map((r) => ({ x: r.x, y: r.y, face: r.face, area: r.area, rest: r }));
+    if (lounge.length) return lounge;
+    return STANDING.map(([x, y, face]) => ({ x, y, face, area: 'boardroom' }));
+  }
+  /** Seconds the free staff spend trying out a piece just set up. */
+  const TRY_SECONDS = 25;
+
   /** Favourites on a towel, in a steady order (so nobody swaps towels when someone else arrives). */
   const towelers = () => world.staff.filter((x) => x.doing === 'towel').sort((a, b) => (a.id < b.id ? -1 : 1));
 
@@ -435,8 +462,11 @@
       const o = world.people.get(x.id);
       return o && !o.leaving && x.doing === 'resting' && now - (o.idleSince ?? -Infinity) >= BREAK_IDLE;
     });
+    // A chair someone waiting for a reply is trying out is theirs until they go back: never two on one chair.
+    const visiting = new Set([...world.people.values()].filter((o) => o.visit && String(o.visit.target.key).startsWith('break:')).map((o) => Number(o.visit.target.key.slice(6))));
+    const chairs = [...Array(Math.min(world.rooms.deckchairs, DECK.length)).keys()].filter((c) => !visiting.has(c));
     const i = free.findIndex((x) => x.id === p.id);
-    return i >= 0 && i < Math.min(world.rooms.deckchairs, DECK.length) ? i : -1;
+    return i >= 0 && i < chairs.length ? chairs[i] : -1;
   }
   const breakOf = (p) => p?.target?.area === 'break';
   /** A place in the volleyball game for p (0-3), or -1: needs the set, at least two players, and a rest between games. */
@@ -575,6 +605,19 @@
     json: 'Sorting out the settings in {f}.', py: 'A bit of Python in {f}.', sql: 'Talking to the database.', cs: 'C# in {f}: braces everywhere.',
     cmd: 'A little batch file magic.', ps1: 'PowerShell, my old friend.',
   };
+  /** A command being run (a test, a build): ten ways to say it, so the chat is not all the same. */
+  const RUNNING = [
+    '{what}… fingers crossed.',
+    'Testing the project: {low}.',
+    'Running a test. Come on, green!',
+    '{what}. Please pass, please pass.',
+    'Kicking off: {low}.',
+    'Let\'s see what breaks: {low}.',
+    'Tests running. Nobody touch anything!',
+    '{what}: here goes nothing.',
+    'Waiting on the test runner…',
+    'Running {low}. Kettle on while it goes.',
+  ];
   function atWork(words, doing) {
     if (doing === 'thinking') return 'Thinking it through…';
     const w = String(words || '').trim();
@@ -584,7 +627,10 @@
       return (AT_WORK[f.split('.').pop().toLowerCase()] ?? 'Working on {f}.').replace('{f}', f);
     }
     const run = /^Running: (.+)$/.exec(w);
-    if (run) return `${run[1].replace(/\.$/, '')}… fingers crossed.`;
+    if (run) {
+      const what = run[1].replace(/\.$/, '');
+      return RUNNING[Math.floor(Math.random() * RUNNING.length)].replace('{what}', what).replace('{low}', what.charAt(0).toLowerCase() + what.slice(1));
+    }
     if (doing === 'researching') return 'Looking something up.';
     return null;
   }
@@ -897,7 +943,9 @@
     for (const p of world.people.values()) {
       if (p.leaving || p.out) continue;
       p.targetKey = '';
-      say(p, p.row.doing === 'resting' ? ['A new room!', 'Wow, look at this!', 'Let\'s go!'][p.seed % 3] : ['Ooh, a new room!', 'Nice!', 'Save me a spot!'][p.seed % 3], 3);
+      const free = p.row.doing === 'resting' || p.row.doing === 'needs';
+      say(p, free ? ['Thanks, boss! A new room!', 'Wow, look at this!', 'Let\'s go see!'][p.seed % 3] : ['Ooh, a new room! Thanks, boss!', 'Nice! Save me a spot!', 'I\'ll look when I\'m done.'][p.seed % 3], 3);
+      thank(p);
     }
   }
 
@@ -958,11 +1006,15 @@
       // In place: the piece shows, and everyone cheers and waves a thank-you (whoever was resting tries it out).
       const piece = world.fitting.shift();
       applyRooms(lessFitting(world.serverRooms ?? world.rooms));
+      // The free (and those waiting for you) go and try it out a while.
+      world.tryOut = { piece, until: world.time + TRY_SECONDS };
       say(k, 'All set!', 2);
       // The first to see it names it ("Hey, we got new deck chairs!"); the rest thank you, each in their own words.
       const what = PIECE_WORDS[piece] || 'new furniture';
+      // Each one in turn takes the next line, from a different starting line each time, so neighbours never repeat.
+      const start = Math.floor(Math.random() * INSTALLED.length);
       [...world.people.values()].filter((p) => !p.leaving && !p.out).forEach((p, i) => {
-        say(p, i === 0 ? `Hey, we got ${what}!` : INSTALLED[(p.seed + i) % INSTALLED.length], 4);
+        say(p, i === 0 ? `Hey, we got ${what}!` : INSTALLED[(start + i) % INSTALLED.length], 4);
         thank(p);
         if (p.target?.rest) p.restUntil = 0;
       });
@@ -982,6 +1034,8 @@
   /** A piece of furniture in words, for the first cheer when it is set up. */
   const PIECE_WORDS = { table: 'a meeting room table', chairs: 'new chairs', whiteboard: 'a whiteboard', plants: 'plants', armchair: 'an armchair', bookcase: 'a bookcase',
     sofa: 'a sofa', tv: 'a TV', gym: 'a gym', arcade: 'an arcade machine', deckchair: 'new deck chairs', volleyball: 'a volleyball net' };
+  /** A piece's short name ("Trying the new deck chair"). */
+  const PIECE_NAME = { table: 'table', chairs: 'chairs', whiteboard: 'whiteboard', plants: 'plants', armchair: 'armchair', bookcase: 'bookcase', sofa: 'sofa', tv: 'TV', gym: 'gym', arcade: 'arcade machine', deckchair: 'deck chair', volleyball: 'volleyball net' };
   /** Everyone else, when a piece is set up. */
   const INSTALLED = ['Thanks, boss!', 'Nice!', 'Very smart!', 'I\'ll try it out soon.', 'Ooh, fancy.', 'Best boss ever.'];
   /** A cardboard box, carried in by the fitter. */
@@ -1064,6 +1118,7 @@
     const thinkHere = s.doing === 'thinking' && !world.rooms.boardroom.table;
     if (p.path.length && !p.out) {
       if (t?.waiting) return `Off to try ${t.visit} while waiting for you`;
+      if (t?.trying) return `Off to try the new ${PIECE_NAME[t.trying] || 'furniture'}`;
       if (t?.area === 'needs' && p.from && p.from !== 'needs' && p.from !== 'desk') return 'Back to the desk: still waiting for you';
       if (t?.area === 'gone') return 'Going home: the thread has gone quiet';
       if (t?.area === 'break') return 'Off out for a break in a deck chair';
@@ -1076,7 +1131,8 @@
       if (t?.area === 'desk') return `Walking to the ${t.desk?.name ?? ''} desk`;
       return `Walking to the ${t?.area ?? 'kitchen'}`;
     }
-    if (s.doing === 'needs') return `Needs you: ${s.doingText}${t?.waiting ? ` (trying ${t.visit} while waiting)` : ''}`;
+    if (s.doing === 'needs') return `Needs you: ${s.doingText}${t?.waiting ? ` (trying ${t.visit} while waiting)` : t?.trying ? ` (trying the new ${PIECE_NAME[t.trying] || 'furniture'} while waiting)` : ''}`;
+    if (t?.trying && t.area !== 'volley') return `Trying the new ${PIECE_NAME[t.trying] || 'furniture'}`;
     if (t?.area === 'break') return 'On a break: in a deck chair on the beach';
     if (t?.area === 'towel') return 'Off duty on a beach towel: a favourite, back when their next thread starts';
     if (t?.area === 'volley') return playing() >= 2 ? 'Playing beach volleyball' : 'At the volleyball net, waiting for a partner';
@@ -2006,13 +2062,12 @@
           v.told = '';
           tell(v);
         }
-        for (const p of present()) {
-          say(p, ['Thanks, boss!', 'A new room!', 'Ooh!'][p.seed % 3], 3);
-          thank(p);
-        }
+        // No thanks yet: the room is still locked. The thanks and the wave come when the IT tech opens the door.
+        for (const p of present()) if (p.seed % 3 === 0) say(p, ['The IT tech is coming!', 'What did the boss buy?', 'Ooh, a key!'][(p.seed >> 2) % 3], 3);
         shopSaid.textContent = `${item.unlocks === 'lounge' ? 'The lounge' : 'The meeting room'} is bought (${big(item.price)} tokens): the IT tech is on the way to unlock it. Then furnish it from the list below.`;
       } else {
-        for (const p of present()) say(p, ['Thanks, boss!', 'Ooh, what is it?', 'Nice!'][p.seed % 3], 3);
+        // Not seen yet, so no thanks yet: only a couple notice the delivery. The thanks come once the fitter has set it up.
+        present().filter((p) => p.seed % 3 === 0).slice(0, 2).forEach((p, i) => say(p, ['A delivery! What\'s in the box?', 'Is that for us?'][i], 3));
         shopSaid.textContent = `${item.name} bought (${big(item.price)} tokens): the fitter is bringing it in.`;
       }
       wake();
