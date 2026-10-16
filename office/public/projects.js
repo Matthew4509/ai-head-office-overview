@@ -39,7 +39,7 @@
     const s = Math.max(0, Date.now() - ms) / 1000;
     if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min ago`;
     if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-    return `${Math.round(s / 86400)} days ago`;
+    { const d = Math.round(s / 86400); return `${d} ${d === 1 ? 'day' : 'days'} ago`; }
   }
   const bytes = (n) => (n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`);
 
@@ -275,6 +275,7 @@
       : [el('p', { class: 'note', text: 'Nothing is open now. Run a project from its Actions menu (on a person\'s card) or from the Projects tab.' })];
     const keepFocus = sheet.contains(document.activeElement) ? document.activeElement.textContent : null;
     app.openWindow(`Projects open (${list.length})`, body, [
+      el('span', { class: 'note foot-note', text: 'This is projects hosted on your localhost, and does not impact any active thread in development.' }),
       list.length > 1 ? el('button', { type: 'button', class: 'btn', onclick: stopAll, title: 'Stop every local copy the office started' }, 'Stop all') : null,
       el('button', { type: 'button', class: 'btn primary', onclick: () => { openShown = false; app.closeWindow(); } }, 'Close')]);
     sheet.firstElementChild.dataset.kind = 'running';

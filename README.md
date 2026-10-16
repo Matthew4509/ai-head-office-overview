@@ -50,7 +50,8 @@ running).
 - **Top line:** the name, then **This PC** as rings (CPU, memory, disk and graphics card, each its share with the
   number inside; point at one for the details, at the PC name for its model, cores and time switched on), then
   **N projects open · View all** (a window with every local copy the office started: its address, **Open** and
-  **Stop**, and **Stop all**); on the right, **Spending balance** (the tokens to spend on Staff rewards), the colours
+  **Stop**, and **Stop all**; its foot says these are copies on your own PC, and stopping one does not touch a thread
+  at work); on the right, **Spending balance** (the tokens to spend on Staff rewards), the colours
   switch (**sun** = light, **moon** = dark, **sun hugged by the moon** = auto) and **Settings** (the gear).
 - **Auto colours** (the default): light from sunrise to sunset, dark at night. The times come from this PC's time
   zone (its main city, or roughly from the zone's offset), so they are close, not exact, and nothing is looked up
@@ -75,13 +76,16 @@ running).
   a **Consultant** at the projects folder's own desk. Working is at the desk; a thread that stopped to ask you
   something stands with a "?"; a long think goes to the meeting room once it has one; after an hour with nothing
   happening they go home. Favourites wait on a beach towel. Click anyone for their card.
-  Someone waiting for your reply for a while goes to try out what has been bought (a lounge spot, a free deck chair) for
-  a minute, then comes back to the desk, the "?" above them all the while; a few minutes later they may go again.
+  Someone waiting for your reply for a while goes to try out what has been bought (a lounge spot, a free deck chair) and
+  stays there enjoying it, the "?" above them all the while, until your reply comes; then they hurry back to the desk.
+  Those resting keep one spot for a few minutes before they move on.
   Beside the office, **Thoughts**: a chat, like a team chat. Each message has its writer's small head on the left and
   arrives a moment after the last (1 to 2 seconds apart), newest at the bottom. Cheers and thanks for treats (a coffee
   and a donut together get dunked), a thought when they settle somewhere ("These deck chairs are nice"), and a line
-  about their work, made from what their thread is doing ("PHP in progress… thinking about loops?"). It follows Filter
-  by. Click someone to see them instead.
+  about their work, made from what their thread is doing ("PHP in progress… thinking about loops?"). When their thread
+  hits a real snag, they quip about it, out loud and in the chat: a step that ended in an error ("Red, not green. Back to
+  it.") or the AI saying it found a bug ("Whoever wrote this code got this wrong. …Oh. It was me."); at most one every
+  few minutes each. It follows Filter by. Click someone to see them instead.
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
   beside the port. When another program holds its port, Run becomes **Re-allocate**: it starts the project on the
@@ -122,7 +126,7 @@ running).
 - **Right panel:** **Needs attention** (threads with a question first, then projects: a live site down, Critical or
   High audit findings, git waiting for a save or push; click a row to open it; and today's **check-ins** from the project
   planner, each with Fine for now, Needs work and Park it) and **Staff rewards** (spend the purse: coffee, plants,
-  furniture, room keys).
+  furniture, room keys; **Transaction history** folds open to list what was bought lately, when, and for how much).
 - **A person's card:** a star beside their name and one on their project's heading (click to make them, or the whole
   project, a favourite; point at a star to read what that does), **EDIT** (their name and look; both belong to the
   seat, so the next thread at that desk is the same person) and under it **Actions** (Run or Stop, Copy prompt, Folder,

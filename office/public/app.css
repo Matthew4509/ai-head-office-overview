@@ -499,3 +499,11 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 /* A check-in in Needs attention: its name opens the score window, its answers are buttons of their own. */
 .wait-checkin { display: grid; gap: 3px; cursor: default; }
 .wait-checkin .plan-name { white-space: normal; }
+/* Staff rewards: Transaction history, folded; open, one line per purchase (what, when, price). */
+.recent { margin: 0 0 8px; font-size: 13px; }
+.recent > summary { cursor: pointer; }
+.recent > summary:hover b { color: var(--accent); }
+.recent-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
+.recent-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; border-bottom: 1px solid var(--line); padding: 2px 0; }
+/* The Projects open window's foot: what these copies are, on the left of its buttons. */
+.foot-note { margin-right: auto; flex: 1 1 260px; }

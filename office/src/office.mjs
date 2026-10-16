@@ -308,6 +308,7 @@ export class Office {
         outSince: t.outSince + counted.reduce((a, h) => a + h.outSince, 0),
         outByDay,
         asked: t.asked,
+        snag: t.snag || null,
         steps: t.steps,
         msgs: t.msgs || [],
         helpers: helpers.length,
@@ -364,6 +365,7 @@ export class Office {
         p.state = x.state;
         p.words = x.words;
         p.since = x.since;
+        p.snag = x.snag;
         p.thread = { id, open: this.appLinks.open(id), title: x.title, startedAt: x.startedAt, lastAt: x.lastAt, asked: x.asked, steps: x.steps, helpers: x.helpers, out: x.out };
       }
     }

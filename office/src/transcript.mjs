@@ -49,7 +49,18 @@ export function emptyThread(id, since = '') {
     msgs: [],
     /** Did this thread do real work (a write, or a command that did more than look)? Used for helpers. */
     worked: false,
+    /** The last snag, for the staff's quips: { at, kind: 'failed' (a command or step that ended in an error) | 'bug'
+     * (the AI's own words say it found a bug) }, or null. */
+    snag: null,
   };
+}
+
+/** The AI saying it found a bug or its cause ("Found the bug", "the root cause is"). Plain words only, so a quip
+ * follows a real find, not every mention of the word. */
+const BUG_FOUND = /\b(found (the|a|another) (bug|problem|cause)|the bug (is|was)|that'?s the bug|root cause|the cause (is|was)|caught (a|the) bug|a bug in)\b/i;
+/** A tool result that is an error, but not one the person chose (a step they declined or stopped). */
+function failedResult(c) {
+  return c.some((x) => x && x.type === 'tool_result' && x.is_error && !/doesn't want to proceed|was rejected|interrupted by user|user declined/i.test(textOf(x.content)));
 }
 
 /** True when every part of a shell command only looks (ls, cat, grep, git status, ...). */
@@ -165,6 +176,7 @@ export function addLine(t, l) {
     if (isResult) {
       t.last = { kind: 'result', at };
       t.asked = '';
+      if (failedResult(c)) t.snag = { at, kind: 'failed' };
       return;
     }
     if (l.isMeta) return;
@@ -223,6 +235,7 @@ export function addLine(t, l) {
       }
     } else if (b.type === 'text' && b.text) {
       pushMsg(t, at, 'ai', b.text);
+      if (BUG_FOUND.test(b.text)) t.snag = { at, kind: 'bug' };
       if (ended) {
         t.last = { kind: 'done', at };
         t.asked = questionIn(b.text);

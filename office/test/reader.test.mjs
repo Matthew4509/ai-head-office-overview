@@ -79,3 +79,19 @@ test('a file is read a piece at a time: a half-written last line waits for the r
     h.done();
   }
 });
+
+test('a snag for the quips: a step that ended in an error, or the AI saying it found a bug; a declined step is not one', () => {
+  const t = emptyThread('a');
+  const result = (at, is_error, text) => ({ type: 'user', timestamp: at, message: { content: [{ type: 'tool_result', is_error, content: text }] } });
+  const said = (at, text) => ({ type: 'assistant', timestamp: at, message: { id: at, content: [{ type: 'text', text }] } });
+  addLine(t, result('2026-10-16T10:00:00Z', false, 'all passed'));
+  assert.equal(t.snag, null);
+  addLine(t, result('2026-10-16T10:01:00Z', true, "The user doesn't want to proceed with this tool use."));
+  assert.equal(t.snag, null, 'a step the person declined is their choice, not a snag');
+  addLine(t, result('2026-10-16T10:02:00Z', true, 'Exit code 1\nFAIL'));
+  assert.deepEqual(t.snag, { at: '2026-10-16T10:02:00Z', kind: 'failed' });
+  addLine(t, said('2026-10-16T10:03:00Z', 'Found the bug: the list was read before it was sorted.'));
+  assert.deepEqual(t.snag, { at: '2026-10-16T10:03:00Z', kind: 'bug' });
+  addLine(t, said('2026-10-16T10:04:00Z', 'No bugs here, the tests pass.'));
+  assert.equal(t.snag.at, '2026-10-16T10:03:00Z', 'a mention of the word alone is not a find');
+});

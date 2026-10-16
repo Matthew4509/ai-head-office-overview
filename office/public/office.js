@@ -343,27 +343,20 @@
       const free = spots.filter((r) => !taken.has(r.id) && r.id !== p.rest?.id);
       const pick = (free.length ? free : spots)[Math.floor(Math.random() * (free.length || spots.length))];
       p.rest = pick;
-      p.restUntil = world.time + 25 + Math.random() * 30;
+      p.restUntil = world.time + 180 + Math.random() * 180; // 3-6 minutes in one spot, enjoying it
     }
     const r = p.rest;
     return { key: `rest:${r.id}`, x: r.x + ((p.seed % 5) - 2) * 10, y: r.y + ((p.seed >> 3) % 3) * 6, face: r.face, area: r.area, rest: r };
   }
 
   /** Waiting for a reply: after VISIT_AFTER seconds they go and try something bought (a lounge spot, a free deck chair)
-   * for VISIT_STAY seconds, then go back to the desk; VISIT_GAP seconds later they may go again. null = at the desk. */
+   * and stay there, enjoying it, until the reply comes (a reply ends the visit and they hurry back to the desk), rather
+   * than popping back and forth. The "?" stays up all the while. null = at the desk. */
   const VISIT_AFTER = 40;
-  const VISIT_STAY = 50;
-  const VISIT_GAP = 240;
   function waitingVisit(p) {
     const t = world.time;
-    if (p.visit && t < p.visit.until) return p.visit.target;
-    if (p.visit) {
-      p.visit = null;
-      p.visitAgain = t + VISIT_GAP;
-      say(p, BACK[(p.seed + (world.visits || 0)) % BACK.length], 3);
-      return null;
-    }
-    if (t - (p.needsSince ?? t) < VISIT_AFTER || t < (p.visitAgain ?? 0)) return null;
+    if (p.visit) return p.visit.target;
+    if (t - (p.needsSince ?? t) < VISIT_AFTER) return null;
     // What there is to try: the lounge's bought spots (not a free one) and the deck chairs nobody is in.
     const busy = new Set([...world.people.values()].filter((o) => o !== p).map((o) => o.targetKey));
     const options = REST.filter((r) => r.area === 'lounge' && r.id !== 'window' && world.rooms.rest.includes(r.id) && !busy.has(`rest:${r.id}`) && !busy.has(`visit:${r.id}`))
@@ -373,7 +366,7 @@
     });
     if (!options.length) return null;
     const pick = options[(p.seed + Math.floor(t / 60)) % options.length];
-    p.visit = { target: { ...pick, waiting: true }, until: t + VISIT_STAY };
+    p.visit = { target: { ...pick, waiting: true } };
     // The first to go says what they are trying; someone going the same way soon after answers them instead.
     const last = world.lastVisit;
     const follows = last && last.id !== p.id && last.what === pick.visit && t - last.at < 90;
@@ -399,15 +392,6 @@
     'Wait for me, {who}!',
     'If {who} is going, I\'m going.',
     'Same here, {who}. Still waiting for a reply.',
-  ];
-  /** Coming back to the desk, still waiting. */
-  const BACK = [
-    'Back at my desk. Still need you!',
-    'Nice break. Ready when you are!',
-    'Back, still waiting on you.',
-    'That was lovely. Now, about my question…',
-    'Five stars, would wait again. Still need an answer!',
-    'Refreshed and ready. Over to you!',
   ];
   const VISIT_WORDS = { tv: 'the TV', nap: 'the armchair', library: 'the bookcase', chat: 'the sofa', treadmill: 'the treadmill', weights: 'the weights', arcade: 'the arcade machine' };
 
@@ -618,6 +602,26 @@
     'Waiting on the test runner…',
     'Running {low}. Kettle on while it goes.',
   ];
+  /** Quips at a real snag in the thread: the AI saying it found a bug, or a step that ended in an error. */
+  const QUIPS = {
+    bug: [
+      'Whoever wrote this code got this wrong. …Oh. It was me.',
+      'Found a bug! Whoever wrote this got it wrong. Please don\'t check the history.',
+      'Aha, there you are, little bug.',
+      'Bug found. Squashing it before anyone notices.',
+      'Found the problem. It was hiding in plain sight.',
+      'A bug! Kettle on, this could take a minute.',
+      'Who wrote this? Never mind, I know who wrote this.',
+    ],
+    failed: [
+      'Well, that didn\'t work. Trying again.',
+      'Red, not green. Back to it.',
+      'The computer says no. Let\'s see why.',
+      'That went bang. Nobody panic.',
+      'Plan B it is.',
+      'Error! Totally meant to do that.',
+    ],
+  };
   function atWork(words, doing) {
     if (doing === 'thinking') return 'Thinking it through…';
     const w = String(words || '').trim();
@@ -671,6 +675,7 @@
       doing: doingOf(p),
       doingText: p.words,
       idleFor: p.state === 'idle' && p.since ? Math.max(0, (nowMs - p.since) / 1000) : null,
+      snag: p.state !== 'home' ? p.snag || null : null,
     }));
     placeDesks();
     const ids = new Set(world.staff.map((s) => s.id));
@@ -687,7 +692,6 @@
         // Waiting starts now (for the visit while waiting); a reply ends any visit under way.
         p.needsSince = world.time;
         p.visit = null;
-        p.visitAgain = 0;
         if (s.doing === 'needs' && p.row && !snap) say(p, 'A question for you!', 5);
         if (s.doing === 'typing' && p.row?.doing === 'needs' && !snap) say(p, 'Thanks, on it!', 3);
         if (s.doing === 'towel' && p.row && !snap) say(p, 'Off to the beach!', 4);
@@ -695,6 +699,16 @@
       }
       p.idleSince = s.idleFor == null ? -Infinity : clock() - s.idleFor;
       const wasWords = p.row?.doingText;
+      // A real snag in their thread (a step that ended in an error, or the AI saying it found a bug): a quip, out loud
+      // and in the chat, at most one every 3 minutes each, and only for a snag of the last 2 minutes.
+      const snagAt = s.snag?.at || '';
+      if (p.row && !snap && snagAt && snagAt !== p.row.snag?.at && nowMs - Date.parse(snagAt) < 120000 && clock() - (p.quipAt ?? -Infinity) > 180) {
+        const lines = QUIPS[s.snag.kind] || QUIPS.failed;
+        const line = lines[(p.seed + (world.quips = (world.quips || 0) + 1)) % lines.length];
+        say(p, line, 4);
+        think(p, line);
+        p.quipAt = clock();
+      }
       p.row = s;
       // A new step in their work: a thought about it (at most one a minute each, so the list is not all work).
       if (s.doingText !== wasWords && clock() - (p.workThoughtAt ?? -Infinity) > 60) {
@@ -2017,10 +2031,14 @@
     const item = (id) => (id === 'pizza' ? PIZZA_ITEM : world.shop.find((i) => i.id === id));
     purseLine.textContent = purseWords();
     const head = el('p', { class: 'row' }, purseLine);
-    // The last few things bought (the office keeps the record), newest first.
+    // The last few things bought (the office keeps the record), newest first, folded under one Transaction history line
+    // (open, it stays open as the shop is drawn again).
     const when = (iso) => new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    const recent = world.recent.length ? el('p', { class: 'note recent' }, 'Recent purchases: ',
-      world.recent.map((b, i) => `${i ? ' · ' : ''}${SHOP_WORDS[b.item]?.label ?? b.item} ${big(b.price)} (${when(b.at)})`).join('')) : null;
+    const wasOpen = !!shopBox?.querySelector('details.recent[open]');
+    const recent = world.recent.length ? el('details', { class: 'recent', open: wasOpen },
+      el('summary', {}, el('b', { text: 'Transaction history' }), el('span', { class: 'note', text: ` · ${world.recent.length} recent` })),
+      el('ul', { class: 'recent-list' }, ...world.recent.map((b) => el('li', {}, el('span', { text: SHOP_WORDS[b.item]?.label ?? b.item }),
+        el('span', { class: 'note', text: when(b.at) }), el('b', { text: big(b.price) }))))) : null;
     const sections = SECTIONS.map(([title, groups]) => el('section', {}, el('h3', { text: title }),
       ...groups.flatMap(([room, ids, lock]) => {
         const heading = room ? el('p', { class: 'note', text: room }) : null;
@@ -2049,7 +2067,7 @@
       else if (item.keeps) callFitter(item.id);
       officeData(d.shop);
       drawShop();
-      // One short line: the purse line above says what is left, and Recent purchases keeps the record.
+      // One short line: the purse line above says what is left, and Transaction history keeps the record.
       if (item.id === 'coffee') {
         deliveries.push({ kind: 'coffee', who: present().map((p) => p.id), at: 0 });
         shopSaid.textContent = `Coffee ordered (${big(item.price)} tokens).`;
@@ -2063,7 +2081,7 @@
           tell(v);
         }
         // No thanks yet: the room is still locked. The thanks and the wave come when the IT tech opens the door.
-        for (const p of present()) if (p.seed % 3 === 0) say(p, ['The IT tech is coming!', 'What did the boss buy?', 'Ooh, a key!'][(p.seed >> 2) % 3], 3);
+        for (const p of present()) if (p.seed % 3 === 0) say(p, [`A new ${item.unlocks === 'lounge' ? 'lounge' : 'meeting room'}? Can't wait to see it!`, 'Did the boss just buy a room?', 'Someone\'s unlocking a door!'][(p.seed >> 2) % 3], 3);
         shopSaid.textContent = `${item.unlocks === 'lounge' ? 'The lounge' : 'The meeting room'} is bought (${big(item.price)} tokens): the IT tech is on the way to unlock it. Then furnish it from the list below.`;
       } else {
         // Not seen yet, so no thanks yet: only a couple notice the delivery. The thanks come once the fitter has set it up.
