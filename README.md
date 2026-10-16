@@ -76,13 +76,28 @@ running).
   the AI saying it found a bug), calls **the council of ducks**: the one with the bug, everyone free and anyone thinking
   there gather round the meeting room table for a minute and a half, their ducks in a ring on it. It needs the meeting
   room table, and sits at most once every five minutes.
+- **Desk cacti** (Staff rewards › Desks): a little cactus on top of every desk's computer, each with a name of its own
+  (point at it to read it).
+- **Wall clock** and **Water cooler** (Staff rewards › Meeting room): the clock on the wall above the table shows the
+  real time; the cooler stands in the corner by the door, and whoever is in a meeting has a cup of water to hand
+  (click someone in a meeting: it shows under Holding).
+- **The arcade machine** (Staff rewards › Lounge) is playable: click it in the lounge and the machine opens: pick **Tetris**,
+  **Lunar Lander** or **Moon Rover** on its screen. A game plays while its screen has the keyboard (click away and it
+  waits); each game's best score is kept in this browser. The machine opens as a cabinet: a lit marquee, the game on
+  its screen and a control panel under it. Moon Rover drives a buggy over rugged ground from the lander to the outpost:
+  low gravity throws it off the crests, so tip it level in the air and land on its wheels, and pick up batteries before
+  the power runs out.
+- **The TV** (Staff rewards › Lounge) stands against the lounge wall and shows a bouncing DVD logo that comes ever so
+  close to the corners but never quite hits one.
+- **Inflatable flamingo** (Staff rewards › Beach): a pink flamingo floats on the sea, bobbing and drifting a little (it
+  stays still when Windows asks for less motion).
 - **The trophy case:** never for sale. It comes by itself once every room is unlocked, every piece is bought as many
-  times as the office holds, and the team has been treated to coffee, donuts and sandwiches at least once. The fitter
-  carries it to the far end of the corridor between the computer room and the kitchen, and everyone comes to admire
-  it. Click it to read its plaque: **World's Best Boss**, and the date it was earned.
-- **Treats** (pizza, donuts, sandwiches, coffee): each order comes in with its own courier, so pizza, donuts and coffee
-  bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something turns to face you
-  and waves a thank-you.
+  times as the office holds, and the team has been treated to coffee, donuts, sandwiches, ice creams and cake at least
+  once. The fitter carries it to the far end of the corridor between the computer room and the kitchen, and everyone
+  comes to admire it. Click it to read its plaque: **World's Best Boss**, and the date it was earned.
+- **Treats** (pizza, donuts, sandwiches, ice creams, cake, coffee): each order comes in with its own courier, so pizza,
+  donuts and coffee bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something
+  turns to face you and waves a thank-you.
 - One row under the tabs, above the office, all ticked to start with: **Show names** (the staff's names under them)
   and **PC name** (the project's name above each desk's computer): untick either to see the staff better, or for a
   screenshot; and **Show general chit-chat**: untick it and Thoughts keeps only what the threads are doing (the same
@@ -466,7 +481,7 @@ audit lists the record of every rule it shows that someone has judged.
 | `lib/live*.js`, `lib/gitstate.js`, `lib/git-program.js` | Live checks, git marks and See what changed, the Git program's version |
 | `lib/tokens.js`, `lib/prompts.js`, `lib/sensors.js` | Codex token counts and the matcher both counts use, saved prompts, This PC |
 | `office/src/` | The office's reader (ES modules): transcripts, people and seats, token counts per project in the same read, setup and hooks, the shop, looks |
-| `office/public/` | The page: `index.html`, `app.css`, `look.js` and `office.js` (the drawing), `app.js` (people, cards, Needs attention), `projects.js`, `checks.js`, `prompts.js`, `settings.js` |
+| `office/public/` | The page: `index.html`, `app.css`, `look.js` and `office.js` (the drawing), `app.js` (people, cards, Needs attention), `projects.js`, `checks.js`, `arcade.js` (the arcade machine's games), `prompts.js`, `settings.js` |
 | `office/hook.mjs` | Advanced setup's hook |
 | `demo/` | The demo: made-up projects, their little sites and live addresses, and the made-up office (`threads.js`) |
 | `index.html` | The launcher page |
