@@ -46,7 +46,7 @@ button { cursor: pointer; }
 .top h1 { margin: 0; font-size: 20px; }
 .top h1 a { color: inherit; text-decoration: none; }
 .top h1 a:hover, .top h1 a:focus-visible { text-decoration: underline; }
-.top-right { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.top-right { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
 .chip {
   border: 1px solid var(--line); background: var(--card); border-radius: 999px;
   padding: 5px 12px; font-size: 14px; white-space: nowrap;
@@ -319,6 +319,14 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 /* N projects open · View all: a plain button on the top line; it opens the Projects open window. */
 .pc-open { display: grid; justify-items: start; gap: 1px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 4px 10px; font-size: 13px; line-height: 1.3; color: var(--ink); text-align: left; }
 .pc-open:hover { border-color: var(--accent); }
+/* Colours on the top line: light (sun), dark (moon) or auto (the sun hugged by the moon: light from sunrise to sunset).
+   The one in use is filled with the accent, and its name says it too (a tooltip and a radio state). */
+.theme-switch { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
+.theme-switch button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--soft); cursor: pointer; padding: 0; }
+.theme-switch button:hover { color: var(--ink); }
+.theme-switch button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); }
+.theme-switch svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.theme-switch svg .fill { fill: currentColor; stroke: none; }
 .pc-view { color: var(--accent); font-size: 12px; text-decoration: underline; }
 /* The Projects open window: one row per local copy, its address under its name, Open and Stop on the right. */
 .open-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }

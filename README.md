@@ -50,8 +50,11 @@ running).
 - **Top line:** the name, then **This PC** as rings (CPU, memory, disk and graphics card, each its share with the
   number inside; point at one for the details, at the PC name for its model, cores and time switched on), then
   **N projects open · View all** (a window with every local copy the office started: its address, **Open** and
-  **Stop**, and **Stop all**); on the right, **Spending balance** (the tokens to spend on Staff rewards) and
-  **Settings** (the gear).
+  **Stop**, and **Stop all**); on the right, **Spending balance** (the tokens to spend on Staff rewards), the colours
+  switch (**sun** = light, **moon** = dark, **sun hugged by the moon** = auto) and **Settings** (the gear).
+- **Auto colours** (the default): light from sunrise to sunset, dark at night. The times come from this PC's time
+  zone (its main city, or roughly from the zone's offset), so they are close, not exact, and nothing is looked up
+  online. Point at the auto button to see today's sunrise and sunset.
 - **A room bought** (Staff rewards, or a click on a locked room): the IT tech walks in and unlocks its door, then
   everyone with nothing to do runs in, jumping and spinning, for a few seconds; whoever is busy cheers from their desk.
 - **Furniture bought:** a fitter carries it in and sets it up, and it shows in the room once they have. Several pieces
@@ -116,7 +119,7 @@ Each mark opens its window:
   list (bring one back), **Scan folders**.
 - **Setup**: step 1, the desktop shortcut, Start with Windows and the start link; step 2 (advanced), the AI app's
   hooks, below.
-- **Office**: the theme (**Dark**, **Light**, or **Match Windows**, which follows Windows' own light or dark setting;
+- **Office**: the theme (**Auto**, **Light**, **Dark**, or **Match Windows**, which follows Windows' own light or dark setting;
   dark dims the office itself too), the projects folder the desks come from, the gone-home time, how often live sites
   are checked.
 - **Private details**: what an audit looks for in what you would publish (your email, phone, street, full name). Typed

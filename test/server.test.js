@@ -88,8 +88,9 @@ async function main() {
   const pageRes = await fetch(BASE + '/');
   const page = await pageRes.text();
   const key = (page.match(/name="aho-key" content="([0-9a-f]+)"/) || [])[1];
-  // The page comes in its theme (none chosen yet: the default), so it never flashes light before turning dark.
-  assert.ok(page.includes('<html lang="en" data-theme="system">'), 'the page is served with its theme on <html>');
+  // The page comes in its theme (none chosen yet: the default, Auto, already light or dark by the sun), so it never
+  // flashes light before turning dark.
+  assert.ok(/<html lang="en" data-theme-choice="auto" data-theme="(light|dark)">/.test(page), 'the page is served with its theme on <html>');
   const api = async (p, body, headers = {}) => {
     const res = await fetch(BASE + p, { method: body ? 'POST' : 'GET', headers: { 'X-AHO-Key': key, 'Content-Type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined });
     return { status: res.status, json: await res.json() };
@@ -140,8 +141,9 @@ async function main() {
     const r = await api('/api/office/setup', { advanced: true });
     assert(r.status === 200 && /advanced setup on/.test(r.json.dryRun), JSON.stringify(r.json));
   });
-  await check('the theme chosen in Settings is the one the page comes in; an unknown one is refused', async () => {
-    const page = async () => (await (await fetch(BASE + '/')).text()).match(/<html lang="en" data-theme="(\w+)">/)?.[1];
+  await check('the theme chosen in Settings is the one the page comes in (Auto as light or dark); an unknown one is refused', async () => {
+    const tag = async () => (await (await fetch(BASE + '/')).text()).match(/<html lang="en" data-theme-choice="(\w+)" data-theme="(\w+)">/);
+    const page = async () => (await tag())?.[1];
     assert.strictEqual((await api('/api/office/settings', { theme: 'dark' })).json.status.theme, 'dark');
     assert.strictEqual(await page(), 'dark');
     const bad = await api('/api/office/settings', { theme: '"><script>' });
@@ -149,6 +151,10 @@ async function main() {
     assert.strictEqual(await page(), 'dark');
     await api('/api/office/settings', { theme: 'system' });
     assert.strictEqual(await page(), 'system');
+    // Auto: served already light or dark by the sun where this PC's time zone is.
+    await api('/api/office/settings', { theme: 'auto' });
+    const t = await tag();
+    assert(t && t[1] === 'auto' && ['light', 'dark'].includes(t[2]), String(t));
   });
   await check('no inline script on the page, and the CSP allows none', () => {
     const csp = pageRes.headers.get('content-security-policy') || '';

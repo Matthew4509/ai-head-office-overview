@@ -124,23 +124,23 @@
     const every = el('select', { class: 'field-text short', 'aria-label': 'Check the live sites every' }, [5, 10, 15].map((m) => el('option', { value: String(m), selected: (app.engineData.stats?.liveEvery || 15) === m }, `${m} minutes`)));
     const save = (body, done) => async () => { try { await app.api('/api/settings', body()); await app.refresh(); say(done); } catch (e) { say(fault(e)); } };
     // The theme the page was served in is the one in use (the office's choice, or its default).
-    const now = document.documentElement.dataset.theme || 'system';
-    const THEMES = [['dark', 'Dark'], ['light', 'Light'], ['system', 'Match Windows']];
+    const now = document.documentElement.dataset.themeChoice || 'auto';
+    const THEMES = [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark'], ['system', 'Match Windows']];
+    const sun = window.officeSun;
     const themeBtn = ([id, name]) => el('button', {
       type: 'button', class: 'btn', 'aria-pressed': String(now === id),
       onclick: async () => {
         try {
-          await app.api('/api/settings', { theme: id });
-          document.documentElement.dataset.theme = id;
+          await sun.theme.choose(id);
           await show('office');
-          say(id === 'system' ? 'Theme: Match Windows. The office turns dark or light with Windows.' : `Theme: ${name}.`);
+          say(id === 'system' ? 'Theme: Match Windows. The office turns dark or light with Windows.' : id === 'auto' ? `Theme: Auto. ${sun.theme.today()}` : `Theme: ${name}.`);
         } catch (e) { say(fault(e)); }
       },
     }, name);
     return [
       el('h3', { text: 'Theme' }),
       el('div', { class: 'row', role: 'group', 'aria-label': 'Theme' }, ...THEMES.map(themeBtn)),
-      el('p', { class: 'note', text: 'Dark dims the office for the evening: the page, the rooms and the beach. Match Windows follows Settings › Personalisation › Colours in Windows.' }),
+      el('p', { class: 'note', text: `Auto is light from sunrise to sunset and dark at night: ${sun.theme.today()} Dark dims the office for the evening: the page, the rooms and the beach. Match Windows follows Settings › Personalisation › Colours in Windows. The sun, moon and auto switch on the top line does the same.` }),
       el('h3', { text: 'Projects folder' }),
       el('p', { class: 'note', text: 'The folder your project folders sit in: each folder in it is a desk, and a thread working in the folder itself is a Consultant. Empty = the folder most threads start in.' }),
       el('div', { class: 'row' }, rootIn, btn('Save folder', save(() => ({ root: rootIn.value }), 'Projects folder saved.'), true)),

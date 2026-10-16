@@ -79,8 +79,8 @@ export function status(office) {
   };
 }
 
-/** The page's colours: dark, light, or "system" (follows Windows). */
-const THEMES = ['dark', 'light', 'system'];
+/** The page's colours: auto (light from sunrise to sunset), dark, light, or "system" (follows Windows). */
+const THEMES = ['auto', 'dark', 'light', 'system'];
 
 /** Turns advanced setup on or off: { advanced: true | false }. A copy of the settings file is kept first. */
 export function apply(office, b, { port, hookScript }) {
@@ -122,7 +122,7 @@ export function onHook(office, b) {
 /** The office's own settings: { root, quietMinutes, theme }. */
 export function settings(office, b) {
   if (b.theme !== undefined) {
-    if (!THEMES.includes(b.theme)) return { error: { fault: 'That theme is not one the office has.', reason: `It knows ${THEMES.join(', ')}.`, wayOut: 'Pick Dark, Light or Match Windows in Settings › Office.' } };
+    if (!THEMES.includes(b.theme)) return { error: { fault: 'That theme is not one the office has.', reason: `It knows ${THEMES.join(', ')}.`, wayOut: 'Pick Auto, Dark, Light or Match Windows in Settings › Office.' } };
     office.settings.theme = b.theme;
   }
   if (b.root !== undefined) {
