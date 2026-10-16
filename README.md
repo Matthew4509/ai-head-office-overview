@@ -89,7 +89,8 @@ running).
   the power runs out.
 - **The vending machine** (in the kitchen): click it and insert a 1M-token coin for energy drinks. Everyone in the
   office gets a can and, for a minute, walks three times as fast, buzzes on the spot and talks in quick bursts (the
-  Thoughts chat speeds up to match), then slumps. It is sold only at the machine, not in Staff rewards.
+  Thoughts chat speeds up to match), then slumps. Anyone with nothing to do (resting, waiting for a reply, on a beach
+  towel) dashes from spot to spot around the office and the beach, and goes back when it wears off. It is sold only at the machine, not in Staff rewards.
 - **The TV** (Staff rewards › Lounge) stands against the lounge wall and shows a bouncing DVD logo that comes ever so
   close to the corners but never quite hits one.
 - **Inflatable flamingo** (Staff rewards › Beach): a pink flamingo floats on the sea, bobbing and drifting a little (it
