@@ -56,16 +56,16 @@
     }
   }
   const LIVE = { up: { mark: '●', text: 'Live', cls: 'm-ok', word: 'Up' }, unsure: { mark: '▲', text: 'Live?', cls: 'm-warn', word: 'Unsure' }, down: { mark: '✕', text: 'Down', cls: 'm-bad', word: 'Down' } };
-  const liveLabel = (p) => (p.liveUrl ? (p.live && LIVE[p.live.state]) || { mark: '○', text: 'Not checked', cls: 'm-none', word: 'Not checked yet' } : { mark: '+', text: 'Live address', cls: 'm-none', word: 'None' });
+  const liveLabel = (p) => (p.liveUrl ? (p.live && LIVE[p.live.state]) || { mark: '○', text: 'Not checked', cls: 'm-none', word: 'Not checked yet' } : { mark: '+', text: 'Live URL', cls: 'm-none', word: 'None' });
 
-  /** The three marks on a project tile (and a person's card): each opens its window. `after` (the tile's Browser) ends the line. */
-  app.checkMarks = (p, after = null) => {
+  /** The three marks on a project tile (and a person's card): each opens its window. `after` (the tile's Browser and More) end the line. */
+  app.checkMarks = (p, ...after) => {
     const mark = (l, label, what, title) => el('button', { type: 'button', class: `mark ${l.cls}`, title, 'aria-label': `${label}: ${l.text}`, onclick: () => what(p.id) }, el('span', { 'aria-hidden': 'true' }, l.mark), ` ${l.text}`);
     const a = auditLabel(p.audit), g = gitLabel(p.git), l = liveLabel(p);
     return el('div', { class: 'row marks' },
       mark(a, 'Audit', auditWindow, p.audit ? `Last audit ${when(p.audit.ranAt)}` : 'No audit yet: open to run one'),
       mark(g, 'Git', gitWindow, g.say),
-      mark(l, 'Live site', liveWindow, p.liveUrl ? `${hostOf(p.liveUrl)}: ${p.live ? p.live.reason : 'not checked yet'}` : 'Add the address this project is hosted at'), after);
+      mark(l, 'Live site', liveWindow, p.liveUrl ? `${hostOf(p.liveUrl)}: ${p.live ? p.live.reason : 'not checked yet'}` : 'Add the address this project is hosted at'), ...after);
   };
 
   // ---- Audit ----
@@ -232,7 +232,7 @@
   function liveWindow(id) {
     const p = proj(id);
     if (!p) return;
-    const input = el('input', { type: 'text', class: 'field-text', inputmode: 'url', value: p.liveUrl || '', placeholder: 'example.com', 'aria-label': 'Live address', spellcheck: 'false', autocomplete: 'off' });
+    const input = el('input', { type: 'text', class: 'field-text', inputmode: 'url', value: p.liveUrl || '', placeholder: 'example.com', 'aria-label': 'Live URL', spellcheck: 'false', autocomplete: 'off' });
     const err = said();
     const state = el('div', {}, liveState(p));
     const set = async (url) => {
@@ -240,7 +240,7 @@
       try {
         const d = await app.engine('/api/live/set', { id, url });
         await app.loadProjects();
-        if (!d.url) { close(); app.say(`Live address removed from ${p.name}.`); } else liveWindow(id);
+        if (!d.url) { close(); app.say(`Live URL removed from ${p.name}.`); } else liveWindow(id);
       } catch (e) { err.textContent = faultText(e); }
     };
     open(`Live site: ${p.name}`, [el('p', { class: 'note', text: `Where ${p.name} is hosted on the internet. The office checks it when it starts and every ${eng.stats?.liveEvery || 15} minutes with one plain request, the same as opening the page: ● up, ▲ unsure, ✕ down.` }),

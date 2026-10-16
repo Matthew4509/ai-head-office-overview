@@ -295,8 +295,9 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .proj-top .staff-row .note { font-size: 12px; line-height: 1.3; }
 /* Beside Run/Stop and the port on a narrow tile, a long name takes a second line rather than being cut. */
 .proj-head .proj-name { white-space: normal; overflow-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-/* Narrower marks on a tile, so Browser fits on their line; a long mark (No audit, Live address) still wraps it. */
-.proj .marks .mark { padding: 1px 6px; }
+/* Narrower marks on a tile, so Browser and More fit on their line; a long mark (No audit, Live URL) still wraps it. */
+.proj .marks { gap: 3px; }
+.proj .marks .mark, .proj .marks .btn.small { padding: 1px 5px; font-size: 12px; }
 .proj-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .proj-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .run-dot { color: var(--working); font-size: 13px; font-weight: 600; white-space: nowrap; }
@@ -349,7 +350,8 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .wait-git, .wait-audit, .wait-live { border-left-color: var(--line); background: var(--card); }
 .wait-live, .wait-audit { border-left-color: var(--bad); }
 .sheet-box.wide { width: min(900px, calc(100vw - 32px)); }
-.sheet-foot { justify-content: flex-end; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 12px; }
+/* A window's buttons (Close and the rest) stay at its foot while what is above them scrolls: never out of sight. */
+.sheet-foot { justify-content: flex-end; border-top: 1px solid var(--line); position: sticky; bottom: -16px; z-index: 2; margin: 12px 0 -16px; padding: 10px 0 16px; background: var(--card); }
 .findings { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
 .finding { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 .finding .sev { font-weight: 700; font-size: 13px; }

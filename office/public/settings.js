@@ -147,7 +147,7 @@
       el('h3', { text: 'Gone home' }),
       el('div', { class: 'row' }, el('span', { text: 'After' }), quietIn, el('span', { text: 'minutes with nothing happening.' }), btn('Save time', save(() => ({ quietMinutes: quietIn.value }), 'Gone-home time saved.'), true)),
       el('h3', { text: 'Live sites' }),
-      el('div', { class: 'row' }, el('span', { text: 'Check every live address every' }), every, btn('Save', async () => {
+      el('div', { class: 'row' }, el('span', { text: 'Check every live URL every' }), every, btn('Save', async () => {
         try { const r = await app.engine('/api/live/every', { minutes: Number(every.value) }); say(`Live sites are checked every ${r.every} minutes.`); } catch (e) { say(fault(e)); }
       }, true), btn('Check all now', async () => { try { await app.engine('/api/live/check-all', {}); say('Checking the live sites, one at a time…'); } catch (e) { say(fault(e)); } })),
     ];

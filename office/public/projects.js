@@ -142,12 +142,15 @@
   }
   /** Browser, at the end of the Audit / Git / Live marks: only when the project has a local address. */
   const browserButton = (p) => (p.running || p.commands.some((c) => c.port) ? tileBtn(p, 'browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null);
-  /** The tile's button row: Free port when another program holds its port (or "No start command"), and More (Copy
-   * prompt, Folder, Terminal, Hide, Remove from list). */
-  function actions(p, open) {
-    const b = (what, label, title) => tileBtn(p, what, label, title);
-    const port = p.portInUse && !p.running ? b('free-port', `Free port ${p.portInUse}`, `Another program holds port ${p.portInUse}: stop it so ${p.name} can run`) : null;
+  /** Under the marks, only when there is one: Free port (another program holds its port) or "No start command". */
+  function portLine(p) {
+    const port = p.portInUse && !p.running ? tileBtn(p, 'free-port', `Free port ${p.portInUse}`, `Another program holds port ${p.portInUse}: stop it so ${p.name} can run`) : null;
     const none = p.commands.length ? null : el('span', { class: 'note', title: 'No start command in the project\'s .claude/launch.json or project.json' }, 'No start command');
+    return port || none ? el('div', { class: 'row proj-actions' }, port, none) : null;
+  }
+  /** The tile's More menu (Copy prompt, Folder, Terminal, Hide, Remove from list), at the end of the marks line. */
+  function moreMenu(p, open) {
+    const b = (what, label, title) => tileBtn(p, what, label, title);
     const more = el('details', { class: 'more', open: !!open, 'data-id': p.id,
       onkeydown: (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } } },
     el('summary', { class: 'btn small', title: `More for ${p.name}`, 'data-act': 'more', 'data-id': p.id }, 'More'),
@@ -155,7 +158,7 @@
         b('folder', 'Folder', `Open ${p.name}'s folder`), b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
         p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
         b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`)));
-    return el('div', { class: 'row proj-actions' }, port, none, more);
+    return more;
   }
   /** On a person's card the same buttons sit in one Actions menu under EDIT: Run or Stop first, then the rest. A choice
    * closes the menu; Escape closes it and goes back to its button. `open`: it was open, so a redraw keeps it open. */
@@ -213,7 +216,7 @@
           runButton(p), p.running ? el('span', { class: 'run-dot', title: `Running on port ${p.running.port}` }, `● ${p.running.port}`) : null),
         p.description || p.folder, [p.tokens ? `${tokens(p.tokens)} tokens` : '', p.updated ? `updated ${ago(p.updated)}` : ''].filter(Boolean).join(' · '),
         staff.length ? staff.map(face) : el('span', { class: 'note', text: 'Nobody in today' })),
-        app.checkMarks?.(p, browserButton(p)), actions(p, openMore.has(p.id)));
+        app.checkMarks?.(p, browserButton(p), moreMenu(p, openMore.has(p.id))), portLine(p));
     };
     // Desks with no project on the list (the projects folder itself: Consultants, or a folder elsewhere) keep a plain tile.
     const linked = new Set(Object.keys(links));
