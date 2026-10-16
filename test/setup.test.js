@@ -22,7 +22,7 @@ const portOpen = port => new Promise(r => { const s = net.connect(port, '127.0.0
 const waitPort = async (port, up, tries = 75) => { for (let i = 0; i < tries; i++) { if (await portOpen(port) === up) return true; await sleep(200); } return false; };
 const regValue = key => { try { const m = /REG_SZ\s+(.*)$/m.exec(execFileSync('reg.exe', ['query', key, '/ve'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); return m ? m[1].trim() : null; } catch { return null; } };
 const regClean = () => { try { execFileSync('reg.exe', ['delete', 'HKCU\\Software\\AiHeadOfficeTest', '/f'], { stdio: 'ignore' }); } catch {} };
-const linkHere = '"' + path.join(HERE, 'start.cmd') + '" quiet "%1"';
+const linkHere = '"' + process.execPath + '" "' + path.join(HERE, 'lib', 'platform', 'windows', 'link-start.js') + '" "%1"';
 
 // Runs a program with input typed in, and returns { code, out }. Waits for the program to EXIT, not for its output
 // to close: the office install.cmd starts inherits the output pipe and keeps it open while it runs.

@@ -128,6 +128,98 @@ const save = (d, file, text) => { fs.writeFileSync(path.join(d, file), text); gi
     assert(!a.ok && /not in git/.test(a.error) && !b.ok && /could run a program/.test(b.error), JSON.stringify([a, b]));
   });
 
+  // ---- the guard reads config the way git does, and every config git would read ----
+  // A clean filter that writes a marker file when it runs; each trap below is armed for real (a control shows plain
+  // git status runs it), so a guard that misses it fails here instead of passing for nothing.
+  const armFilter = (name) => {
+    const marker = path.join(tmp, name + '-RAN.txt');
+    const script = path.join(tmp, name + '.js');
+    fs.writeFileSync(script, 'require("fs").writeFileSync(' + JSON.stringify(marker) + ', "ran"); process.stdin.pipe(process.stdout);');
+    // Written straight into the config file, so the quotes around each path are escaped the way git config writes them.
+    return { marker, line: '"\\"' + process.execPath.replace(/\\/g, '/') + '\\" \\"' + script.replace(/\\/g, '/') + '\\""' };
+  };
+  const armedRepo = (name, configText, where) => {
+    const t = repo(name); save(t, 'a.txt', '1');
+    fs.writeFileSync(path.join(t, '.gitattributes'), '* filter=evil\n');
+    fs.appendFileSync(where ? where(t) : path.join(t, '.git', 'config'), configText);
+    fs.writeFileSync(path.join(t, 'a.txt'), '2'); // a changed file: git status must hash it, through the filter
+    return t;
+  };
+  const controlRan = (t, marker) => {
+    try { execFileSync('git', ['-C', t, 'status'], { stdio: 'pipe' }); } catch {}
+    const ran = fs.existsSync(marker);
+    if (ran) fs.unlinkSync(marker);
+    return ran;
+  };
+
+  await check('a filter written as [filter.evil] (no quotes) is refused, and its program never runs', async () => {
+    const f = armFilter('dotted');
+    const t = armedRepo('dotted-filter', '[filter.evil]\n\tclean = ' + f.line + '\n');
+    assert(controlRan(t, f.marker), 'control: plain git status did not run the [filter.evil] program, so the trap is not armed');
+    const g = await gitState(t, true);
+    const c = await changes(t);
+    assert(!fs.existsSync(f.marker), 'the office ran a filter written as [filter.evil]');
+    assert(g.state === 'error' && /could run a program/.test(g.reason) && !c.ok, JSON.stringify([g, c]));
+  });
+  await check('a section header and its key on one line ([filter "evil"] clean = …) is refused too', async () => {
+    const f = armFilter('oneline');
+    const t = armedRepo('oneline-filter', '[filter "evil"] clean = ' + f.line + '\n');
+    assert(controlRan(t, f.marker), 'control: plain git status did not run the one-line filter');
+    const g = await gitState(t, true);
+    assert(!fs.existsSync(f.marker) && g.state === 'error' && /could run a program/.test(g.reason), JSON.stringify(g));
+  });
+  await check('a worktree whose shared config (commondir) sets a filter is refused, not read as "no config"', async () => {
+    const f = armFilter('common');
+    const main = repo('common-main'); save(main, 'a.txt', '1');
+    fs.writeFileSync(path.join(main, '.gitattributes'), '* filter=evil\n'); git(main, 'add', '.gitattributes'); git(main, 'commit', '-q', '-m', 'attrs');
+    const wt = path.join(tmp, 'common-wt');
+    git(main, 'worktree', 'add', '-q', wt);
+    fs.appendFileSync(path.join(main, '.git', 'config'), '[filter "evil"]\n\tclean = ' + f.line + '\n');
+    fs.writeFileSync(path.join(wt, 'a.txt'), '2');
+    assert(controlRan(wt, f.marker), 'control: plain git status in the worktree did not run the shared filter');
+    const g = await gitState(wt, true);
+    assert(!fs.existsSync(f.marker), 'the office ran a filter from the worktree\'s shared config');
+    assert(g.state === 'error' && /could run a program/.test(g.reason), JSON.stringify(g));
+  });
+  await check('a ".git" folder with a commondir that leads nowhere is refused as unreadable', async () => {
+    const t = repo('lost-common'); save(t, 'a.txt', '1');
+    fs.writeFileSync(path.join(t, '.git', 'commondir'), '../../no-such-folder\n');
+    const g = await gitState(t, true);
+    assert(g.state === 'error' && /could not be read safely/.test(g.reason), JSON.stringify(g));
+  });
+  await check('a damaged config is refused, not taken as safe', async () => {
+    const t = repo('damaged-config'); save(t, 'a.txt', '1');
+    fs.appendFileSync(path.join(t, '.git', 'config'), '[filter "evil"\n\tclean = x\n');
+    const g = await gitState(t, true);
+    assert(g.state === 'error' && /could not be read safely/.test(g.reason), JSON.stringify(g));
+  });
+  await check('a submodule\'s config (in .git/modules/) is checked, and git status never goes into submodules', async () => {
+    const f = armFilter('sub');
+    const lib = repo('sub-lib'); save(lib, 'b.txt', '1');
+    fs.writeFileSync(path.join(lib, '.gitattributes'), '* filter=evil\n'); git(lib, 'add', '.gitattributes'); git(lib, 'commit', '-q', '-m', 'attrs');
+    const top = repo('sub-top'); save(top, 'a.txt', '1');
+    git(top, '-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', lib, 'vendor/lib'); git(top, 'commit', '-q', '-m', 'sub');
+    fs.appendFileSync(path.join(top, '.git', 'modules', 'vendor', 'lib', 'config'), '[filter.evil]\n\tclean = ' + f.line + '\n');
+    fs.writeFileSync(path.join(top, 'vendor', 'lib', 'b.txt'), '2');
+    assert(controlRan(top, f.marker), 'control: plain git status did not go into the submodule and run its filter');
+    const g = await gitState(top, true);
+    assert(!fs.existsSync(f.marker), 'the office ran a filter from a submodule\'s config');
+    assert(g.state === 'error' && /could run a program/.test(g.reason), JSON.stringify(g));
+  });
+  await check('textconv, include, credential and *command keys are refused; git\'s own fsmonitor and plain settings are not', async () => {
+    const { gitConfigRisky } = require('../lib/gitstate');
+    const one = (name, text) => { const t = repo(name); fs.appendFileSync(path.join(t, '.git', 'config'), text); return gitConfigRisky(t); };
+    assert(one('k-textconv', '[diff "pdf"]\n\ttextconv = x\n'), 'textconv');
+    assert(one('k-include', '[include]\n\tpath = elsewhere\n'), 'include');
+    assert(one('k-includeif', '[includeIf "gitdir:x/"]\n\tpath = elsewhere\n'), 'includeIf');
+    assert(one('k-credential', '[credential]\n\thelper = x\n'), 'credential');
+    assert(one('k-ssh', '[core]\n\tsshCommand = x\n'), 'sshCommand');
+    assert(one('k-gpg', '[gpg "ssh"]\n\tprogram = x\n'), 'gpg program');
+    assert(one('k-fsmon-prog', '[core]\n\tfsmonitor = x.exe\n'), 'fsmonitor naming a program');
+    assert(!one('k-fsmon-true', '[core]\n\tfsmonitor = true\n'), 'core.fsmonitor=true is git\'s own watcher');
+    assert(!one('k-plain', '[branch "main"]\n\tremote = origin\n[http]\n\tproxy = http://127.0.0.1:9\n'), 'plain settings');
+  });
+
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(failures ? failures + ' FAILED' : 'all passed');
   process.exit(failures ? 1 : 0);

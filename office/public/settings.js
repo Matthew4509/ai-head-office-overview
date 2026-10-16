@@ -1,6 +1,6 @@
 // Settings: one window for everything that is not the office itself. Folders (working folders, projects added one by
 // one, projects taken off the list), Setup (the start link, desktop shortcut and Start with Windows; advanced setup,
-// the AI app's hooks, as its last step), Office (projects folder, gone-home time, live checks), Private details, Help
+// the AI app's hooks, as its last step), Office (theme, projects folder, gone-home time, live checks), Private details, Help
 // and About (version, the Git program, Quit, Uninstall). Opened by Settings at the top. The welcome on the first start
 // is here too.
 'use strict';
@@ -115,14 +115,31 @@
     ];
   }
 
-  // ---- Office: projects folder, gone-home time, live checks ----
+  // ---- Office: theme, projects folder, gone-home time, live checks ----
   async function drawOffice() {
     const st = app.data?.setup || {};
     const rootIn = el('input', { type: 'text', class: 'field-text', value: st.root || '', 'aria-label': 'Projects folder', spellcheck: 'false' });
     const quietIn = el('input', { type: 'number', class: 'field-text short', min: '5', max: '1440', value: String(st.quietMinutes || 60), 'aria-label': 'Gone-home time in minutes' });
     const every = el('select', { class: 'field-text short', 'aria-label': 'Check the live sites every' }, [5, 10, 15].map((m) => el('option', { value: String(m), selected: (app.engineData.stats?.liveEvery || 15) === m }, `${m} minutes`)));
     const save = (body, done) => async () => { try { await app.api('/api/settings', body()); await app.refresh(); say(done); } catch (e) { say(fault(e)); } };
+    // The theme the page was served in is the one in use (the office's choice, or its default).
+    const now = document.documentElement.dataset.theme || 'system';
+    const THEMES = [['dark', 'Dark'], ['light', 'Light'], ['system', 'Match Windows']];
+    const themeBtn = ([id, name]) => el('button', {
+      type: 'button', class: 'btn', 'aria-pressed': String(now === id),
+      onclick: async () => {
+        try {
+          await app.api('/api/settings', { theme: id });
+          document.documentElement.dataset.theme = id;
+          await show('office');
+          say(id === 'system' ? 'Theme: Match Windows. The office turns dark or light with Windows.' : `Theme: ${name}.`);
+        } catch (e) { say(fault(e)); }
+      },
+    }, name);
     return [
+      el('h3', { text: 'Theme' }),
+      el('div', { class: 'row', role: 'group', 'aria-label': 'Theme' }, ...THEMES.map(themeBtn)),
+      el('p', { class: 'note', text: 'Dark dims the office for the evening: the page, the rooms and the beach. Match Windows follows Settings › Personalisation › Colours in Windows.' }),
       el('h3', { text: 'Projects folder' }),
       el('p', { class: 'note', text: 'The folder your project folders sit in: each folder in it is a desk, and a thread working in the folder itself is a Consultant. Empty = the folder most threads start in.' }),
       el('div', { class: 'row' }, rootIn, btn('Save folder', save(() => ({ root: rootIn.value }), 'Projects folder saved.'), true)),

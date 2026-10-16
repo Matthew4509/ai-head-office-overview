@@ -65,7 +65,8 @@ Repository: https://github.com/Matthew4509/ai-head-office-overview (Windows, Nod
   adds (`lib/live.js`, `lib/audit.js`) and, only if ticked under About, one request a day to GitHub for the newest Git
   version (`lib/git-program.js`). To check: search the code for `fetch(`, `http.get`, `http.request`.
 - **Its own privacy check:** `node tools/disclose.js` scans the folder, its git history and any zip for private
-  details, other project names, AI trail and local paths; it prints labels and places only. "Nothing found" is clean.
+  details, other project names, AI trail and local paths; it prints labels and places only. "Nothing found" is clean;
+  a WARNING line and exit code 2 mean it had no private-details list or no project names to check against.
 - A test copy that changes nothing: `node server.js --dry-run --port=8883` (reports windows, shortcuts and hooks
   instead of making them; reads no real transcripts). Stop it with `node server.js --stop --port=8883`.
 

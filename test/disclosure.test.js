@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 const assert = require('assert');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 const { disclosurePass, autoDetails, savePrivateList, readPrivateList, listForPage } = require('../lib/disclosure');
 const { runAudit, fingerprint } = require('../lib/audit');
 
@@ -342,9 +342,11 @@ async function main() {
   }
 
   const HERE = path.resolve(__dirname, '..');
-  const projectsDir = path.dirname(HERE);
-  const siblings = fs.readdirSync(projectsDir, { withFileTypes: true }).filter(e => e.isDirectory() && !/^[._-]/.test(e.name) && e.name !== path.basename(HERE)).map(e => e.name);
-  const self = await disclosurePass(HERE, { details: autoDetails([projectsDir]), others: siblings, own: [path.basename(HERE)] });
+  // From a second working copy (a git worktree) the projects folder is the one beside the MAIN copy, as for the bake.
+  const MAIN = require('../tools/privacy-context').mainCopy(HERE);
+  const projectsDir = path.dirname(MAIN);
+  const siblings = fs.readdirSync(projectsDir, { withFileTypes: true }).filter(e => e.isDirectory() && !/^[._-]/.test(e.name) && e.name !== path.basename(MAIN)).map(e => e.name);
+  const self = await disclosurePass(HERE, { details: autoDetails([projectsDir]), others: siblings, own: [path.basename(HERE), path.basename(MAIN)] });
   // Known and allowed: past versions of the museum's disclosure fixtures (committed before T4) hold made-up trail lines
   // written out in full; the files themselves now build them at run time. Nothing else may be found, now or in history.
   const pastFixture = f => f.rule === 'DISC-003' && /^git history: test\/museum\/cases-4-disclosure\.js:\d+$/.test(f.where);
@@ -354,6 +356,61 @@ async function main() {
   const ownGuide = f => f.rule === 'DISC-003' && /^(_releases\/ai-head-office-overview-[\d.]+\.zip > ai-head-office-overview\/ ?)?((AGENTS|CLAUDE)\.md|\(2 files, e\.g\. (AGENTS|CLAUDE)\.md\))$/.test(f.where);
   const selfFound = self.findings.filter(f => !pastFixture(f) && !ownGuide(f));
   check('the office\'s own folder scans clean', () => assert.strictEqual(selfFound.length, 0, selfFound.map(f => f.rule + '@' + f.where + ' ' + f.title).join('\n  ')));
+
+  // ---- the bake and tools/disclose.js: context from the MAIN copy, every working folder, never a blind "0 hits" ----
+  // A copy of this app in a made-up projects folder, as a git repository with a second working copy (a worktree) inside
+  // it, the way the app is worked on. Its data/ is made up here; nothing of this PC's office is read.
+  {
+    // Made-up folder names, put together at run time: the copy's own files (this one too) are scanned against them.
+    const SIB = 'bramble' + '-tarn', SMALL = 'pebble' + '-tarn', FAR = 'quill' + 'moor-ledger';
+    const B = path.join(tmp, 'bake'), projects = path.join(B, 'shelf' + '-wren'), far = path.join(B, 'shelf' + '-kestrel');
+    const app = path.join(projects, 'office-copy');
+    const shipped = execFileSync('git', ['-C', HERE, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+    for (const rel of shipped) { if (!fs.existsSync(path.join(HERE, rel))) continue; fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true }); fs.copyFileSync(path.join(HERE, rel), path.join(app, rel)); }
+    fs.mkdirSync(path.join(projects, SIB)); fs.mkdirSync(path.join(far, FAR), { recursive: true });
+    const g = (...a) => execFileSync('git', ['-C', app, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', ...a], { stdio: 'pipe' });
+    g('init', '-q'); g('add', '-A'); g('commit', '-q', '-m', 'copy');
+    const second = path.join(app, 'copies', 'second');
+    g('worktree', 'add', '-q', '-b', 'second', second);
+    const run = (where, ...args) => { const r = spawnSync(process.execPath, args, { cwd: where, encoding: 'utf8', timeout: 120000 }); return { code: r.status, out: (r.stdout || '') + (r.stderr || '') }; };
+    const { privacyContext } = require('../tools/privacy-context');
+    const small = path.join(projects, SMALL); fs.mkdirSync(small); fs.writeFileSync(path.join(small, 'README.md'), '# Small\n\nA made-up project.\n');
+
+    // No list in the main copy's data/: the bake stops, disclose.js says the check was not complete.
+    const noList = run(second, path.join('tools', 'bake.js'), '--check');
+    const noListDisclose = run(second, path.join('tools', 'disclose.js'), small);
+    check('bake: no private-details list in the main copy stops the bake, and never says "0 hits"', () =>
+      assert(noList.code === 1 && /Bake stopped/.test(noList.out) && /private-details list is missing/.test(noList.out) && !/0 hits/.test(noList.out), noList.out));
+    check('disclose.js: no private-details list is a loud warning and exit code 2, never "Nothing found." alone', () =>
+      assert(noListDisclose.code === 2 && /WARNING, not a complete check/.test(noListDisclose.out) && /NOT a complete check/.test(noListDisclose.out) && !/^Nothing found\.$/m.test(noListDisclose.out), noListDisclose.out));
+    const forced = run(second, path.join('tools', 'bake.js'), '--check', '--incomplete');
+    check('bake --incomplete goes on, but says NOT A COMPLETE CHECK instead of "0 hits"', () =>
+      assert(forced.code === 0 && /NOT A COMPLETE CHECK/.test(forced.out) && !/0 hits/.test(forced.out), forced.out));
+
+    // The list and settings live in the MAIN copy only; the worktree has no data/ of its own.
+    fs.mkdirSync(path.join(app, 'data'));
+    fs.writeFileSync(path.join(app, 'data', 'private-details.json'), JSON.stringify({ details: [{ id: 'a', label: 'my code word', value: 'zephyr-lantern-' + 4242 }] }));
+    fs.writeFileSync(path.join(app, 'data', 'settings.json'), JSON.stringify({ workingFolders: [projects, far] }));
+    const c = privacyContext(second);
+    check('a worktree takes its context from the main copy: the list, the projects beside it and every working folder', () => {
+      assert.strictEqual(c.main.toLowerCase(), app.toLowerCase());
+      assert(c.listed === 1 && !c.gaps.length, JSON.stringify(c.gaps));
+      assert(c.others.includes(SIB) && c.others.includes(FAR), JSON.stringify(c.others));
+      assert(!c.others.includes('office-copy') && !c.others.includes('second'), 'the app\'s own copies are not other projects: ' + JSON.stringify(c.others));
+    });
+    const clean = run(second, path.join('tools', 'bake.js'), '--check');
+    check('bake from the worktree with the main copy\'s list: 1 detail from the list, names from 2 folders, 0 hits', () =>
+      assert(clean.code === 0 && /1 detail from your list/.test(clean.out) && /project names from 2 folders, 0 hits/.test(clean.out), clean.out));
+    // A project name from a working folder that is NOT beside the app, written into a shipped file: the bake stops.
+    fs.appendFileSync(path.join(second, 'README.md'), '\nSee ' + FAR + '.\n');
+    const named = run(second, path.join('tools', 'bake.js'), '--check');
+    check('bake: a project name from another working folder in a shipped file stops the bake', () =>
+      assert(named.code === 1 && /Bake stopped/.test(named.out) && /README\.md/.test(named.out), named.out));
+    fs.writeFileSync(path.join(small, 'notes.txt'), 'Code word: zephyr-lantern-' + 4242 + '\n');
+    const found = run(second, path.join('tools', 'disclose.js'), small);
+    check('disclose.js from the worktree finds a detail from the main copy\'s list, and never prints the value', () =>
+      assert(found.code === 1 && /my code word/.test(found.out) && !found.out.includes('zephyr-lantern-' + 4242), found.out));
+  }
 
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(failures ? failures + ' FAILED' : 'all passed');

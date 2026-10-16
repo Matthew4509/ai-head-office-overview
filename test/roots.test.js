@@ -109,6 +109,31 @@ async function main() {
     assert(/lantern-php\//.test(n) && !/[(\s]lantern\//.test(n), n);
   });
 
+  // ---- 7. asking git "would it publish this copy?" never runs a program named in the folder's git settings ----
+  {
+    const d = 'trap';
+    w(d + '/app/index.php', FAULT); w(d + '/old/index.php', FAULT); w(d + '/.gitignore', 'old/\n');
+    git(d, 'init', '-q'); git(d, 'config', 'user.email', '1+robin@users.noreply.github.com'); git(d, 'config', 'user.name', 'Robin'); git(d, 'config', 'commit.gpgsign', 'false');
+    git(d, 'add', '-A'); git(d, 'commit', '-q', '-m', 'first');
+    const marker = path.join(tmp, 'FSMONITOR-RAN.txt');
+    const script = path.join(tmp, 'fsmon.js');
+    fs.writeFileSync(script, 'require("fs").writeFileSync(' + JSON.stringify(marker) + ', "ran")');
+    git(d, 'config', 'core.fsmonitor', '"' + process.execPath.replace(/\\/g, '/') + '" "' + script.replace(/\\/g, '/') + '"');
+    // Control: the plain question the old code asked (check-ignore) DOES run it, so the trap is armed.
+    try { execFileSync('git', ['-C', path.join(tmp, d), 'check-ignore', '-q', '--', 'old/'], { stdio: 'ignore', windowsHide: true }); } catch {}
+    const armed = fs.existsSync(marker);
+    if (armed) fs.unlinkSync(marker);
+    const T = findRoots(path.join(tmp, d));
+    check('a repository whose config names a program in core.fsmonitor: git is not asked, so nothing runs', () => {
+      assert(armed, 'control: plain git check-ignore did not run the fsmonitor program, so the trap is not armed');
+      assert(!fs.existsSync(marker), 'finding the app ran the program named in core.fsmonitor');
+    });
+    check('...and the left-out copy counts as published, so the private-detail pass still reads it', () => {
+      const old = T.left.find(l => l.rel === 'old');
+      assert(old && old.publishes === true, JSON.stringify(T.left));
+    });
+  }
+
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(failures ? failures + ' FAILED' : 'all passed');
   process.exit(failures ? 1 : 0);

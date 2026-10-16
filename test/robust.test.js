@@ -196,6 +196,52 @@ async function main() {
       assert(!s.ok && /Could not start/.test(s.error), JSON.stringify(s));
       assert(Date.now() - t < 8000, 'took ' + (Date.now() - t) + ' ms');
     });
+    await check('S4: a program that ends at once is reported at once, with its exit code, not after 20 s', async () => {
+      make('ends-at-once', { '.claude/launch.json': launch({ name: 'x', runtimeExecutable: NODE, runtimeArgs: ['-e', 'process.exit(3)'], port: await freePort() }) });
+      const t = Date.now();
+      const s = (await api('/api/start', { id: await idOf('ends-at-once'), key: '0', open: false })).json;
+      assert(!s.ok && /ended by itself/.test(s.error) && /exit code 3/.test(s.error), JSON.stringify(s));
+      assert(Date.now() - t < 6000, 'took ' + (Date.now() - t) + ' ms');
+      assert(!(await list()).find(p => p.folder === 'ends-at-once').running, 'still shown as running');
+    });
+    await check('S5: two Run requests at once start one copy; the other is told it is already starting', async () => {
+      const port = await freePort();
+      make('double-run', { '.claude/launch.json': launch({ name: 'x', runtimeExecutable: NODE, runtimeArgs: ['-e', "require('http').createServer((q, s) => s.end('ok')).listen(" + port + ", '127.0.0.1')"], port }) });
+      const id = await idOf('double-run');
+      // Two separate connections, sent together (one connection would carry them one after the other).
+      const startOnOwnConnection = () => new Promise((resolve, reject) => {
+        const body = JSON.stringify({ id, key: '0', open: false });
+        const req = http.request(BASE + '/api/start', { method: 'POST', agent: false, headers: { 'X-AHO-Key': key, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, res => {
+          let t = ''; res.on('data', c => { t += c; }); res.on('end', () => { try { resolve(JSON.parse(t)); } catch (e) { reject(e); } });
+        });
+        req.on('error', reject);
+        req.end(body);
+      });
+      const answers = await Promise.all([startOnOwnConnection(), startOnOwnConnection()]);
+      assert.strictEqual(answers.filter(r => r.ok && !r.already).length, 1, JSON.stringify(answers));
+      assert(answers.some(r => /already starting/.test(r.error || '') || r.already), JSON.stringify(answers));
+      assert((await list()).find(p => p.folder === 'double-run').running, 'the one copy is shown as running');
+      await api('/api/stop', { id });
+      for (let i = 0; i < 20 && (await new Promise(r => { const c = net.connect(port, '127.0.0.1', () => { c.destroy(); r(true); }); c.on('error', () => r(false)); })); i++) await new Promise(r => setTimeout(r, 250));
+      const still = await new Promise(r => { const c = net.connect(port, '127.0.0.1', () => { c.destroy(); r(true); }); c.on('error', () => r(false)); });
+      assert(!still, 'a second copy was left running on port ' + port + ' after Stop');
+    });
+    await check('U3: a character split between two network chunks comes through whole', async () => {
+      const { readBody } = require('../lib/http');
+      const { EventEmitter } = require('events');
+      const req = new EventEmitter();
+      const bytes = Buffer.from(JSON.stringify({ text: 'café — ok' }), 'utf8');
+      const cut = bytes.indexOf(Buffer.from('é', 'utf8')) + 1; // between the two bytes of é
+      const p = readBody(req, 1000);
+      req.emit('data', bytes.subarray(0, cut)); req.emit('data', bytes.subarray(cut)); req.emit('end');
+      assert.strictEqual((await p).text, 'café — ok');
+    });
+    await check('U4: projects.json keys match a folder in any letter case', async () => {
+      const ovf = path.join(WS, 'overrides-case.json');
+      fs.writeFileSync(ovf, JSON.stringify({ projects: { 'GOOD': { name: 'Good Named' } } }));
+      const rows = listProjects({ workingFolders: [WS], extraProjects: [], hidden: [], known: [], hiddenView: [], order: [] }, { overridesFile: ovf });
+      assert.strictEqual((rows.find(p => p.folder === 'good') || {}).name, 'Good Named');
+    });
     await check('U1: an added project whose folder is gone can be taken off by its path', async () => {
       const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-robust-added-'));
       assert((await api('/api/projects/add', { path: elsewhere })).json.ok);
@@ -259,7 +305,12 @@ async function main() {
     const q = spawnSync('reg.exe', ['query', key + '\\shell\\open\\command', '/ve'], { encoding: 'utf8' });
     spawnSync('reg.exe', ['delete', key, '/f'], { stdio: 'ignore' });
     assert(JSON.parse(r.stdout).here, r.stdout + r.stderr);
-    assert(q.stdout.includes('"' + path.join(dir, 'start.cmd') + '" quiet "%1"'), q.stdout);
+    assert(q.stdout.includes('"' + process.execPath + '" "' + path.join(dir, 'lib', 'platform', 'windows', 'link-start.js') + '" "%1"'), q.stdout);
+  });
+  await check('S7: the link runs node with link-start.js, which never reads the address it is given', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'platform', 'windows', 'link-start.js'), 'utf8').replace(/\/\/.*$/gm, '');
+    assert(!/process\.argv|process\.env\.(?!SystemRoot)/.test(src), 'link-start.js reads its arguments or the environment');
+    assert(/\['\/d', '\/c', path\.join\(folder, 'start\.cmd'\), 'quiet'\]/.test(src), 'start.cmd is started with the fixed word quiet only');
   });
 
   try { fs.rmSync(WS, { recursive: true, force: true }); fs.rmSync(DATA, { recursive: true, force: true }); } catch {}

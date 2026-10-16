@@ -16,6 +16,38 @@
   const ROWS = 40;
   const INK = '#27364e';
   const PALETTE = ['#69bfe9', '#b29be4', '#78c6a3', '#ef8a91', '#efbd72', '#74a7d0'];
+  /** The office by night (the dark theme): floors, walls, the outside and the furniture in evening light. People, screens,
+   * signs, food and the beach things keep their own colours, so they stand out as they do by day. A colour not listed
+   * here is the same by day and by night. */
+  const NIGHT = {
+    '#cbd6df': '#1c2531', // the corridors
+    '#e8eff2': '#2a3542', // computer room
+    '#e9e7f1': '#2e2c3d', // meeting room
+    '#f3e9dc': '#3a3129', // kitchen
+    '#e0ece7': '#273731', // lounge and library
+    '#b9c9a4': '#33412c', // the verge
+    '#d9cfb8': '#4a4538', // the path
+    '#f2dfae': '#6b5d3e', // the sand
+    '#7fc4e0': '#1d4a63', // the sea
+    '#d8f0fa': '#4f88a6', // waves
+    '#cfe8f5': '#3f6680', // the lounge window
+    '#a4b8c3': '#4d5f6c', // the front door, the sink
+    '#d5e3e8': '#7d9099', // the sink's basin
+    '#e8bb80': '#a77d4c', // desks, tables, the counter
+    '#9eb3c8': '#5b6f84', // desk chairs
+    '#a6aacb': '#5f6283', // meeting room chairs
+    '#fff7e9': '#cfc6b6', // keyboards
+    '#b78966': '#8a6548', // the bookcase
+    '#a4bac9': '#566b7b', // the armchair
+    '#9ab4c9': '#506a80', // the sofa's seat
+    '#b8cddd': '#62788c', // the sofa's back
+  };
+  /** True while the page is dark (Settings › Office › Theme, or Windows when it follows Windows): see readTheme. */
+  let night = false;
+  const tone = (col) => (night && NIGHT[col]) || col;
+  /** Words written straight on the floor: dark by day, light by night. */
+  const floorInk = () => (night ? '#e8ecf2' : INK);
+  const floorSoft = () => (night ? '#a5afbe' : '#7b8794');
   const ROOMS = [
     { name: 'Computer room', x: 20, y: 20, w: 540, h: 340, fill: '#e8eff2' },
     { name: 'Meeting room', x: 640, y: 20, w: 540, h: 340, fill: '#e9e7f1', lock: 'boardroom' },
@@ -680,22 +712,22 @@
   function box(c, x, y, w, h, r, fill, stroke = INK, width = 2.5) {
     c.beginPath();
     c.roundRect(x, y, w, h, r);
-    c.fillStyle = fill;
+    c.fillStyle = tone(fill);
     c.fill();
-    if (stroke) { c.strokeStyle = stroke; c.lineWidth = width; c.stroke(); }
+    if (stroke) { c.strokeStyle = tone(stroke); c.lineWidth = width; c.stroke(); }
   }
   function oval(c, x, y, rx, ry, fill, stroke = INK, width = 2) {
     c.beginPath();
     c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-    c.fillStyle = fill;
+    c.fillStyle = tone(fill);
     c.fill();
-    if (stroke) { c.strokeStyle = stroke; c.lineWidth = width; c.stroke(); }
+    if (stroke) { c.strokeStyle = tone(stroke); c.lineWidth = width; c.stroke(); }
   }
   function line(c, x, y, xx, yy, col = INK, width = 3) {
     c.beginPath();
     c.moveTo(x, y);
     c.lineTo(xx, yy);
-    c.strokeStyle = col;
+    c.strokeStyle = tone(col);
     c.lineWidth = width;
     c.lineCap = 'round';
     c.stroke();
@@ -726,13 +758,13 @@
     cv.width = W;
     cv.height = H;
     const c = cv.getContext('2d');
-    c.fillStyle = '#cbd6df';
+    c.fillStyle = tone('#cbd6df');
     c.fillRect(0, 0, W, H);
     ROOMS.forEach((r, i) => {
       box(c, r.x, r.y, r.w, r.h, 16, r.fill);
       const xx = i % 2 === 0 ? r.x + r.w : r.x;
       const dy = i < 2 ? 190 : 610;
-      c.fillStyle = r.fill;
+      c.fillStyle = tone(r.fill);
       c.fillRect(xx - 5, dy - 25, 10, 50);
       if (lockedRoom(r)) {
         // Locked: the lights off (a dark veil over the room), the door shut in its frame, and a padlock on the corridor side.
@@ -746,13 +778,13 @@
     box(c, 1172, 566, 14, 82, 3, '#cfe8f5', INK, 2);
     line(c, 1179, 570, 1179, 644, '#fff', 1.5);
     // Outside: the path past the front door, the sand, the sea, and the deck chairs bought.
-    c.fillStyle = '#b9c9a4';
+    c.fillStyle = tone('#b9c9a4');
     c.fillRect(0, 786, W, 38);
-    c.fillStyle = '#d9cfb8';
+    c.fillStyle = tone('#d9cfb8');
     c.fillRect(0, 797, W, 16);
-    c.fillStyle = '#f2dfae';
+    c.fillStyle = tone('#f2dfae');
     c.fillRect(0, 824, W, 82);
-    c.fillStyle = '#7fc4e0';
+    c.fillStyle = tone('#7fc4e0');
     c.fillRect(0, 906, W, H - 906);
     for (let x = 20; x < W; x += 70) line(c, x, 920 + (x % 140 ? 6 : 0), x + 30, 920 + (x % 140 ? 6 : 0), '#d8f0fa', 2);
     DECK.slice(0, world.rooms.deckchairs).forEach(([x, y], i) => deckChair(c, x, y, i));
@@ -930,8 +962,8 @@
         const words = fitText(c, d.name, 150, size);
         c.font = `600 ${size}px Segoe UI, system-ui, sans-serif`;
         const w = c.measureText(words).width + size;
-        box(c, d.x - w / 2, d.y - 24 - size * 1.25, w, size * 1.35, 5, '#ffffff', '#9eb3c8', 1.5);
-        text(c, words, d.x, d.y - 24 - size * 0.25, size, INK, 'center');
+        box(c, d.x - w / 2, d.y - 24 - size * 1.25, w, size * 1.35, 5, night ? '#2b3646' : '#ffffff', '#9eb3c8', 1.5);
+        text(c, words, d.x, d.y - 24 - size * 0.25, size, floorInk(), 'center');
       }
     }
   }
@@ -1136,8 +1168,8 @@
         const seats = p.target?.desk?.seats.length ?? 1;
         // On a towel the rows are staggered: a name is cut to its own towel's width.
         const max = p.target?.area === 'desk' || p.target?.area === 'needs' ? Math.max(48, 150 / seats) : p.target?.area === 'towel' ? 80 : 140;
-        text(c, fitText(c, p.row.name, max, size * 0.85), p.x, y + 28, size * 0.85, INK, 'center');
-      } else if (full && p.id === 'courier' && walk) text(c, p.row.name, p.x, y + 32, size * 0.92, '#56677b', 'center');
+        text(c, fitText(c, p.row.name, max, size * 0.85), p.x, y + 28, size * 0.85, floorInk(), 'center');
+      } else if (full && p.id === 'courier' && walk) text(c, p.row.name, p.x, y + 32, size * 0.92, night ? '#aab6c4' : '#56677b', 'center');
     }
   }
 
@@ -1191,14 +1223,14 @@
     c.drawImage(background, 0, 0);
     // Names are written only where they can be read at 12 px or more without crowding (not on a small phone).
     const full = labelSize(c) <= 24;
-    if (full) for (const r of emptyRooms()) text(c, 'Empty: furnish it from Staff rewards (right panel)', r.x + r.w / 2, r.y + r.h / 2 + 30, labelSize(c) * 0.9, '#7b8794', 'center');
+    if (full) for (const r of emptyRooms()) text(c, 'Empty: furnish it from Staff rewards (right panel)', r.x + r.w / 2, r.y + r.h / 2 + 30, labelSize(c) * 0.9, floorSoft(), 'center');
     // A locked room: a big padlock in the middle, and what opens it (always drawn: the padlock says it at any size).
     for (const r of ROOMS.filter(lockedRoom)) {
       padlock(c, r.x + r.w / 2, r.y + r.h / 2 - 22, 2.6, '#c9d3dc');
       const key = world.shop.find((i) => i.unlocks === r.lock);
       if (full) text(c, `Locked: click to unlock${key ? ` (${big(key.price)} tokens)` : ''}`, r.x + r.w / 2, r.y + r.h / 2 + 50, labelSize(c) * 0.9, '#e8eef4', 'center');
     }
-    if (full && !world.people.size) text(c, 'Nobody in yet: start a thread in Claude and they come in.', 290, 200, labelSize(c), '#7b8794', 'center');
+    if (full && !world.people.size) text(c, 'Nobody in yet: start a thread in Claude and they come in.', 290, 200, labelSize(c), floorSoft(), 'center');
     drawDesks(c, full);
     for (const p of world.people.values()) if (p.target?.area === 'towel' && !p.path.length && !p.leaving) towel(c, p.target.x, p.target.y, p.seed);
     if (world.pizzaOn && world.food === 'donuts') {
@@ -1561,6 +1593,27 @@
   if (holder) addView(holder);
   // The office fits the window's height: a taller or shorter window redraws it.
   window.addEventListener('resize', () => { for (const v of views) v.drawnAt = 0; wake(); });
+
+  // Day or night: the theme on <html> (Settings › Office), or Windows' own when it follows Windows. A change redraws the
+  // rooms (kept as one picture) and the Staff rewards pictures, if they are open.
+  const darkWindows = window.matchMedia?.('(prefers-color-scheme: dark)');
+  function readTheme() {
+    const t = document.documentElement.dataset.theme;
+    const was = night;
+    night = t === 'dark' || (t !== 'light' && !!darkWindows?.matches);
+    if (night === was) return;
+    background = null;
+    for (const v of views) v.drawnAt = 0;
+    if (shopBox?.isConnected) drawShop();
+    wake();
+  }
+  readTheme();
+  darkWindows?.addEventListener('change', readTheme);
+  // Also on coming back to the window (Windows' colours are changed in its own Settings app), in case a browser does
+  // not report the change while the page is in the background.
+  window.addEventListener('focus', readTheme);
+  document.addEventListener('visibilitychange', readTheme);
+  new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   window.officeView = {
     update,

@@ -65,11 +65,13 @@ test('a new project list counts the tokens again from the start; new lines are c
   } finally { h.done(); }
 });
 
-test('this month: only replies written this month (UTC) count', () => {
+test('this month: only replies written this calendar month on this PC count (not the UTC month)', () => {
   const h = tempHome();
   try {
-    lines('m').raw(reply('old', '2026-09-30T23:00:00Z', A, 4)).raw(reply('new', '2026-10-01T00:30:00Z', A, 4)).write(file(h, 'm'));
-    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts, now: () => Date.parse('2026-10-12T00:00:00Z') });
+    // Half an hour either side of midnight, local time, whatever time zone the test runs in.
+    const local = (...a) => new Date(...a).toISOString();
+    lines('m').raw(reply('old', local(2026, 8, 30, 23, 30), A, 4)).raw(reply('new', local(2026, 9, 1, 0, 30), A, 4)).write(file(h, 'm'));
+    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts, now: () => new Date(2026, 9, 12).getTime() });
     office.setTokens(rules(office, [{ id: 'a', dir: A }], 'one'));
     office.scan();
     const t = office.tokenTotals();

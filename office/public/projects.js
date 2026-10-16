@@ -109,8 +109,14 @@
         await engine('/api/projects/remove', { id });
         say(`${p.name} is off the list. Its files were not touched.`);
       } else if (what === 'free-port') {
-        const r = await engine('/api/stop-port', { port: p.portInUse });
-        say(r.free ? `Port ${p.portInUse} is free now.` : `The program on port ${p.portInUse} was stopped.`);
+        // Name the program first and stop only that one: the pid lets the office refuse if another has the port now.
+        const port = p.portInUse;
+        const o = ((await engine('/api/port-owners', {})).owners || []).find((x) => x.port === port);
+        if (!o) { say(`Port ${port} is not held by another program any more.`); return; }
+        if (o.why) { say(`The program on port ${port} (${o.name}) is not stopped: ${o.why}.`); return; }
+        if (!confirm(`Stop ${o.name} (program id ${o.pid})? It holds port ${port}, which ${p.name} needs. Anything unsaved in it is lost.`)) return;
+        const r = await engine('/api/stop-port', { port, pid: o.pid });
+        say(r.dryRun ? `Test copy, not stopped: ${r.dryRun}` : r.free ? `Port ${port} is free now.` : `${r.name || o.name} was stopped: port ${port} is free.`);
       }
       app.showFault(null);
     } catch (e) { app.showFault(e); } finally {

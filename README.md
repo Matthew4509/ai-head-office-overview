@@ -1,4 +1,4 @@
-# AI Head Office Overview 0.1.1 (Windows)
+# AI Head Office Overview 0.1.2 (Windows)
 
 Your AI coding threads as staff in a little office, beside the projects they work on. Each thread is a person at their
 project's desk: working, thinking, standing with a question for you, or gone home. Next to them, each project has
@@ -58,8 +58,9 @@ running).
 - **Projects** tab: a tile per project with its staff as faces, its **Audit / Git / Live** marks, and **Run** (starts
   the project's own dev server and opens it) or **Stop**, **Copy prompt** (its name and full folder, to paste into the
   AI you use; the office never starts an AI itself), **Folder**, **Terminal**, **Browser**, **Free port N** when another
-  program holds its port, and **More**: **Hide** (stays on the list, out of view until **Show hidden** is ticked) and
-  **Remove from list** (its folder and files are never touched; Settings › Folders brings it back).
+  program holds its port (it names that program and asks before stopping it), and **More**: **Hide** (stays on the
+  list, out of view until **Show hidden** is ticked) and **Remove from list** (its folder and files are never touched;
+  Settings › Folders brings it back).
 - **Favourites** tab: your starred people and projects.
 - **Prompts** tab: prompts you use again and again, a tile per category: **Copy**, **Edit** (which can move it),
   **Remove**; **New category**, **Add prompt**, **Rename** and **Delete category**; search across them all. Words in
@@ -95,7 +96,9 @@ Each mark opens its window:
   list (bring one back), **Scan folders**.
 - **Setup**: step 1, the desktop shortcut, Start with Windows and the start link; step 2 (advanced), the AI app's
   hooks, below.
-- **Office**: the projects folder the desks come from, the gone-home time, how often live sites are checked.
+- **Office**: the theme (**Dark**, **Light**, or **Match Windows**, which follows Windows' own light or dark setting;
+  dark dims the office itself too), the projects folder the desks come from, the gone-home time, how often live sites
+  are checked.
 - **Private details**: what an audit looks for in what you would publish (your email, phone, street, full name). Typed
   once and never shown again; a finding shows only its label.
 - **Help** and **About** (the version, the Git program's own security state, Quit, Uninstall).
@@ -336,7 +339,9 @@ audit lists the record of every rule it shows that someone has judged.
   read for both) and checks the token totals agree. Read only; its scratch data is removed.
 - `node tools/disclose.js [folder]`: the disclosure pass (private details, other projects' names, AI trail, local
   paths; git history, commit emails, zips) on any folder; labels only. `node tools/bake.js` uses the same matcher on
-  every file it would ship and stops on any hit.
+  every file it would ship and stops on any hit. Both take your private-details list and working folders from the main
+  copy (also when run from a git worktree). With no list or no other project names to check against, the bake stops
+  (`--incomplete` goes on and says so) and `disclose.js` warns and ends with exit code 2, never "Nothing found".
 - `node tools/benchmark.js`: the audit's benchmark over `test/museum/`, one small made-up project per kind of real fault.
 
 ### Where the code is

@@ -1,42 +1,32 @@
+/* Colours: each token is light-dark(day, night). The theme is chosen in Settings › Office and served on <html>:
+   data-theme="light" or "dark" fixes it; "system" (or none) follows Windows. Nothing below names a colour of its own. */
 :root {
-  --page: #f2f4f7;
-  --card: #ffffff;
-  --ink: #1d2533;
-  --soft: #5a6577;
-  --line: #d9dee6;
-  --accent: #2457d6;
-  --accent-ink: #ffffff;
-  --working: #1f7a4d;
-  --thinking: #6b4bb8;
-  --needs: #b5470b;
-  --needs-bg: #fff1e6;
-  --idle: #4f5d73;
-  --home: #8a94a3;
-  --fault-bg: #fdecec;
-  --fault-ink: #8a1c1c;
-  color-scheme: light;
+  color-scheme: light dark;
+  --page: light-dark(#f2f4f7, #12161d);
+  --card: light-dark(#ffffff, #1b212b);
+  --ink: light-dark(#1d2533, #e8ecf2);
+  --soft: light-dark(#5a6577, #a5afbe);
+  --line: light-dark(#d9dee6, #2e3745);
+  --accent: light-dark(#2457d6, #5b8cff);
+  --accent-ink: light-dark(#ffffff, #0c1220);
+  --working: light-dark(#1f7a4d, #5fd39a);
+  --thinking: light-dark(#6b4bb8, #b9a2f5);
+  --needs: light-dark(#b5470b, #ffad73);
+  --needs-bg: light-dark(#fff1e6, #3a2516);
+  --idle: light-dark(#4f5d73, #b3bfd1);
+  --home: light-dark(#8a94a3, #7d8796);
+  --fault-bg: light-dark(#fdecec, #3b1c1c);
+  --fault-ink: light-dark(#8a1c1c, #ffc2c2);
+  --bad: light-dark(#c0262d, #ff8a8a);
+  /* Behind a Staff rewards picture: the same floor as the office's computer room, by day or by night. */
+  --pic-bg: light-dark(#f4f6f9, #2a3542);
+  --star-line: light-dark(#e0b04f, #c99a3c);
+  --star-bg: light-dark(#fff6dc, #3a3018);
+  --star-ink: light-dark(#6b4e00, #f2d58a);
+  --swatch-line: light-dark(rgba(0, 0, 0, 0.15), rgba(255, 255, 255, 0.3));
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --page: #12161d;
-    --card: #1b212b;
-    --ink: #e8ecf2;
-    --soft: #a5afbe;
-    --line: #2e3745;
-    --accent: #5b8cff;
-    --accent-ink: #0c1220;
-    --working: #5fd39a;
-    --thinking: #b9a2f5;
-    --needs: #ffad73;
-    --needs-bg: #3a2516;
-    --idle: #b3bfd1;
-    --home: #7d8796;
-    --fault-bg: #3b1c1c;
-    --fault-ink: #ffc2c2;
-    color-scheme: dark;
-  }
-}
-[hidden] { display: none !important; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }[hidden] { display: none !important; }
 * { box-sizing: border-box; }
 html { font-size: 16px; }
 body {
@@ -132,6 +122,8 @@ button { cursor: pointer; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
 .btn { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 12px; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* A choice of several (the theme): the one in use is filled, and says so to a screen reader (aria-pressed). */
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .btn.link { border: 0; background: none; color: var(--accent); padding: 4px 0; text-decoration: underline; }
 .nick-form input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--card); min-width: 0; flex: 1 1 160px; }
 .note { color: var(--soft); font-size: 13px; }
@@ -158,7 +150,7 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
   .office-strip { flex: none; margin: 6px 0 0; min-height: 4.4em; }
 }
 .shop-item .row { margin: 0; gap: 10px; flex-wrap: nowrap; }
-.shop-item canvas { width: 80px; height: 60px; flex: none; background: #f4f6f9; border-radius: 8px; }
+.shop-item canvas { width: 80px; height: 60px; flex: none; background: var(--pic-bg); border-radius: 8px; }
 /* A locked room in Staff rewards: one line with what unlocking it costs and the Unlock button. */
 .room-locked { justify-content: space-between; align-items: center; gap: 8px; margin: 0; border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; font-size: 13px; }
 
@@ -174,7 +166,7 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .side .shop-item .what b { display: block; }
 /* Favourites: the card's two stars, and the small Hide box under a favourite who has gone home. */
 .fav-row { gap: 8px; flex-wrap: wrap; }
-.fav-btn[aria-pressed="true"] { border-color: #e0b04f; background: #fff6dc; color: #6b4e00; }
+.fav-btn[aria-pressed="true"] { border-color: var(--star-line); background: var(--star-bg); color: var(--star-ink); }
 #favs-view .people > li { display: grid; gap: 4px; align-content: start; }
 .fav-hide { display: flex; align-items: center; gap: 6px; margin: 0 2px; }
 /* The open-thread button on a person's card: on its own, centred. */
@@ -229,7 +221,7 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .look-choice { border: 1px solid var(--line); background: var(--card); color: var(--ink); }
 .look-text { border-radius: 999px; padding: 3px 12px; font-size: 14px; }
 .look-text[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
-.look-swatch { width: 30px; height: 30px; border-radius: 50%; padding: 0; display: grid; place-items: center; border: 2px solid rgba(0, 0, 0, 0.15); }
+.look-swatch { width: 30px; height: 30px; border-radius: 50%; padding: 0; display: grid; place-items: center; border: 2px solid var(--swatch-line); }
 .look-swatch[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: 2px; }
 .look-tick { width: 18px; height: 18px; border-radius: 50%; background: #fff; color: #27364e; font-size: 12px; font-weight: 700; line-height: 18px; text-align: center; }
 .look-face { border-radius: 12px; padding: 4px 4px 3px; display: grid; justify-items: center; gap: 2px; width: 64px; font-size: 12px; }
@@ -285,11 +277,10 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .mark:hover { border-color: var(--accent); }
 .m-ok { color: var(--working); }
 .m-warn { color: var(--needs); }
-.m-bad { color: #c0262d; }
+.m-bad { color: var(--bad); }
 .m-none { color: var(--soft); }
-@media (prefers-color-scheme: dark) { .m-bad { color: #ff8a8a; } }
 .wait-git, .wait-audit, .wait-live { border-left-color: var(--line); background: var(--card); }
-.wait-live, .wait-audit { border-left-color: #c0262d; }
+.wait-live, .wait-audit { border-left-color: var(--bad); }
 .sheet-box.wide { width: min(900px, calc(100vw - 32px)); }
 .sheet-foot { justify-content: flex-end; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 12px; }
 .findings { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
@@ -306,7 +297,7 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .df-file { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: 6px 0; }
 .df-lines { margin: 6px 0 0; font-size: 12px; overflow: auto; max-height: 320px; background: var(--page); padding: 6px; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .df-add { color: var(--working); }
-.df-del { color: #c0262d; }
+.df-del { color: var(--bad); }
 .df-hunk { color: var(--thinking); }
 .check-said { min-height: 1.3em; }
 @media (max-width: 700px) { .finding, .fact { grid-template-columns: minmax(0, 1fr); } }

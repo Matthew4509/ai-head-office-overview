@@ -75,8 +75,12 @@ export function status(office) {
     root: office.root(),
     rootSet: !!office.settings.root,
     quietMinutes: office.settings.quietMinutes,
+    theme: THEMES.includes(office.settings.theme) ? office.settings.theme : '',
   };
 }
+
+/** The page's colours: dark, light, or "system" (follows Windows). */
+const THEMES = ['dark', 'light', 'system'];
 
 /** Turns advanced setup on or off: { advanced: true | false }. A copy of the settings file is kept first. */
 export function apply(office, b, { port, hookScript }) {
@@ -115,8 +119,12 @@ export function onHook(office, b) {
   else if (event === 'Notification') office.hook(id, /permission/i.test(b.message) ? 'needs' : 'done', /permission/i.test(b.message) ? 'Waiting for your permission' : '');
 }
 
-/** The office's own settings: { root, quietMinutes }. */
+/** The office's own settings: { root, quietMinutes, theme }. */
 export function settings(office, b) {
+  if (b.theme !== undefined) {
+    if (!THEMES.includes(b.theme)) return { error: { fault: 'That theme is not one the office has.', reason: `It knows ${THEMES.join(', ')}.`, wayOut: 'Pick Dark, Light or Match Windows in Settings › Office.' } };
+    office.settings.theme = b.theme;
+  }
   if (b.root !== undefined) {
     const root = String(b.root || '').trim();
     if (root) {

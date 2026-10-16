@@ -35,7 +35,7 @@ function make(folder, files) {
 const PAGE = '<!doctype html><html><head><title>Test site</title></head><body><p>A made-up site.</p></body></html>';
 
 async function main() {
-  const pAlpha = await freePort(), pBeta = await freePort();
+  const pAlpha = await freePort(), pBeta = await freePort(), pEps1 = await freePort(), pEps2 = await freePort();
   const alphaDir = make('alpha-site', {
     'README.md': '# Alpha\n\nAlpha Site is a made-up website that only exists for this test.\n',
     'public/index.html': PAGE,
@@ -44,6 +44,12 @@ async function main() {
   make('beta-site', {
     'public/index.html': PAGE,
     'project.json': JSON.stringify({ name: 'Beta Site', description: 'A second made-up site.', start: { name: 'beta', exe: NODE, args: [SITE, String(pBeta), '.'], port: pBeta } }),
+  });
+  // One app with two start entries that differ only by port: the office merges them into one entry with alternates.
+  make('epsilon-site', {
+    'public/index.html': PAGE,
+    '.claude/launch.json': JSON.stringify({ configurations: [{ name: 'eps', runtimeExecutable: NODE, runtimeArgs: [SITE, String(pEps1), '.'], port: pEps1 },
+      { name: 'eps-2', runtimeExecutable: NODE, runtimeArgs: [SITE, String(pEps2), '.'], port: pEps2 }] }),
   });
   make('gamma-notes', { 'README.md': '# Gamma\n\nGamma Notes is a folder of plain notes with no start command at all.\n' });
   // A port that is not a number must never reach an address or a command line.
@@ -82,6 +88,8 @@ async function main() {
   const pageRes = await fetch(BASE + '/');
   const page = await pageRes.text();
   const key = (page.match(/name="aho-key" content="([0-9a-f]+)"/) || [])[1];
+  // The page comes in its theme (none chosen yet: the default), so it never flashes light before turning dark.
+  assert.ok(page.includes('<html lang="en" data-theme="system">'), 'the page is served with its theme on <html>');
   const api = async (p, body, headers = {}) => {
     const res = await fetch(BASE + p, { method: body ? 'POST' : 'GET', headers: { 'X-AHO-Key': key, 'Content-Type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined });
     return { status: res.status, json: await res.json() };
@@ -132,6 +140,16 @@ async function main() {
     const r = await api('/api/office/setup', { advanced: true });
     assert(r.status === 200 && /advanced setup on/.test(r.json.dryRun), JSON.stringify(r.json));
   });
+  await check('the theme chosen in Settings is the one the page comes in; an unknown one is refused', async () => {
+    const page = async () => (await (await fetch(BASE + '/')).text()).match(/<html lang="en" data-theme="(\w+)">/)?.[1];
+    assert.strictEqual((await api('/api/office/settings', { theme: 'dark' })).json.status.theme, 'dark');
+    assert.strictEqual(await page(), 'dark');
+    const bad = await api('/api/office/settings', { theme: '"><script>' });
+    assert(bad.status === 400 && bad.json.error.fault, JSON.stringify(bad.json));
+    assert.strictEqual(await page(), 'dark');
+    await api('/api/office/settings', { theme: 'system' });
+    assert.strictEqual(await page(), 'system');
+  });
   await check('no inline script on the page, and the CSP allows none', () => {
     const csp = pageRes.headers.get('content-security-policy') || '';
     assert(/script-src 'self'(;|$)/.test(csp), csp);
@@ -170,7 +188,7 @@ async function main() {
   const { json } = await api('/api/projects');
   const byFolder = f => json.projects.find(p => p.folder === f);
   await check('project list is the made-up working folder, nothing else', () => {
-    assert.deepStrictEqual(json.projects.map(p => p.folder).sort(), ['alpha-site', 'beta-site', 'delta-site', 'gamma-notes', 'odd;name&more']);
+    assert.deepStrictEqual(json.projects.map(p => p.folder).sort(), ['alpha-site', 'beta-site', 'delta-site', 'epsilon-site', 'gamma-notes', 'odd;name&more']);
   });
   await check('name and description come from project.json, else the folder name and the README', () => {
     assert.strictEqual(byFolder('beta-site').name, 'Beta Site');
@@ -384,9 +402,9 @@ async function main() {
       assert(r.ok && /taskkill \/PID \d+/.test(r.dryRun), JSON.stringify(r));
       assert(await portOpen(pBeta), 'the program must still be running');
     });
-    await check('stop-port with only the port (the page asks nothing first) names the program it stops', async () => {
+    await check('stop-port with only the port (no program named) stops nothing and says why', async () => {
       const r = (await api('/api/stop-port', { port: pBeta })).json;
-      assert(r.ok && r.name && /taskkill \/PID \d+/.test(r.dryRun), JSON.stringify(r));
+      assert(!r.ok && /Nothing was stopped/.test(r.error) && !r.dryRun, JSON.stringify(r));
       assert(await portOpen(pBeta), 'the program must still be running');
     });
     await check('stop-port refuses when a different program holds the port now', async () => {
@@ -398,6 +416,19 @@ async function main() {
       assert(r.ok && r.others.length === 0, JSON.stringify(r));
       const r2 = (await api('/api/stop-all', { others: true, listed: [{ port: pBeta, pid: hog.pid }] })).json;
       assert(r2.others.length === 1 && r2.others[0].dryRun, JSON.stringify(r2));
+    });
+    hog.kill();
+  }
+  // Free port on an alternate start port (the second of two entries merged into one): found and stoppable.
+  {
+    const hog = hold(pEps2);
+    await waitOpen(pEps2);
+    await check('an alternate start port held by another program is listed, and Free port can stop it', async () => {
+      const o = (await api('/api/port-owners', {})).json.owners.find(x => x.port === pEps2);
+      assert(o && o.pid === hog.pid && o.projects.length === 1 && !o.why, JSON.stringify(o));
+      const r = (await api('/api/stop-port', { port: pEps2, pid: hog.pid })).json;
+      assert(r.ok && /taskkill \/PID \d+/.test(r.dryRun), JSON.stringify(r));
+      assert(await portOpen(pEps2), 'the program must still be running (test copy)');
     });
     hog.kill();
   }

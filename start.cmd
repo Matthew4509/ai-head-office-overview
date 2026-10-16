@@ -6,11 +6,9 @@ rem "start.cmd quiet" (Start with Windows, and the Start office link) starts it 
 rem First time on this PC? Double-click install.cmd instead: it checks Node.js and sets up the shortcuts.
 rem
 rem Every start also (re)registers the ai-head-office://start link for this Windows user, so index.html's Start office
-rem button works after the first start with no setup step, and keeps working if this folder is moved. The command is
-rem   "<folder>\start.cmd" quiet "%1"
-rem so this file always runs with the fixed word "quiet" as %1; the link's URL lands in %2, which this file never
-rem uses. The quoted "%1" placeholder is what makes Windows SUBSTITUTE the URL there (inside quotes, so shell
-rem characters like & are inert) instead of appending it unquoted to the command line. uninstall.cmd removes it.
+rem button works after the first start with no setup step, and keeps working if this folder is moved. The link runs
+rem node.exe with lib\platform\windows\link-start.js, which ignores the link's address and runs this file with the
+rem fixed word "quiet". uninstall.cmd removes the link.
 rem AHO_LINK_KEY: tests register the link under a throwaway key instead of the real one.
 if not "%~1"=="run" (
   where node >nul 2>&1 || goto :no_node
@@ -26,7 +24,7 @@ node -e "require('./lib/platform').link('create', process.cwd())" >nul 2>&1
 set AHO_OPEN=1
 if /i "%~2"=="quiet" set AHO_OPEN=0
 node server.js
-if errorlevel 1 pause
+if errorlevel 1 if /i not "%~2"=="quiet" pause
 exit /b
 
 :no_node

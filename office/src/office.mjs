@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { emptyThread, readFrom, localDay } from './transcript.mjs';
-import { newTally, tallyLine } from './tokens.mjs';
+import { newTally, tallyLine, monthOf } from './tokens.mjs';
 import { folderOf, stateOf, assignSeats, defaultName, projectOf } from './people.mjs';
 import { cleanLook } from './look.mjs';
 import { AppLinks } from './applinks.mjs';
@@ -14,7 +14,7 @@ import { AppLinks } from './applinks.mjs';
 /** How long a finished thread on the Needs attention list stays there. */
 const WAITING_DAYS = 7;
 /** Bump when the summary's shape changes: the cache is then read again from the start. */
-const CACHE_VERSION = 5;
+const CACHE_VERSION = 6;
 
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
@@ -119,7 +119,7 @@ export class Office {
   tokenTotals() {
     if (!this.tok) return null;
     const total = {}, month = {};
-    const thisMonth = new Date(this.now()).toISOString().slice(0, 7); // as the reply times are kept: UTC
+    const thisMonth = monthOf(this.now()); // this PC's calendar month, as the replies are filed (tokens.mjs)
     for (const r of Object.values(this.files)) {
       if (!r.tok || r.tok.sig !== this.tok.sig) continue;
       for (const [id, n] of Object.entries(r.tok.per)) total[id] = (total[id] || 0) + n;

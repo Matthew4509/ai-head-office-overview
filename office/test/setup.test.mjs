@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { apply, status, onHook, withOurs, withoutOurs, hookCommand } from '../src/setup.mjs';
+import { apply, status, onHook, withOurs, withoutOurs, hookCommand, settings } from '../src/setup.mjs';
 import { Office } from '../src/office.mjs';
 import { tempHome, lines, ROOT } from './helpers.mjs';
 
@@ -116,4 +116,22 @@ test('the hook script ends cleanly and prints nothing when the office is closed'
   const r = spawnSync(process.execPath, [path.join(import.meta.dirname, '..', 'hook.mjs'), '1', '--ai-head-office-hook'], { input: JSON.stringify({ hook_event_name: 'Stop', session_id: 'x' }), timeout: 5000 });
   assert.equal(r.status, 0);
   assert.equal(String(r.stdout), '');
+});
+
+test('the theme is kept in the office settings: dark, light or system, and nothing else', () => {
+  const h = tempHome();
+  try {
+    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts });
+    assert.equal(status(office).theme, '');
+    assert.equal(settings(office, { theme: 'dark' }).ok, true);
+    assert.equal(status(office).theme, 'dark');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(h.data, 'settings.json'), 'utf8')).theme, 'dark');
+    const bad = settings(office, { theme: 'purple' });
+    assert.match(bad.error.fault, /theme/);
+    assert.equal(status(office).theme, 'dark', 'a refused theme leaves the one chosen before');
+    assert.equal(settings(office, { theme: 'system' }).ok, true);
+    assert.equal(new Office({ dataDir: h.data, transcriptsDir: h.transcripts }).settings.theme, 'system', 'read back after a restart');
+  } finally {
+    h.done();
+  }
 });

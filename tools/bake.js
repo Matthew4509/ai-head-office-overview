@@ -1,16 +1,20 @@
 // Bakes the shareable zip: _releases/ai-head-office-overview-<version>.zip, one folder "ai-head-office-overview" inside.
 //   node tools/bake.js            (--check: the privacy check only, no zip; --again: replace an existing zip of this
-//                                 version, only when it was never shared)
+//                                 version, only when it was never shared; --incomplete: go on without your private-details
+//                                 list or other project names, said loudly and never as "0 hits")
 // Only the files in SHIP go in (an allow list: anything new stays out until it is added here), projects.json goes in
 // EMPTY (the real one holds this PC's project names), and data/, test copies, notes and handovers never go in.
 // Before zipping, every shipped file goes through the disclosure pass's matcher: private details read from THIS PC at
-// bake time and from your list in data/, the names of the project folders next to the office, an AI or prompt trail,
-// and local paths; plus dated notes. None of the values are written in this file or printed. Any hit stops the bake.
+// bake time and from your list in data/, the names of the project folders in your working folders and next to the
+// office, an AI or prompt trail, and local paths; plus dated notes. Baked from a second working copy (a git worktree),
+// the list and the folders are the main copy's (tools/privacy-context.js). None of the values are written in this file
+// or printed. Any hit stops the bake, and so does a check with nothing to check against (no list, no project names).
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { makeMatcher, autoDetails, readPrivateList } = require('../lib/disclosure');
+const { makeMatcher } = require('../lib/disclosure');
+const { privacyContext } = require('./privacy-context');
 
 const HERE = path.resolve(__dirname, '..');
 const VERSION = /const VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(HERE, 'lib', 'config.js'), 'utf8'))[1];
@@ -45,10 +49,15 @@ fs.writeFileSync(path.join(root, 'projects.json'), JSON.stringify(EMPTY_PROJECTS
 
 // ---- private details: the disclosure pass's own matcher (lib/disclosure.js), so the bake and the audit agree ----
 // This PC's details are read now, never stored; the list you keep in the office (data/private-details.json) is added.
-const projectsDir = path.dirname(HERE);
-const details = [...readPrivateList(path.join(HERE, 'data', 'private-details.json')), ...autoDetails([projectsDir])];
-const others = fs.readdirSync(projectsDir, { withFileTypes: true }).filter(e => e.isDirectory() && e.name !== path.basename(HERE) && !/^[._-]/.test(e.name)).map(e => e.name); // .claude, _backups: tool folders, not projects
-const scan = makeMatcher({ details, others, own: [path.basename(HERE), 'ai-head-office-overview', 'ai-head-office'] });
+const ctx = privacyContext(HERE);
+const { details, others, gaps } = ctx;
+if (gaps.length && !process.argv.includes('--incomplete')) {
+  fs.rmSync(stage, { recursive: true, force: true });
+  console.error('Bake stopped: the privacy check has nothing to check against, so it cannot say the files are clean.\n  - '
+    + gaps.join('\n  - ') + '\nFix that and bake again. To bake without it (the check is then NOT complete), add --incomplete.');
+  process.exit(1);
+}
+const scan = makeMatcher({ details, others, own: [path.basename(HERE), path.basename(ctx.main), 'ai-head-office-overview', 'ai-head-office'] });
 const hits = [];
 const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else check(f); } };
 function check(f) {
@@ -72,10 +81,14 @@ if (hits.length) {
   console.error('Bake stopped: ' + hits.length + ' possible private detail(s) in the shipped files (labels only, never the values):\n  ' + hits.join('\n  '));
   process.exit(1);
 }
+// What was checked, in numbers; a check with gaps says so instead of "0 hits".
+const checked = 'private-details check: ' + ctx.listed + ' detail' + (ctx.listed === 1 ? '' : 's') + ' from your list, '
+  + new Set(details.map(d => d.label)).size + ' kinds of detail in all, ' + others.length + ' project names from ' + ctx.working.length + ' folder' + (ctx.working.length === 1 ? '' : 's') + ', '
+  + (gaps.length ? 'nothing found in what was checked. NOT A COMPLETE CHECK: ' + gaps.join('; ') + '.' : '0 hits.');
 // --check: the private-details check on exactly what would ship, without making (or replacing) a zip.
 if (process.argv.includes('--check')) {
   fs.rmSync(stage, { recursive: true, force: true });
-  console.log('Check only: ' + SHIP.length + ' files would ship; private-details check: ' + new Set(details.map(d => d.label)).size + ' kinds of detail, ' + others.length + ' project names, 0 hits. No zip made.');
+  console.log('Check only: ' + SHIP.length + ' files would ship; ' + checked + ' No zip made.');
   process.exit(0);
 }
 
@@ -92,4 +105,4 @@ const TAR = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.
 execFileSync(TAR, ['-a', '-c', '-f', zip, 'ai-head-office-overview'], { cwd: stage });
 fs.rmSync(stage, { recursive: true, force: true });
 const n = execFileSync(TAR, ['-t', '-f', zip], { encoding: 'utf8' }).trim().split(/\r?\n/).filter(x => !x.endsWith('/')).length;
-console.log('Baked ' + path.relative(HERE, zip) + ': ' + n + ' files, ' + Math.round(fs.statSync(zip).size / 1024) + ' KB. Private-details check: ' + new Set(details.map(d => d.label)).size + ' kinds of detail, ' + others.length + ' project names, 0 hits.');
+console.log('Baked ' + path.relative(HERE, zip) + ': ' + n + ' files, ' + Math.round(fs.statSync(zip).size / 1024) + ' KB. ' + checked[0].toUpperCase() + checked.slice(1));
