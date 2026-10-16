@@ -344,7 +344,7 @@
     if (p.visit) {
       p.visit = null;
       p.visitAgain = t + VISIT_GAP;
-      say(p, ['Back at my desk. Still need you!', 'Nice break. Ready when you are!', 'Back, still waiting on you.'][p.seed % 3], 3);
+      say(p, BACK[(p.seed + (world.visits || 0)) % BACK.length], 3);
       return null;
     }
     if (t - (p.needsSince ?? t) < VISIT_AFTER || t < (p.visitAgain ?? 0)) return null;
@@ -358,9 +358,41 @@
     if (!options.length) return null;
     const pick = options[(p.seed + Math.floor(t / 60)) % options.length];
     p.visit = { target: { ...pick, waiting: true }, until: t + VISIT_STAY };
-    say(p, `Trying out ${pick.visit} while I wait for you!`, 3);
+    // The first to go says what they are trying; someone going the same way soon after answers them instead.
+    const last = world.lastVisit;
+    const follows = last && last.id !== p.id && last.what === pick.visit && t - last.at < 90;
+    const line = follows ? GOING_TOO[(p.seed + (world.visits || 0)) % GOING_TOO.length].replace('{who}', last.who)
+      : GOING[(p.seed + (world.visits || 0)) % GOING.length].replace('{what}', pick.visit);
+    world.visits = (world.visits || 0) + 1;
+    world.lastVisit = { id: p.id, who: p.row.name, what: pick.visit, at: t };
+    say(p, line, 3);
     return p.visit.target;
   }
+  /** Going to try something while waiting for a reply: the first one, then someone joining them. */
+  const GOING = [
+    'Trying out {what} while I wait for you!',
+    'While I wait: time to test {what}.',
+    'Waiting on you, so I\'m off to {what}. Shout when you\'re back!',
+    'Quick look at {what} while the boss reads my question.',
+    'I\'ll be at {what}. The "?" is still up!',
+    'Someone has to try {what}. Might as well be me.',
+  ];
+  const GOING_TOO = [
+    'Great idea, {who}! I\'ll do the same while I wait.',
+    'Room for one more, {who}?',
+    'Wait for me, {who}!',
+    'If {who} is going, I\'m going.',
+    'Same here, {who}. Still waiting for a reply.',
+  ];
+  /** Coming back to the desk, still waiting. */
+  const BACK = [
+    'Back at my desk. Still need you!',
+    'Nice break. Ready when you are!',
+    'Back, still waiting on you.',
+    'That was lovely. Now, about my question…',
+    'Five stars, would wait again. Still need an answer!',
+    'Refreshed and ready. Over to you!',
+  ];
   const VISIT_WORDS = { tv: 'the TV', nap: 'the armchair', library: 'the bookcase', chat: 'the sofa', treadmill: 'the treadmill', weights: 'the weights', arcade: 'the arcade machine' };
 
   /** Favourites on a towel, in a steady order (so nobody swaps towels when someone else arrives). */
