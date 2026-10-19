@@ -81,6 +81,27 @@ async function main() {
     const st = Prompts.load(old);
     assert(!st.categories.some(c => c.id === 'starter-office') && !st.prompts.some(p => p.id === 'starter-office-1'), JSON.stringify(st.categories));
   });
+  await check('a file that cannot be written (read-only, held by antivirus) still shows the list with the starter, and records it once it can', () => {
+    const ro = path.join(WS, 'data', 'prompts-ro.json');
+    const before = JSON.stringify({ categories: [{ id: 'mine', name: 'My prompts' }], prompts: [{ id: 'a1', category: 'mine', title: 'Mine', text: 'My own prompt.' }] });
+    fs.writeFileSync(ro, before);
+    fs.chmodSync(ro, 0o444);
+    try {
+      let st;
+      assert.doesNotThrow(() => { st = Prompts.load(ro); });
+      assert.deepStrictEqual(st.categories.map(c => c.id), ['starter-office', 'mine']);
+      assert.strictEqual(fs.readFileSync(ro, 'utf8'), before, 'the read-only file was changed');
+      assert(!fs.existsSync(ro + '.tmp'), 'a half-written copy was left beside it');
+    } finally { fs.chmodSync(ro, 0o666); }
+    Prompts.load(ro);
+    assert.deepStrictEqual(JSON.parse(fs.readFileSync(ro, 'utf8')).added, ['office']);
+  });
+  await check('an edit that saves to a read-only file still reports the error', () => {
+    const ro = path.join(WS, 'data', 'prompts-ro2.json');
+    fs.writeFileSync(ro, JSON.stringify({ categories: [{ id: 'mine', name: 'My prompts' }], prompts: [], added: ['office'] }));
+    fs.chmodSync(ro, 0o444);
+    try { assert.throws(() => Prompts.upsert(ro, { category: 'mine', title: 'New', text: 'Text.' })); } finally { fs.chmodSync(ro, 0o666); }
+  });
   await check('an edit elsewhere in the file keeps the record that it was given', () => {
     assert(Prompts.upsert(old, { category: 'mine', title: 'Two', text: 'Another.' }).ok);
     assert.deepStrictEqual(JSON.parse(fs.readFileSync(old, 'utf8')).added, ['office']);

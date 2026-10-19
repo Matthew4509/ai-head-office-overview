@@ -76,17 +76,22 @@ test('"It worked on my desk." always gets its answer from the nearest, when some
 });
 
 test('day-specific moments: a Friday or weekend push always, failed tests on a Monday about half the time', () => {
-  // 13-18 Oct 2026, local noon: Tuesday 13th to Sunday 18th; 12th is a Monday.
-  const at = (d) => new Date(2026, 9, d, 12).toISOString();
+  // One week at local noon, built when the test runs: the Monday of this week, plus 0 (Monday) to 6 (Sunday) days.
+  const monday = new Date();
+  monday.setHours(12, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const at = (n) => { const d = new Date(monday); d.setDate(d.getDate() + n); return d.toISOString(); };
+  const [MON, TUE, WED, FRI, SAT, SUN] = [0, 1, 2, 4, 5, 6];
+  assert.equal(new Date(at(MON)).getDay(), 1, 'the week starts on a Monday');
   const always = () => 0;
-  assert.equal(B.dayKind({ kind: 'push' }, at(16), always).kind, 'push-friday');
-  assert.equal(B.dayKind({ kind: 'push' }, at(17), always).kind, 'push-weekend');
-  assert.equal(B.dayKind({ kind: 'push' }, at(18), always).kind, 'push-weekend');
-  assert.equal(B.dayKind({ kind: 'push' }, at(14), always).kind, 'push');
-  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(12), always).kind, 'tests-failed-monday');
-  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(12), () => 0.9).kind, 'tests-failed', 'Mondays still hear the usual lines');
-  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(13), always).kind, 'tests-failed');
-  assert.equal(B.dayKind({ kind: 'commit', file: 'a.js' }, at(16), always).file, 'a.js', 'the rest of the event is kept');
+  assert.equal(B.dayKind({ kind: 'push' }, at(FRI), always).kind, 'push-friday');
+  assert.equal(B.dayKind({ kind: 'push' }, at(SAT), always).kind, 'push-weekend');
+  assert.equal(B.dayKind({ kind: 'push' }, at(SUN), always).kind, 'push-weekend');
+  assert.equal(B.dayKind({ kind: 'push' }, at(WED), always).kind, 'push');
+  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(MON), always).kind, 'tests-failed-monday');
+  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(MON), () => 0.9).kind, 'tests-failed', 'Mondays still hear the usual lines');
+  assert.equal(B.dayKind({ kind: 'tests-failed' }, at(TUE), always).kind, 'tests-failed');
+  assert.equal(B.dayKind({ kind: 'commit', file: 'a.js' }, at(FRI), always).file, 'a.js', 'the rest of the event is kept');
   assert.ok(B.LINES['push-friday'].any.includes('Pushing on a Friday... isn\'t there a rule about this?'));
 });
 

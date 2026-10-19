@@ -89,6 +89,12 @@ async function main() {
   await check('S7: a relative cwd resolves from the root; a cwd that is not there or an env value that is not text drops the entry', () => {
     assert.deepStrictEqual(row('react-other').commands.map(c => c.name), ['root-react-other']);
   });
+  await check('S7: a dropped root entry whose cwd names the folder is counted for that folder, with the reason when its folder is gone', () => {
+    assert.deepStrictEqual(row('react-other').startSkipped, [
+      'root .claude/launch.json ("root-react-gone", whose cwd folder is not there)',
+      'root .claude/launch.json ("root-react-bad-env")']);
+    for (const f of ['react-shop', 'shop', 'public', 'good']) assert.deepStrictEqual(row(f).startSkipped, [], f + ' was given another folder\'s entry');
+  });
   await check('S7: the same command run in two sub-folders of one project stays two entries', () => {
     const cs = row('react-shop').commands;
     assert.deepStrictEqual(cs.map(c => c.name), ['root-react', 'root-react-admin'], JSON.stringify(cs));

@@ -115,7 +115,7 @@
     const bad = p.startSkipped || [];
     app.openWindow(`No start command for ${p.name}`, [
       el('p', { text: 'The office runs a project from a start line in its own files: a "start" in project.json at the top of its folder, or an entry in .claude/launch.json. '
-        + (bad.length ? `The start entry in ${bad.join(' and ')} could not be used: it names no program, its arguments are not a list, its cwd is not a folder that is there, or its env holds something other than text.` : 'This project has neither yet.') }),
+        + (bad.length ? `The start entry in ${bad.join(' and ')} could not be used. An entry is skipped when it names no program, its arguments are not a list, its cwd is not a folder that is there, or its env is not plain names with text values.` : 'This project has neither yet.') }),
       el('p', { class: 'note', text: 'Copy this prompt into Claude, ChatGPT or the AI you use. It asks the AI to remember how to write a start line, and to add one for this project now (the prompt names its folder).' }),
       copyBlock('Copy the prompt', async () => `${await startLinePrompt()}\n\nPlease add the start line for this project now.\nProject: ${oneLine(p.name).slice(0, 100)}\nFull folder: ${p.dir}`,
         `Start-line prompt copied for ${p.name}. Paste it into the AI you use.`, true)],
