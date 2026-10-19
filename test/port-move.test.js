@@ -29,6 +29,10 @@ check('a command that does not name its port is moved through PORT only, and say
   const c = onPort({ exe: 'npm', args: ['run', 'dev'], port: 3000 }, 3000, 3001);
   assert(c.args.join(' ') === 'run dev' && c.env.PORT === '3001' && c.moved.named === false, JSON.stringify(c));
 });
+check('a start file\'s own env is kept on a move; only PORT changes (also when the env named the old port)', () => {
+  const c = onPort({ exe: 'npx', args: ['craco', 'start'], port: 3010, env: { PORT: '3010', BROWSER: 'none', DATA_DIR: 'data' } }, 3010, 3011);
+  assert.deepStrictEqual(c.env, { PORT: '3011', BROWSER: 'none', DATA_DIR: 'data' });
+});
 try { fs.rmSync(process.env.AHO_DATA, { recursive: true, force: true }); } catch { /* left in temp */ }
 console.log(failures ? failures + ' failed' : 'all passed');
 process.exit(failures ? 1 : 0);

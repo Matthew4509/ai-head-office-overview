@@ -595,3 +595,8 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .vend-note { margin: 10px 2px 0; font: 600 12px/1.4 'Segoe UI', system-ui, sans-serif; color: #e5eef5; }
 .vend-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
 @media (prefers-reduced-motion: reduce) { .vend-coin.dropping .vend-slot::after, .vend-can.out { animation: none; } }
+/* The start-line prompt's Copy button, with the text shown under it when the clipboard is blocked */
+.copy-block { display: grid; gap: 8px; justify-items: start; }
+.copy-block textarea { width: 100%; }
+.welcome-start-line { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.welcome-start-line .note { margin: 4px 0 10px; }

@@ -222,7 +222,7 @@
       li('The page says the office is not answering: it stopped. Double-click start.cmd (or the desktop shortcut); the page catches up by itself.',
         '"Needs Node.js 22 or newer": double-click install.cmd; it offers to install it.',
         'Port 8880 is taken by another program: start it with node server.js --port=8885 (any free port).',
-        'A project shows "No start command": add a start for it in the office\'s projects.json (see README.md).',
+        'A project shows "No start command": click it for a prompt to paste into your AI, which adds a start to the project\'s own project.json. Or add a start for it in the office\'s projects.json (see README.md).',
         'Your folders or prompts are suddenly back to the start: the file that held them could not be read; the office kept it in its data folder as settings.damaged-….json or prompts.damaged-….json.'),
       h3('Uninstall'),
       p('About › Uninstall (or uninstall.cmd) stops the office and removes its desktop shortcut, Start with Windows and the start link. Your files stay: delete the office\'s folder yourself to remove it completely. Its data folder holds your settings, audits, prompts and the office\'s own records.'),
@@ -330,6 +330,10 @@
       el('h2', { id: 'welcome-title', text: 'Welcome to AI Head Office Overview' }),
       el('p', { text: 'Your AI threads as an office, with your projects, local copies and audits, on this PC only.' }),
       el('p', { class: 'note', text: 'So you never have to start it by hand:' }), ...ticks,
+      app.copyBlock ? el('div', { class: 'welcome-start-line' },
+        el('b', { text: 'Teach your AI to save a start line' }),
+        el('p', { class: 'note', text: 'The office runs each project from a "start" line in its project.json. Paste this prompt once into Claude, ChatGPT or the AI you use, and it will write that line for your projects and keep it up to date. It is also on the Prompts tab.' }),
+        app.copyBlock('Copy the prompt', app.startLinePrompt, 'Start-line prompt copied. Paste it into the AI you use.')) : null,
       el('div', { class: 'row sheet-foot' }, btn('Done', () => answer(true), true), btn('Not now', () => answer(false)))));
     sheet.hidden = false;
   };

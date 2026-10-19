@@ -260,10 +260,21 @@ text. It looks, in order, at:
 
 1. the project's own `.claude/launch.json`;
 2. the project's own `project.json`, key `start`;
-3. the working folder's `.claude/launch.json`: entries whose arguments point inside the project;
+3. the working folder's `.claude/launch.json`: entries whose arguments point inside the project, or whose `cwd` is
+   the project folder or inside it;
 4. the office's own `projects.json`, key `start`.
 
-A start command needs a `port`, so the office can check the port is free and open the right address.
+A start command needs a `port`, so the office can check the port is free and open the right address. It may also
+name the folder it runs in (`cwd`, relative to where that file's entries run) and settings for the program (`env`,
+names with text values, such as `{ "PORT": "3010", "BROWSER": "none" }`); an entry whose `cwd` is not a folder, or
+whose `env` holds anything but text, is skipped. The first-run window shows the folder and every `env` setting, and
+asks again when one of them changes. A copy that is still starting gets a minute to answer on its port.
+
+**Teach your AI to save a start line.** Rather than adding entries to a shared launch.json, each project can keep its
+own `"start"` in its `project.json`. The office has a prompt for that: paste it once into Claude, ChatGPT or the AI
+you use, and it writes the line for your projects and keeps it up to date. Copy it from the Welcome window, from
+**No start command…** on a project (that copy also names the project and its folder), or from the first category on
+the Prompts tab.
 
 ## Names and descriptions: `projects.json`
 

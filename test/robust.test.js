@@ -45,7 +45,15 @@ async function main() {
   make('dev', { 'README.md': '# A project that happens to be called dev\n' });
   make('public', { 'index.html': PAGE });
   make('shop', { 'server.js': '// made-up\n' });
+  make('react-shop', { 'frontend/package.json': '{}', 'admin/package.json': '{}' });
+  make('react-other', { 'frontend/package.json': '{}' });
   make('.claude', { 'launch.json': launch(
+    { name: 'root-react', runtimeExecutable: 'npx', runtimeArgs: ['craco', 'start'], cwd: path.join(WS, 'react-shop', 'frontend'), env: { PORT: '5200', BROWSER: 'none' }, port: 5200 },
+    { name: 'root-react-2', runtimeExecutable: 'npx', runtimeArgs: ['craco', 'start'], cwd: path.join(WS, 'react-shop', 'frontend'), env: { PORT: '5201', BROWSER: 'none' }, port: 5201 },
+    { name: 'root-react-admin', runtimeExecutable: 'npx', runtimeArgs: ['craco', 'start'], cwd: path.join(WS, 'react-shop', 'admin'), env: { PORT: '5205', BROWSER: 'none' }, port: 5205 },
+    { name: 'root-react-other', runtimeExecutable: 'npx', runtimeArgs: ['craco', 'start'], cwd: 'react-other/frontend', port: 5202 },
+    { name: 'root-react-gone', runtimeExecutable: 'npx', runtimeArgs: ['craco', 'start'], cwd: path.join(WS, 'react-other', 'missing'), port: 5203 },
+    { name: 'root-react-bad-env', runtimeExecutable: 'npx', runtimeArgs: ['craco', 'start'], cwd: 'react-other/frontend', env: { PORT: 5204 }, port: 5204 },
     { name: 'root-dev', runtimeExecutable: 'npm', runtimeArgs: ['run', 'dev'], port: 5100 },
     { name: 'root-vite', runtimeExecutable: 'npx', runtimeArgs: ['vite', 'dev'], port: 5104 },
     { name: 'root-public', runtimeExecutable: 'npx', runtimeArgs: ['serve', 'public'], port: 5101 },
@@ -70,6 +78,21 @@ async function main() {
   await check('S7: a root entry attaches where its argument is a path inside the folder (serve public, shop/server.js)', () => {
     assert.deepStrictEqual(row('public').commands.map(c => c.name), ['root-public']);
     assert.deepStrictEqual(row('shop').commands.map(c => c.name), ['root-shop']);
+  });
+  await check('S7: a root entry whose cwd is inside the folder attaches, runs there with its env, and its other-port copy merges', () => {
+    const cs = row('react-shop').commands;
+    assert.strictEqual(cs[0].name, 'root-react', JSON.stringify(cs));
+    assert.strictEqual(cs[0].cwd, path.join(WS, 'react-shop', 'frontend'));
+    assert.deepStrictEqual(cs[0].env, { PORT: '5200', BROWSER: 'none' });
+    assert.deepStrictEqual(cs[0].alts.map(a => [a.port, a.env.PORT]), [[5200, '5200'], [5201, '5201']]);
+  });
+  await check('S7: a relative cwd resolves from the root; a cwd that is not there or an env value that is not text drops the entry', () => {
+    assert.deepStrictEqual(row('react-other').commands.map(c => c.name), ['root-react-other']);
+  });
+  await check('S7: the same command run in two sub-folders of one project stays two entries', () => {
+    const cs = row('react-shop').commands;
+    assert.deepStrictEqual(cs.map(c => c.name), ['root-react', 'root-react-admin'], JSON.stringify(cs));
+    assert.strictEqual(cs[1].cwd, path.join(WS, 'react-shop', 'admin'));
   });
   const before = new Map(rows.map(r => [r.folder, r.id]));
   make('my-site', { 'README.md': '# one\n' });
@@ -208,6 +231,57 @@ async function main() {
       assert(!s.ok && /ended by itself/.test(s.error) && /exit code 3/.test(s.error), JSON.stringify(s));
       assert(Date.now() - t < 6000, 'took ' + (Date.now() - t) + ' ms');
       assert(!(await list()).find(p => p.folder === 'ends-at-once').running, 'still shown as running');
+    });
+    // A made-up program that answers with the folder it runs in and one of its settings, on the port its env names.
+    const ENV_SITE = "require('http').createServer((q,s)=>s.end(JSON.stringify({cwd:process.cwd(),browser:process.env.BROWSER||''}))).listen(+process.env.PORT,'127.0.0.1')";
+    const getJson = async url => JSON.parse(await (await fetch(url)).text());
+    await check('S7: a root launch.json entry with a cwd inside a project and an env PORT starts there, on that port, with its env', async () => {
+      const pEnv = await freePort();
+      make('env-root', { 'web/x.txt': 'x' });
+      const rootFile = path.join(WS, '.claude', 'launch.json');
+      const rootLaunch = JSON.parse(fs.readFileSync(rootFile, 'utf8'));
+      rootLaunch.configurations.push({ name: 'env-root', runtimeExecutable: NODE, runtimeArgs: ['-e', ENV_SITE], cwd: 'env-root/web', env: { PORT: String(pEnv), BROWSER: 'none' }, port: pEnv });
+      fs.writeFileSync(rootFile, JSON.stringify(rootLaunch));
+      const id = await idOf('env-root');
+      const s = (await api('/api/start', { id, key: '0', open: false })).json;
+      assert(s.ok && s.url && s.url.includes(':' + pEnv), JSON.stringify(s));
+      const got = await getJson('http://127.0.0.1:' + pEnv + '/');
+      await api('/api/stop', { id });
+      assert.strictEqual(got.cwd.toLowerCase(), path.join(WS, 'env-root', 'web').toLowerCase());
+      assert.strictEqual(got.browser, 'none');
+    });
+    await check('Re-allocate keeps the start file\'s other env settings: a moved copy still sees BROWSER=none', async () => {
+      const held = http.createServer((q, s) => s.end(PAGE)); await new Promise(r => held.listen(0, '127.0.0.1', r)); outside.push(held);
+      const pHeld = held.address().port;
+      make('env-moved', { '.claude/launch.json': launch({ name: 'x', runtimeExecutable: NODE, runtimeArgs: ['-e', ENV_SITE], env: { PORT: String(pHeld), BROWSER: 'none' }, port: pHeld }) });
+      const id = await idOf('env-moved');
+      const s = (await api('/api/start', { id, key: '0', open: false, move: true })).json;
+      assert(s.ok && s.url && !s.url.includes(':' + pHeld + '/'), JSON.stringify(s));
+      const got = await getJson(s.url);
+      await api('/api/stop', { id });
+      assert.strictEqual(got.browser, 'none', 'the moved copy lost its env: ' + JSON.stringify(got));
+    });
+    await check('Run\'s first-run window shows the folder and every env setting, and asks again when an env value or the folder changes', async () => {
+      const port = await freePort();
+      const entry = env => launch({ name: 'x', runtimeExecutable: NODE, runtimeArgs: ['-e', 'process.exit(0)'], cwd: 'web', env, port });
+      const dir = make('env-trust', { 'web/x.txt': 'x', 'web2/x.txt': 'x', '.claude/launch.json': entry({ PORT: String(port), BROWSER: 'none' }) });
+      const id = await idOf('env-trust');
+      const ask = async () => { await list(); return (await post('/api/start', { id, key: '0', open: false })).json; };
+      const a = (await ask()).needsTrust;
+      assert(a && a.cwd.toLowerCase() === path.join(dir, 'web').toLowerCase(), JSON.stringify(a));
+      assert.deepStrictEqual(a.env, [['PORT', String(port)], ['BROWSER', 'none']]);
+      assert.deepStrictEqual(a.envRisky, []);
+      await post('/api/start', { id, key: '0', open: false, trust: a.fp }); // the yes (the program ends at once)
+      assert(!(await ask()).needsTrust, 'the same command was asked again');
+      fs.writeFileSync(path.join(dir, '.claude', 'launch.json'), entry({ PORT: String(port), BROWSER: 'chrome' }));
+      const b = (await ask()).needsTrust;
+      assert(b && b.fp !== a.fp && b.env.some(([k, v]) => k === 'BROWSER' && v === 'chrome'), 'a changed env value was not asked again: ' + JSON.stringify(b));
+      fs.writeFileSync(path.join(dir, '.claude', 'launch.json'), entry({ PORT: String(port), BROWSER: 'none', NODE_OPTIONS: '--require ./x.js' }));
+      const c = (await ask()).needsTrust;
+      assert(c && c.fp !== a.fp && c.envRisky.includes('NODE_OPTIONS'), 'an added NODE_OPTIONS was not asked again and pointed out: ' + JSON.stringify(c));
+      fs.writeFileSync(path.join(dir, '.claude', 'launch.json'), launch({ name: 'x', runtimeExecutable: NODE, runtimeArgs: ['-e', 'process.exit(0)'], cwd: 'web2', env: { PORT: String(port), BROWSER: 'none' }, port }));
+      const d = (await ask()).needsTrust;
+      assert(d && d.fp !== a.fp && /web2$/i.test(d.cwd), 'a changed folder was not asked again: ' + JSON.stringify(d));
     });
     await check('a live address in a project\'s own project.json is only a suggestion: nothing is asked of it', async () => {
       make('suggest-site', { 'project.json': JSON.stringify({ name: 'Suggest', liveUrl: 'https://example.com' }) });

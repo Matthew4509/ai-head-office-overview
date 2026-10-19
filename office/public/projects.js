@@ -85,6 +85,44 @@
     try { await navigator.clipboard.writeText(text); say(`Copied for ${p.name}: its name and folder. Paste it into the AI you use.`); } catch { say(`The clipboard was blocked. The folder is ${p.dir}`); }
   }
 
+  // ---- The start-line prompt: pasted once into the AI the person uses, so it writes each project's "start" in its
+  // project.json and keeps it up to date. On Welcome and on a project with no start command; also a starter on Prompts.
+  let startLine = null;
+  async function startLinePrompt() { if (!startLine) startLine = await engine('/api/start-prompt'); return startLine.text; }
+  /** A Copy button that says Copied. If the clipboard is blocked, the text shows selected under the button: a second
+   * window would close the one the button sits in. */
+  function copyBlock(label, textOf, done, primary = false) {
+    const ta = el('textarea', { class: 'field-text', rows: 10, readonly: true, hidden: true, 'aria-label': 'The prompt' });
+    const b = el('button', { type: 'button', class: `btn${primary ? ' primary' : ''}`, onclick: async () => {
+      let t;
+      try { t = await textOf(); } catch (e) { app.showFault(e); return; }
+      try {
+        await navigator.clipboard.writeText(t);
+        say(done);
+        b.textContent = 'Copied';
+        setTimeout(() => { b.textContent = label; }, 2000);
+      } catch {
+        ta.value = t; ta.hidden = false; ta.focus(); ta.select();
+        say('The clipboard was blocked, so the prompt is shown below the button: copy it with Ctrl+C.');
+      }
+    } }, label);
+    return el('div', { class: 'copy-block' }, b, ta);
+  }
+  app.copyBlock = copyBlock;
+  app.startLinePrompt = startLinePrompt;
+  /** "No start command" on a tile or in Actions: why, and the prompt that has the AI add one for this project. */
+  function noStartWindow(p) {
+    const bad = p.startSkipped || [];
+    app.openWindow(`No start command for ${p.name}`, [
+      el('p', { text: 'The office runs a project from a start line in its own files: a "start" in project.json at the top of its folder, or an entry in .claude/launch.json. '
+        + (bad.length ? `The start entry in ${bad.join(' and ')} could not be used: it names no program, its arguments are not a list, its cwd is not a folder that is there, or its env holds something other than text.` : 'This project has neither yet.') }),
+      el('p', { class: 'note', text: 'Copy this prompt into Claude, ChatGPT or the AI you use. It asks the AI to remember how to write a start line, and to add one for this project now (the prompt names its folder).' }),
+      copyBlock('Copy the prompt', async () => `${await startLinePrompt()}\n\nPlease add the start line for this project now.\nProject: ${oneLine(p.name).slice(0, 100)}\nFull folder: ${p.dir}`,
+        `Start-line prompt copied for ${p.name}. Paste it into the AI you use.`, true)],
+    [el('button', { type: 'button', class: 'btn', onclick: () => app.closeWindow() }, 'Close')]);
+  }
+  const noStartButton = (p, extra = '') => el('button', { type: 'button', class: `btn${extra}`, title: 'No start command in the project\'s .claude/launch.json or project.json: see how to add one', onclick: (e) => { const menu = e.currentTarget.closest('details'); if (menu) menu.open = false; noStartWindow(p); } }, 'No start command…');
+
   /** Before a project's start command first runs (or after it changed): the whole command, where it comes from, and a
    * choice. Resolves true for Run it; false for Cancel, Escape or a click beside the window. Cancel has the focus. */
   function trustWindow(t) {
@@ -100,7 +138,11 @@
         t.local ? el('p', { class: 'm-bad', text: `▲ This program is inside ${t.name}'s own folder, so it runs instead of the usual one of that name. Run it only if you know why the project has it.` }) : null,
         fact('Arguments', t.args.length ? t.args.map(quote).join(' ') : '(none)'),
         t.script ? fact(`Script "${t.script.name}" (package.json)`, t.script.text) : null,
-        fact('Folder', t.cwd), ...(t.others || []).map((o) => fact('Or, if its port is taken, in', o)), fact('From', t.from),
+        fact('Folder', t.cwd), ...(t.others || []).map((o) => fact('Or, if its port is taken, in', o)),
+        // Settings from the start file's "env": part of what runs, so each one is shown.
+        ...(t.env || []).map(([k, v]) => fact('Setting (env)', `${k}=${v}`)),
+        (t.envRisky || []).length ? el('p', { class: 'm-bad', text: `▲ ${t.envRisky.join(', ')} can change which program runs or what it loads. Run it only if you know why the project sets ${t.envRisky.length > 1 ? 'them' : 'it'}.` }) : null,
+        fact('From', t.from),
         el('p', { class: 'note', text: 'The office remembers your yes for this exact command, and asks again if it changes.' })],
       [el('button', { type: 'button', class: 'btn primary', onclick: () => finish(false) }, 'Cancel'),
         el('button', { type: 'button', class: 'btn', onclick: () => finish(true) }, 'Run it')]);
@@ -187,7 +229,7 @@
   const browserButton = (p) => (p.running || p.commands.some((c) => c.port) ? tileBtn(p, 'browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null);
   /** Under the marks, only when the project has no start command. */
   function portLine(p) {
-    return p.commands.length ? null : el('div', { class: 'row proj-actions' }, el('span', { class: 'note', title: 'No start command in the project\'s .claude/launch.json or project.json' }, 'No start command'));
+    return p.commands.length ? null : el('div', { class: 'row proj-actions' }, noStartButton(p, ' small'));
   }
   /** The tile's More menu (Free port when shown, Copy prompt, Folder, Terminal, Hide, Remove from list), at the end of
    * the marks line. */
@@ -226,7 +268,7 @@
       onkeydown: (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); } } },
     el('summary', { class: 'btn', title: `Run, stop, open and more for ${p.name}` }, 'Actions'),
     el('div', { class: 'more-menu' }, ...items.filter(Boolean),
-      p.commands.length ? null : el('span', { class: 'note', title: 'No start command in the project\'s .claude/launch.json or project.json' }, 'No start command')));
+      p.commands.length ? null : noStartButton(p)));
     return menu;
   }
   app.projectMenu = (folder, open) => { const p = projectOfFolder(folder); return p ? actionsMenu(p, open) : null; };
