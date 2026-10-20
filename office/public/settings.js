@@ -217,7 +217,7 @@
       h3('Prompts'),
       p('Prompts you use again and again, a tile per category: Copy, Edit (which can move it), Remove; New category, Add prompt, Rename and Delete category. Words in [brackets] are yours to fill in. Kept on this PC only.'),
       h3('What leaves this PC'),
-      p('Nothing about you or your projects. The only requests that leave this PC are plain page requests to the live addresses you add, and, only if you tick it under About, one request a day to GitHub for the newest Git version, and, when you open Settings › Update, one request to GitHub for the newest office. Transcripts are read, never changed or sent.'),
+      p('Nothing about you or your projects. The only requests that leave this PC are plain page requests to the live addresses you add, and, only if you tick it under About, one request a day to GitHub for the newest Git version, and, when you open Settings › Update, a look at GitHub for the newest signed release of the office. Transcripts are read, never changed or sent.'),
       h3('If something goes wrong'),
       li('The page says the office is not answering: it stopped. Double-click start.cmd (or the desktop shortcut); the page catches up by itself.',
         '"Needs Node.js 22 or newer": double-click install.cmd; it offers to install it.',
@@ -229,9 +229,12 @@
     ];
   }
 
-  // ---- Update: asks GitHub for a newer office when this tab is opened (or Check is pressed), and takes it in one click ----
+  // ---- Update: asks GitHub for a newer signed release when this tab is opened (or Check is pressed), takes it in one
+  // click (after starting it once as a test copy), and goes back to the version before the last update ----
   async function drawUpdate() {
     const stats = app.engineData.stats || await app.engine('/api/stats');
+    let st = null;
+    try { st = await app.engine('/api/update'); } catch { /* shown without the last update */ }
     const box = el('div', { class: 'update-box', 'aria-live': 'polite' }, el('p', { class: 'note', text: 'Asking GitHub for the newest version…' }));
     const said = (...kids) => box.replaceChildren(...kids.flat().filter(Boolean));
     // After an update the office starts again; the page waits for it and then reloads itself (a new run, a new key).
@@ -244,34 +247,48 @@
       }
       said(el('p', { text: 'The office did not come back by itself. Double-click start.cmd (or the desktop shortcut) to start it.' }));
     }
-    async function take(button) {
+    const failed = (e) => said(el('p', { text: fault(e) }), el('div', { class: 'row' }, btn('Check again', check)));
+    async function take(button, version) {
       button.disabled = true;
-      said(el('p', { text: 'Taking the update…' }));
+      said(el('p', { text: `Taking ${version}: fetching it, checking its signature and starting it once as a test copy (up to a minute)…` }));
       try {
-        const r = await app.engine('/api/update/pull', {});
-        said(el('p', { text: `Updated${r.newVersion ? ` to ${r.newVersion}` : ''}: ${plural(r.took, 'change', 'changes')} taken (${r.from} to ${r.to}).` }));
+        const r = await app.engine('/api/update/take', { version });
+        said(el('p', { text: `Updated to ${r.version} (${r.from} to ${r.to}).` }));
         await app.engine('/api/update/restart', {}).catch(() => null);
         backAgain();
-      } catch (e) { said(el('p', { text: fault(e) }), el('div', { class: 'row' }, btn('Check again', check))); }
+      } catch (e) { failed(e); }
     }
     async function check() {
       said(el('p', { class: 'note', text: 'Asking GitHub for the newest version…' }));
       let r;
-      try { r = await app.engine('/api/update/check', {}); } catch (e) { return said(el('p', { text: fault(e) }), el('div', { class: 'row' }, btn('Check again', check))); }
+      try { r = await app.engine('/api/update/check', {}); } catch (e) { return failed(e); }
       const again = btn('Check again', check);
-      const where = el('p', { class: 'note', text: `From ${r.remote}, branch ${r.branch}. This copy is at ${r.at}. Checked ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` });
-      if (!r.behind) return said(el('p', {}, el('b', { text: '● You have the newest version.' })), where, el('div', { class: 'row' }, again));
+      const when = `Checked ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+      if (!r.version) return said(el('p', {}, el('b', { text: '● There is no signed release on GitHub yet.' })), el('p', { class: 'note', text: `Update takes only a version signed by the office's maker, and ${r.from} has none so far. ${when}` }), el('div', { class: 'row' }, again));
+      if (!r.newer) return said(el('p', {}, el('b', { text: '● You have the newest version.' })), el('p', { class: 'note', text: `The newest signed release on ${r.from} is ${r.version}. ${when}` }), el('div', { class: 'row' }, again));
       const list = el('ul', { class: 'update-list' }, r.commits.map((c) => el('li', {}, el('span', { class: 'note', text: `${c.date} ` }), c.text)));
       const blocked = r.changed.length ? `Files here were changed (${r.changed.slice(0, 3).join(', ')}${r.changed.length > 3 ? ', …' : ''}), so it will not update until they are kept or undone.`
-        : r.ahead ? `This copy has ${plural(r.ahead, 'saved change', 'saved changes')} of its own, so it cannot simply move forward.` : '';
-      const go = btn('Update now', (e) => take(e.currentTarget), true, { title: 'Takes the new version from GitHub, then restarts the office. Your data folder (settings, audits, prompts, the office) is not touched.' });
-      said(el('p', {}, el('b', { text: `▲ ${r.newVersion && r.newVersion !== stats.version ? `Version ${r.newVersion} is out` : 'A newer version is out'}: ${plural(r.behind, 'change', 'changes')} since yours.` })),
-        list, blocked ? el('p', { text: blocked }) : null, where,
+        : r.own ? 'This copy has saved changes of its own that the new version does not, so it cannot simply move forward. Bring it up to date by hand (see AGENTS.md, "Update it").' : '';
+      const go = btn('Update now', (e) => take(e.currentTarget, r.version), true, { title: 'Takes the signed version from GitHub, starts it once as a test copy, then moves this copy to it and restarts the office. Your data folder (settings, audits, prompts, the office) is not touched.' });
+      said(el('p', {}, el('b', { text: `▲ Version ${r.version} is out, signed by the office's maker: ${plural(r.behind, 'change', 'changes')} since yours.` })),
+        list, blocked ? el('p', { text: blocked }) : null,
+        el('p', { class: 'note', text: `From ${r.from}, tag v${r.version} (commit ${r.commit}). This copy is at ${r.at}. ${when}` }),
         el('div', { class: 'row' }, blocked ? null : go, again),
-        el('p', { class: 'note', text: 'Update now takes it and restarts the office (the page reloads itself). Your data folder is never touched, and nothing here is overwritten: an update that would is refused.' }));
+        el('p', { class: 'note', text: 'Update now checks the signature again, starts the new version once as a test copy (a version that does not start is never taken), then takes it and restarts the office (the page reloads itself). Your data folder is never touched, and nothing here is overwritten: an update that would is refused.' }));
     }
+    // The last update taken here, and Go back to the version before it.
+    const last = st?.last;
+    const day = (iso) => { const d = new Date(iso); return Number.isNaN(+d) ? '' : ` on ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`; };
+    const lastRow = !last ? null : row(last.back ? `Went back to ${last.to} (from ${last.from})${day(last.when)}` : `Last update: ${last.from} to ${last.to}${day(last.when)}`,
+      st.canGoBack ? `Go back moves this copy to ${last.from}, the version it had before, and restarts the office. Your data folder is not touched.` : last.back ? 'Go back was pressed in Settings › Update on this PC.' : 'Taken by Settings › Update on this PC.',
+      st.canGoBack && st.here ? btn(`Go back to ${last.from}`, async (e) => {
+        if (!confirm(`Go back to ${last.from}? The office moves back to the version it had before the last update and restarts.`)) return;
+        e.currentTarget.disabled = true;
+        said(el('p', { text: `Going back to ${last.from}…` }));
+        try { await app.engine('/api/update/back', {}); await app.engine('/api/update/restart', {}).catch(() => null); backAgain(); } catch (x) { failed(x); }
+      }) : null);
     check();
-    return [row(`This copy: AI Head Office Overview ${stats.version}`, 'Updates come from GitHub. Opening this tab asks GitHub once; nothing about you or your projects is sent.'), box];
+    return [row(`This copy: AI Head Office Overview ${stats.version}`, 'Updates come from the office\'s own GitHub address, and only as a version signed by its maker. Opening this tab asks GitHub once; nothing about you or your projects is sent.'), lastRow, box].filter(Boolean);
   }
 
   // ---- About ----
@@ -291,7 +308,7 @@
       el('label', { class: 'tick-row' }, online, el('span', { text: 'Check online for a newer Git (asks GitHub once a day; off until you tick it)' })),
       row('Quit the office', 'Stops the office and every local copy it started. Start it again with start.cmd or the desktop shortcut.', btn('Quit', async () => {
         if (!confirm('Quit the office? It stops, and so does every local copy it started.')) return;
-        try { await app.engine('/api/quit', {}); } catch { /* it is stopping */ }
+        try { await app.engine('/api/quit', {}); } catch (e) { if (e?.error?.fault) return say(fault(e)); /* else it is stopping */ }
         document.body.replaceChildren(el('p', { class: 'empty stopped', text: 'The office has stopped. You can close this window.' }));
       })),
       row('Uninstall', 'Stops the office and removes its desktop shortcut, Start with Windows and the start link. Your files are not deleted.', btn('Uninstall…', async () => {

@@ -43,19 +43,33 @@ https://github.com/Matthew4509/ai-office-overview. Explain the difference and le
    and advanced setup for hooks: see below), Update (a newer version from GitHub, taken in one click), Help and About
    (Quit, Uninstall).
 
-## Update it (pull)
+## Update it
+A release is a tag `v<version>` on https://github.com/Matthew4509/ai-head-office-overview whose message carries an
+`aho-release {…}` line: a signature from the office's maker for that exact commit and its files. Pushes to `main`
+that have no such tag are not releases. Settings › Update takes only these, from that fixed address (never the
+folder's own `origin`), and checks the signature against the key the office carries (`lib/release.js`).
 1. **See what is new before taking it:** in the app's folder,
-   `git fetch origin` then `git log --oneline HEAD..origin/main` (the new commits) and
-   `git diff --stat HEAD..origin/main` (the files they change). Read the diff of anything that runs on the user's PC
-   (`lib/`, `office/`, `*.cmd`, `server.js`) and summarise it for the user before pulling.
-2. **Stop it:** `node server.js --stop` (it also stops every local copy the app started).
-3. **Take it:** `git pull --ff-only`. If git refuses because files were changed here, stop and tell the user: do not
+   `git ls-remote --tags --refs https://github.com/Matthew4509/ai-head-office-overview.git` lists the release tags
+   (take the newest `v<version>`), then
+   `git fetch --no-tags https://github.com/Matthew4509/ai-head-office-overview.git +refs/tags/v<version>:refs/aho-update/v<version>`.
+   `git cat-file tag refs/aho-update/v<version>` shows the commit it names and its signature line;
+   `git log --oneline HEAD..refs/aho-update/v<version>` the new commits and
+   `git diff --stat HEAD..refs/aho-update/v<version>` the files they change. Read the diff of anything that runs on
+   the user's PC (`lib/`, `office/`, `*.cmd`, `server.js`) and summarise it for the user. Then remove the ref again:
+   `git update-ref -d refs/aho-update/v<version>`.
+2. **Take it with Settings › Update › Update now** (the user presses it): it fetches the tag again, checks the
+   signature, refuses when files here were changed or this copy has commits of its own, starts the new version once as
+   a test copy on a free port with throwaway data (a version that does not start is never taken), then moves this
+   folder to exactly the signed commit with git hooks off, and restarts the office. **Go back** there returns to the
+   version before the last update (`git reset --keep`, refused if anything changed since).
+3. **Only if Update cannot be used** (this copy is older than signed updates, or its key changed): with the user's
+   word, `node server.js --stop`, then `git merge --ff-only <the commit the tag names>` (never `git pull` from a
+   branch), then `npm test`, `cmd /c start "" start.cmd` and `node server.js --status`. This skips the signature check
+   and the test start, so say so. If git refuses because files were changed here, stop and tell the user: do not
    reset, stash or overwrite their changes without their word.
-4. **Check and start:** `npm test`, then `cmd /c start "" start.cmd` and `node server.js --status`.
-5. The user can also press **Update now** in Settings › Update: it does the same fast-forward, refuses when files here
-   were changed or saved here, runs git with hooks off, and restarts the office. Prefer the steps above when asked to
-   review an update first.
-6. The version is in `lib/config.js` (`VERSION`) and Settings › About. The user's data stays as it was; a new version
+4. A copy from before signed updates follows `main` in its own Settings › Update until it runs a version that has
+   them; from that version on it takes signed tags only.
+5. The version is in `lib/config.js` (`VERSION`) and Settings › About. The user's data stays as it was; a new version
    reads it as it is.
 
 ## Review it (what it does on this PC)
@@ -73,8 +87,9 @@ https://github.com/Matthew4509/ai-office-overview. Explain the difference and le
   read-only commands; and PowerShell helpers in `lib/platform/windows/`.
 - **Sends:** nothing about the user. The only requests that leave the PC are plain GETs to the live addresses the user
   adds (`lib/live.js`, `lib/audit.js`) and, only if ticked under About, one request a day to GitHub for the newest Git
-  version (`lib/git-program.js`), and, when the user opens Settings › Update, one `git fetch` of this repository
-  (`lib/update.js`). To check: search the code for `fetch(`, `http.get`, `http.request`, `git fetch`.
+  version (`lib/git-program.js`), and, when the user opens Settings › Update, a `git ls-remote` of this repository's
+  tags plus, when one is newer, a `git fetch` of that one tag (`lib/update.js`; the address is fixed in
+  `lib/release.js`). To check: search the code for `fetch(`, `http.get`, `http.request`, `git fetch`, `ls-remote`.
 - **Its own privacy check:** `node tools/disclose.js` scans the folder, its git history and any zip for private
   details, other project names, AI trail and local paths; it prints labels and places only. "Nothing found" is clean;
   a WARNING line and exit code 2 mean it had no private-details list or no project names to check against.

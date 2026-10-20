@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { apply, status, onHook, withOurs, withoutOurs, hookCommand, settings } from '../src/setup.mjs';
+import { apply, status, onHook, withOurs, withoutOurs, hookCommand, settings, OWN_HOOK } from '../src/setup.mjs';
 import { Office } from '../src/office.mjs';
 import { tempHome, lines, ROOT } from './helpers.mjs';
 
@@ -50,20 +50,41 @@ test('advanced setup adds its three hooks beside the ones already there, keeps a
   }
 });
 
-test('hooks an earlier version wrote, under its old mark, still count as ours: on, replaced, and taken off', () => {
+test('a hook that runs this office\'s own hook.mjs under another mark still counts as ours: on, replaced, and taken off', () => {
   const h = tempHome();
   try {
-    const old = (ev) => ({ hooks: [{ type: 'command', command: 'node "C:/x/old office/hook.mjs" 8884 --old-office-hook', timeout: 3 }] });
+    const old = (ev) => ({ hooks: [{ type: 'command', command: `node "${OWN_HOOK.replace(/\\/g, '/')}" 8884 --old-office-hook`, timeout: 3 }] });
     const file = withSettings(h, { ...BEEPS, hooks: { ...BEEPS.hooks, Stop: [...BEEPS.hooks.Stop, old()], Notification: [...BEEPS.hooks.Notification, old()], UserPromptSubmit: [old()] } });
     const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts });
     assert.equal(status(office).mode, 'advanced');
-    apply(office, { advanced: true }, { port: 8884, hookScript: 'C:\\x\\harbour notes\\hook.mjs' });
+    apply(office, { advanced: true }, { port: 8884, hookScript: OWN_HOOK });
     const now = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(now.hooks.Stop.length, 2, 'the old one replaced, not added beside');
     assert.match(now.hooks.Stop[1].hooks[0].command, /--ai-head-office-hook$/);
     fs.writeFileSync(file, JSON.stringify({ ...BEEPS, hooks: { ...BEEPS.hooks, Stop: [...BEEPS.hooks.Stop, old()] } }));
-    apply(office, { advanced: false }, { port: 8884, hookScript: 'x' });
+    apply(office, { advanced: false }, { port: 8884, hookScript: OWN_HOOK });
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), BEEPS, 'the old one taken off, the beeps kept');
+  } finally {
+    delete process.env.AHO_SETTINGS;
+    h.done();
+  }
+});
+
+test('another app\'s hooks (AI Office Overview\'s, its own hook.mjs and mark) are never counted, changed or removed', () => {
+  const h = tempHome();
+  try {
+    const theirs = { hooks: [{ type: 'command', command: 'node "C:/x/other office app/hook.mjs" 8870 --ai-office-overview-hook', timeout: 3 }] };
+    const before = { ...BEEPS, hooks: { ...BEEPS.hooks, Stop: [...BEEPS.hooks.Stop, theirs], UserPromptSubmit: [theirs] } };
+    const file = withSettings(h, before);
+    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts });
+    assert.equal(status(office).mode, 'easy', 'their hooks do not make this office "advanced"');
+    apply(office, { advanced: true }, { port: 8884, hookScript: OWN_HOOK });
+    const on = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(on.hooks.UserPromptSubmit[0], theirs, 'theirs kept when ours go on');
+    assert.equal(on.hooks.Stop.length, 3);
+    apply(office, { advanced: false }, { port: 8884, hookScript: OWN_HOOK });
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), before, 'theirs kept when ours come off: back exactly as it was');
+    assert.deepEqual(withoutOurs(before), before, 'uninstall\'s clean-up leaves them too');
   } finally {
     delete process.env.AHO_SETTINGS;
     h.done();

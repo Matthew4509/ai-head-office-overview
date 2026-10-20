@@ -1,7 +1,10 @@
 // Bakes the shareable zip: _releases/ai-head-office-overview-<version>.zip, one folder "ai-head-office-overview" inside.
 //   node tools/bake.js            (--check: the privacy check only, no zip; --again: replace an existing zip of this
 //                                 version, only when it was never shared; --incomplete: go on without your private-details
-//                                 list or other project names, said loudly and never as "0 hits")
+//                                 list or other project names, said loudly and never as "0 hits"; --new-key: the
+//                                 release key is lost, make a new one)
+// Every zip is signed (tools/sign-release.js): the first bake makes the release key, saves its private half outside
+// the repository and writes its public half into lib/release.js; a private key anywhere in what ships stops the bake.
 // Only the files in SHIP go in (an allow list: anything new stays out until it is added here), projects.json goes in
 // EMPTY (the real one holds this PC's project names), and data/, test copies, notes and handovers never go in.
 // Before zipping, every shipped file goes through the disclosure pass's matcher: private details read from THIS PC at
@@ -15,6 +18,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { makeMatcher } = require('../lib/disclosure');
 const { privacyContext } = require('./privacy-context');
+const signing = require('./sign-release');
 
 const HERE = path.resolve(__dirname, '..');
 const VERSION = /const VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(HERE, 'lib', 'config.js'), 'utf8'))[1];
@@ -33,6 +37,12 @@ const SHIP = ['server.js', 'index.html', 'start.cmd', 'install.cmd', 'uninstall.
 const EMPTY_PROJECTS = {
   note: 'The office\'s own list of names, descriptions and live addresses, keyed by project folder name. Nothing here is written into any project\'s folder. See README.md, "Names and descriptions".',
 };
+
+// The release key first: made on the first bake, its public half goes into lib/release.js, which then ships.
+const CHECK_ONLY = process.argv.includes('--check');
+const key = CHECK_ONLY ? null : signing.ensureKey({ newKey: process.argv.includes('--new-key') });
+if (key && key.error) { console.error('Bake stopped: ' + key.error); process.exit(1); }
+if (key && key.said) console.log(key.said);
 
 const out = path.join(HERE, '_releases');
 const stage = path.join(out, 'stage-' + VERSION);
@@ -59,6 +69,8 @@ if (gaps.length && !process.argv.includes('--incomplete')) {
 }
 const scan = makeMatcher({ details, others, own: [path.basename(HERE), path.basename(ctx.main), 'ai-head-office-overview', 'ai-head-office'] });
 const hits = [];
+// Spelled in two parts so this file does not match itself.
+const PRIVATE_BLOCK = new RegExp('-----BEGIN [A-Z ]*' + 'PRIVATE KEY-----');
 const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else check(f); } };
 function check(f) {
   if (/\.(ico|png)$/i.test(f)) return;
@@ -68,6 +80,8 @@ function check(f) {
   for (const h of scan.inName(at)) hits.push(scan.redact(at) + '  [' + h.rule + ' in the file name' + (h.labels.size ? ': ' + [...h.labels].join(', ') : '') + ']');
   // Notes from building it: dated remarks (the shipped files carry no dates).
   text.split(/\r?\n/).forEach((l, i) => { if (/\b\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) 20\d\d\b/i.test(l)) hits.push(at + ':' + (i + 1) + '  [dated note]'); });
+  // A private key (the release key above all) never ships: a .pem / .key file, or a key block inside any file.
+  if (/\.(pem|key|p12|pfx)$/i.test(f) || PRIVATE_BLOCK.test(text)) hits.push(at + '  [private key]  a private key must never ship');
 }
 walk(root);
 // The git repo publishes more than the zip (tests, tools ...): every tracked file gets the same check.
@@ -86,7 +100,7 @@ const checked = 'private-details check: ' + ctx.listed + ' detail' + (ctx.listed
   + new Set(details.map(d => d.label)).size + ' kinds of detail in all, ' + others.length + ' project names from ' + ctx.working.length + ' folder' + (ctx.working.length === 1 ? '' : 's') + ', '
   + (gaps.length ? 'nothing found in what was checked. NOT A COMPLETE CHECK: ' + gaps.join('; ') + '.' : '0 hits.');
 // --check: the private-details check on exactly what would ship, without making (or replacing) a zip.
-if (process.argv.includes('--check')) {
+if (CHECK_ONLY) {
   fs.rmSync(stage, { recursive: true, force: true });
   console.log('Check only: ' + SHIP.length + ' files would ship; ' + checked + ' No zip made.');
   process.exit(0);
@@ -106,3 +120,7 @@ execFileSync(TAR, ['-a', '-c', '-f', zip, 'ai-head-office-overview'], { cwd: sta
 fs.rmSync(stage, { recursive: true, force: true });
 const n = execFileSync(TAR, ['-t', '-f', zip], { encoding: 'utf8' }).trim().split(/\r?\n/).filter(x => !x.endsWith('/')).length;
 console.log('Baked ' + path.relative(HERE, zip) + ': ' + n + ' files, ' + Math.round(fs.statSync(zip).size / 1024) + ' KB. ' + checked[0].toUpperCase() + checked.slice(1));
+// Signed: the zip's .sig, and the signed tag message that Settings › Update needs before it offers this version.
+try { console.log(signing.signZip(zip, VERSION, key.pem)); }
+catch (e) { fs.rmSync(zip + '.sig', { force: true }); console.error('The zip was made but NOT signed: ' + e.message); process.exit(1); }
+console.log(signing.nextSteps(VERSION, signing.writeTag(VERSION, key.pem)));

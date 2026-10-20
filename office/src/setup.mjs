@@ -32,18 +32,27 @@ export function hookCommand(hookScript, port) {
   return `node "${hookScript.replace(/\\/g, '/')}" ${port} --${MARK}`;
 }
 
-/** Ours: this mark, or a hook an earlier version wrote (it runs a hook.mjs with a port and its own --…-hook mark). */
-const OLDER = /hook\.mjs" \d+ --[a-z-]+-hook$/;
-const isOurs = (h) => typeof h?.command === 'string' && (h.command.includes(MARK) || OLDER.test(h.command));
+/** This office's own hook script: an entry that runs it is ours whatever mark it carries. */
+export const OWN_HOOK = path.resolve(import.meta.dirname, '..', 'hook.mjs');
+const slashes = (p) => String(p).replace(/\\/g, '/').toLowerCase();
+/** Ours: this mark, or a hook that runs THIS office's hook.mjs (with a port and a --…-hook mark). Another app's hook
+ * (its own hook.mjs, its own mark, such as AI Office Overview's) is never counted, changed or removed. */
+const OLDER = /^node "([^"]+)" \d+ --[a-z-]+-hook$/;
+const isOurs = (h, own = OWN_HOOK) => {
+  if (typeof h?.command !== 'string') return false;
+  if (h.command.includes(`--${MARK}`)) return true;
+  const m = OLDER.exec(h.command);
+  return !!m && slashes(m[1]) === slashes(own);
+};
 
 /** The AI app's settings without this office's entries (everything else exactly as it was). */
-export function withoutOurs(data) {
+export function withoutOurs(data, own = OWN_HOOK) {
   const out = { ...data };
   if (!out.hooks || typeof out.hooks !== 'object') return out;
   const hooks = {};
   for (const [event, groups] of Object.entries(out.hooks)) {
     if (!Array.isArray(groups)) { hooks[event] = groups; continue; }
-    const kept = groups.map((g) => (Array.isArray(g?.hooks) ? { ...g, hooks: g.hooks.filter((h) => !isOurs(h)) } : g)).filter((g) => !Array.isArray(g?.hooks) || g.hooks.length);
+    const kept = groups.map((g) => (Array.isArray(g?.hooks) ? { ...g, hooks: g.hooks.filter((h) => !isOurs(h, own)) } : g)).filter((g) => !Array.isArray(g?.hooks) || g.hooks.length);
     if (kept.length) hooks[event] = kept;
   }
   if (Object.keys(hooks).length) out.hooks = hooks;
@@ -52,8 +61,8 @@ export function withoutOurs(data) {
 }
 
 /** The AI app's settings with this office's entries added (its old ones replaced, nobody else's touched). */
-export function withOurs(data, command) {
-  const out = withoutOurs(data);
+export function withOurs(data, command, own = OWN_HOOK) {
+  const out = withoutOurs(data, own);
   out.hooks = { ...(out.hooks || {}) };
   for (const event of EVENTS) {
     const groups = Array.isArray(out.hooks[event]) ? out.hooks[event] : [];
@@ -66,7 +75,7 @@ export function withOurs(data, command) {
 export function status(office) {
   const file = settingsFile();
   const r = readSettings(file);
-  const on = !r.error && Object.values(r.data.hooks || {}).some((groups) => Array.isArray(groups) && groups.some((g) => Array.isArray(g?.hooks) && g.hooks.some(isOurs)));
+  const on = !r.error && Object.values(r.data.hooks || {}).some((groups) => Array.isArray(groups) && groups.some((g) => Array.isArray(g?.hooks) && g.hooks.some((h) => isOurs(h))));
   return {
     mode: on ? 'advanced' : 'easy',
     settingsFile: file,
@@ -87,7 +96,7 @@ export function apply(office, b, { port, hookScript }) {
   const file = settingsFile();
   const r = readSettings(file);
   if (r.error) return r;
-  const next = b.advanced ? withOurs(r.data, hookCommand(hookScript, port)) : withoutOurs(r.data);
+  const next = b.advanced ? withOurs(r.data, hookCommand(hookScript, port), hookScript) : withoutOurs(r.data, hookScript);
   const text = `${JSON.stringify(next, null, 2)}\n`;
   if (text === r.text) return { ok: true, status: status(office), unchanged: true };
   try {
