@@ -682,7 +682,8 @@
   function focusInto(sheet) {
     if (sheet.hidden || sheet.contains(document.activeElement)) return;
     const shown = (n) => n && n.offsetParent !== null;
-    const field = [...sheet.querySelectorAll('[autofocus], input:not([type=checkbox]):not([type=radio]):not([type=file]):not([disabled]), textarea:not([disabled])')].find(shown);
+    // Not a read-only box (a copy block's text) or a hidden one: focus on those does nothing useful.
+    const field = [...sheet.querySelectorAll('[autofocus], input:not([type=checkbox]):not([type=radio]):not([type=file]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly])')].find(shown);
     const main = [...sheet.querySelectorAll('.sheet-foot .btn.primary:not([disabled])')].find(shown);
     const box = sheet.querySelector('.sheet-box');
     const to = field || main || box;

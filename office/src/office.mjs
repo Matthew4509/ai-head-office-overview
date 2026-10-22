@@ -185,36 +185,44 @@ export class Office {
    */
   root() {
     if (this.settings.root) return this.settings.root;
-    const starts = [];
-    for (const r of Object.values(this.files)) if (!r.parent && r.t.startCwd) starts.push(r.t.startCwd);
+    const mains = Object.values(this.files).filter((r) => !r.parent && r.t.startCwd).map((r) => r.t);
+    const starts = mains.map((t) => t.startCwd);
     const under = (p, dir) => { const n = normPath(p), d = normPath(dir); return !!d && (n === d || n.startsWith(`${d}/`)); };
     const wfs = (() => { try { return (this.workingFolders() || []).filter((w) => typeof w === 'string' && w.trim()); } catch { return []; } })();
     if (wfs.length) {
       const ranked = wfs.map((w, i) => ({ w, i, n: starts.filter((s) => under(s, w)).length })).sort((a, b) => b.n - a.n || a.i - b.i);
       if (ranked[0].n || !starts.length) return ranked[0].w;
     }
+    // The same rule as AI Office Overview's root(): the siblings of the top start folder (with threads started in their
+    // parent itself) win when they are as many as the top folder's, or when there are two or more of them and the top
+    // folder's own threads work in one folder at most (it is a project, not a projects folder). One stray thread in a
+    // sibling (C:\Work\notes beside C:\Work\projects) never moves the root up.
     const count = new Map();
-    for (const s of starts) {
-      const k = normPath(s);
-      const c = count.get(k) || { path: s, n: 0 };
+    for (const t of mains) {
+      const k = normPath(t.startCwd);
+      const c = count.get(k) || count.set(k, { at: t.startCwd, n: 0, threads: [] }).get(k);
       c.n++;
-      count.set(k, c);
+      c.threads.push(t);
     }
-    const best = [...count.values()].sort((a, b) => b.n - a.n)[0];
+    const [key, best] = [...count].sort((a, b) => b[1].n - a[1].n)[0] || [];
     if (!best) return '';
-    // Start folders grouped by the folder they sit in: two or more siblings holding more threads than the top one.
-    const parents = new Map();
-    for (const c of count.values()) {
-      const parent = path.dirname(c.path);
-      if (!parent || normPath(parent) === normPath(c.path) || /^[a-z]:[\\/]?$/i.test(parent) || parent === '/') continue;
-      const k = normPath(parent);
-      const g = parents.get(k) || { path: parent, kids: 0, n: 0 };
-      g.kids++;
-      g.n += c.n;
-      parents.set(k, g);
+    const up = (p) => p.slice(0, Math.max(p.lastIndexOf('/'), 0));
+    const parentKey = up(key);
+    if (!parentKey || parentKey === key) return best.at;
+    let others = count.get(parentKey)?.n || 0;
+    let siblings = 0;
+    for (const [k, c] of count) if (k !== key && up(k) === parentKey) { siblings++; others += c.n; }
+    if (!siblings) return best.at;
+    const parent = best.at.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '') || '/';
+    const asRoot = /^[a-z]:$/i.test(parent) ? `${parent}\\` : parent;
+    if (others >= best.n) return asRoot;
+    const worksIn = new Set();
+    for (const t of best.threads) {
+      for (const p of t.wrote || []) worksIn.add(projectOf(p, best.at));
+      for (const r of t.ran || []) worksIn.add(projectOf(r.cwd, best.at, [], true));
     }
-    const group = [...parents.values()].filter((g) => g.kids >= 2).sort((a, b) => b.n - a.n)[0];
-    return group && group.n > best.n ? group.path : best.path;
+    worksIn.delete(null);
+    return siblings >= 2 && worksIn.size < 2 ? asRoot : best.at;
   }
 
   /** The folders in the projects folder, as they are spelt on disk. */

@@ -226,6 +226,19 @@ test('X-01: threads started in 4 sibling project folders: the folder they sit in
   }
 });
 
+test('X-01: a projects folder with one stray thread in a sibling folder stays the root (not their parent)', () => {
+  const h = tempHome();
+  try {
+    for (const id of ['r1', 'r2', 'r3']) lines(id).prompt(0, 'go').tool(1, 'Write', { file_path: `${ROOT}\\${id}-app\\a.md` }, 10).reply(2, 'Done.', 10).write(file(h, id));
+    lines('n1').prompt(0, 'go', 'C:\\Work\\notes').reply(1, 'Done.', 10, 'C:\\Work\\notes').write(file(h, 'n1'));
+    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts, now: () => at(3) });
+    office.scan();
+    assert.equal(office.root(), ROOT);
+  } finally {
+    h.done();
+  }
+});
+
 test('X-01: with no projects folder set, a working folder (Settings › Folders) the threads started under is the root', () => {
   const h = tempHome();
   try {
