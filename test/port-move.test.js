@@ -1,4 +1,4 @@
-// Tests for Re-allocate (lib/runner.js onPort): a start command moved to a clean port names the new port wherever it
+// Tests for Use another port (lib/runner.js onPort): a start command moved to a clean port names the new port wherever it
 // named the old one as a whole number, and nowhere else. Run: node test/port-move.test.js
 'use strict';
 const fs = require('fs');

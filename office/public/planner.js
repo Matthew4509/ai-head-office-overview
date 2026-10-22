@@ -23,7 +23,7 @@
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   const hm = (min) => (min < 60 ? `${min} min` : min % 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}` : `${min / 60} h`);
   const dateWords = (s) => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString([], { day: 'numeric', month: 'short' }); };
-  const faultText = (e) => { const f = e?.error || {}; return f.fault ? `${f.fault} ${f.reason || ''} ${f.wayOut || ''}`.trim() : String(e?.message || e); };
+  const faultText = (e) => app.faultText(e);
   const careText = (c) => `${c.handoverDays ? `${plural(c.handoverDays, 'day', 'days')} of handover at ${c.handoverMin} min a day, then ` : ''}${c.checkEvery === 'none' ? 'no check-ins' : `${c.checkEvery === 'week' ? 'a weekly' : 'a daily'} check of ${c.checkMin} min`}${c.paid ? ' (paid: at the top of the day)' : ''}`;
 
   // ---- the data ----

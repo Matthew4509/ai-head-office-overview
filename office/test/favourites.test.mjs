@@ -80,3 +80,26 @@ test('an old favourite can be hidden and shown again; starring again clears the 
     h.done();
   }
 });
+
+test('X-02: a folder or thread named __proto__, constructor or prototype is refused and never reaches Object.prototype', () => {
+  const h = tempHome();
+  try {
+    const office = open(h, 0);
+    for (const bad of ['__proto__', 'constructor', 'prototype']) {
+      assert.equal(office.setNickname(bad, 1, 'Polly'), false, bad);
+      assert.equal(office.setFavourite(bad, 1, true), false, bad);
+      assert.equal(office.setFavouriteHidden(bad, 1, true), false, bad);
+      assert.equal(office.setLook(bad, 1, null), false, bad);
+      assert.equal(office.markDone(bad), false, bad);
+      office.hook(bad, 'needs', 'x');
+    }
+    assert.equal({}['1'], undefined);
+    assert.equal(Object.prototype['1'], undefined);
+    assert.equal(Object.getPrototypeOf(office.hooks), Object.prototype);
+    assert.deepEqual(Object.keys(office.seatNames), []);
+    // An ordinary folder still works.
+    assert.equal(office.setNickname('garden', 1, 'Polly'), true);
+  } finally {
+    h.done();
+  }
+});

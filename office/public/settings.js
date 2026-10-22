@@ -14,13 +14,15 @@
   let section = 'folders';
   const said = el('p', { class: 'note check-said', role: 'status', 'aria-live': 'polite' });
   const say = (t) => { said.textContent = t; };
-  const fault = (e) => { const f = e?.error || {}; return f.fault ? `${f.fault} ${f.reason || ''} ${f.wayOut || ''}`.trim() : 'The office did not answer. Check that AI Head Office Overview is still running.'; };
+  const fault = (e) => app.faultText(e);
   const btn = (label, onclick, primary = false, extra = {}) => el('button', { type: 'button', class: `btn${primary ? ' primary' : ''}`, onclick, ...extra }, label);
   const row = (title, sub, ...acts) => el('div', { class: 'set-row' }, el('div', { class: 'set-txt' }, el('b', { text: title }), sub ? el('span', { class: 'note', text: sub }) : null), el('div', { class: 'row set-acts' }, ...acts));
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
   async function show(which) {
     if (which) section = which;
+    // A tab pressed from the keyboard keeps the focus on the (new) tab when the window is drawn again.
+    const onTab = sheet.contains(document.activeElement) && document.activeElement.getAttribute('role') === 'tab';
     const tabs = el('div', { class: 'side-tabs', role: 'tablist', 'aria-label': 'Settings' }, SECTIONS.map(([id, name]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(section === id), onclick: () => { say(''); show(id); } }, name)));
     const body = el('div', { class: 'set-body' }, el('p', { class: 'note', text: 'Reading…' }));
     const box = el('div', { class: 'sheet-box wide', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'setup-title' },
@@ -28,6 +30,7 @@
       el('div', { class: 'row sheet-foot' }, btn('Close', close, true)));
     sheet.replaceChildren(box);
     sheet.hidden = false;
+    if (onTab) tabs.querySelector('[aria-selected="true"]')?.focus();
     try { body.replaceChildren(...[await DRAW[section]()].flat().filter(Boolean)); } catch (e) { body.replaceChildren(el('p', { text: fault(e) })); }
   }
   function close() { sheet.hidden = true; sheet.replaceChildren(); }
@@ -142,7 +145,7 @@
       el('div', { class: 'row', role: 'group', 'aria-label': 'Theme' }, ...THEMES.map(themeBtn)),
       el('p', { class: 'note', text: `Auto is light from sunrise to sunset and dark at night: ${sun.theme.today()} Dark dims the office for the evening: the page, the rooms and the beach. Match Windows follows Settings › Personalisation › Colours in Windows. The sun, moon and auto switch on the top line does the same.` }),
       el('h3', { text: 'Projects folder' }),
-      el('p', { class: 'note', text: 'The folder your project folders sit in: each folder in it is a desk, and a thread working in the folder itself is a Consultant. Empty = the folder most threads start in.' }),
+      el('p', { class: 'note', text: 'The folder your project folders sit in: each folder in it is a desk, and a thread working in the folder itself is a Consultant. Empty = the working folder (Folders) your threads start in; with none there, the folder most threads start in, or the folder those sit in when they start inside each project.' }),
       el('div', { class: 'row' }, rootIn, btn('Save folder', save(() => ({ root: rootIn.value }), 'Projects folder saved.'), true)),
       el('h3', { text: 'Gone home' }),
       el('div', { class: 'row' }, el('span', { text: 'After' }), quietIn, el('span', { text: 'minutes with nothing happening.' }), btn('Save time', save(() => ({ quietMinutes: quietIn.value }), 'Gone-home time saved.'), true)),
@@ -353,6 +356,7 @@
         app.copyBlock('Copy the prompt', app.startLinePrompt, 'Start-line prompt copied. Paste it into the AI you use.')) : null,
       el('div', { class: 'row sheet-foot' }, btn('Done', () => answer(true), true), btn('Not now', () => answer(false)))));
     sheet.hidden = false;
+    app.welcomeAnswer = (yes) => { app.welcomeAnswer = null; answer(yes); };
   };
 
   document.getElementById('open-setup').addEventListener('click', () => { say(''); show(); });

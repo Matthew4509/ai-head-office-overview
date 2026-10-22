@@ -1761,7 +1761,7 @@
         box(c, x - mw / 2 + 3, d.y + 7, mw - 6, 7, 2, '#fff7e9', INK, 2);
       });
       for (const fr of friendsOf(d)) (fr.kind === 'duck' ? duck(c, fr.x, fr.y, FRIEND_SIZE, 'west') : fr.kind === 'cactus' ? cactus(c, fr.x, fr.y, CACTUS_SIZE) : petRock(c, fr.x, fr.y, FRIEND_SIZE));
-      // The project's name above its computer, unless PC name is unticked (to see the staff better).
+      // The project's name above its computer, unless Project on screens is unticked (to see the staff better).
       if (full && app()?.showPcName !== false) {
         const size = labelSize(c) * 0.85;
         const words = fitText(c, d.name, 150, size);
@@ -2059,6 +2059,11 @@
 
   // ---- The view ----
 
+  /** The strip's width beside the office, and the room kept for it (three thoughts) when it sits under the office. */
+  const STRIP_W = 240;
+  const STRIP_UNDER = 200;
+  const NARROW = window.matchMedia('(max-width: 700px)');
+
   function fit(view) {
     const cv = view.canvas;
     const ratio = Math.min(2, window.devicePixelRatio || 1);
@@ -2084,6 +2089,20 @@
         : 90;
       room = Math.max(260, window.innerHeight - top - Math.ceil(below) - 1);
     }
+    // A wide panel where the strip beside the office would leave it small (held by the width, with room to spare
+    // below): the strip goes under the office instead, so the office fills the panel (X-08).
+    if (view.strip && !NARROW.matches) {
+      const bcss = getComputedStyle(box);
+      const gap = parseFloat(bcss.columnGap) || 14;
+      // Under the office already: what the strip really takes (its thoughts can wrap), else a fair guess.
+      const strip = box.classList.contains('office-stacked') ? view.strip.offsetHeight + (parseFloat(bcss.rowGap) || 0) + (parseFloat(getComputedStyle(view.strip).marginTop) || 0) : 0;
+      const keep = Math.max(STRIP_UNDER, strip);
+      const besideW = Math.min(box.clientWidth - STRIP_W - gap, (room * W) / H);
+      const underW = Math.min(box.clientWidth, ((room - keep) * W) / H);
+      const stack = underW > besideW * 1.15;
+      box.classList.toggle('office-stacked', stack);
+      if (stack) room -= keep;
+    } else box.classList.remove('office-stacked');
     // The strip beside the office (a wide window) takes its own width and the gap out of the row.
     const css = getComputedStyle(box);
     const beside = css.display === 'flex' && css.flexDirection === 'row' && view.strip ? view.strip.offsetWidth + (parseFloat(css.columnGap) || 0) : 0;
@@ -2606,8 +2625,7 @@
       }
       wake();
     } catch (e) {
-      const f = e.error || {};
-      shopSaid.textContent = f.fault ? `${f.fault} ${f.reason || ''} ${f.wayOut || ''}` : 'The office did not answer. Check that AI Head Office Overview is still running.';
+      shopSaid.textContent = app()?.faultText?.(e) || 'The office did not answer. Check that the AI Head Office Overview window is still open, then try again.';
     } finally {
       button.disabled = false;
     }
@@ -2681,8 +2699,7 @@
         shopSaid.textContent = `Energy drinks bought (${big(energy.price)} tokens): everyone buzzes for a minute.`;
         setTimeout(() => { app()?.closeWindow?.(); drinkUp(); }, 1300);
       } catch (e) {
-        const f = e.error || {};
-        show('COIN RETURNED', f.fault ? `${f.fault} ${f.reason || ''}` : 'The office did not answer. Check that AI Head Office Overview is still running.');
+        show('COIN RETURNED', app()?.faultText?.(e) || 'The office did not answer. Check that the AI Head Office Overview window is still open, then try again.');
         coin.disabled = false;
         coin.classList.remove('dropping');
       }
@@ -2732,7 +2749,7 @@
 
   window.officeView = {
     update,
-    /** Draws again now (Show names or PC name was ticked or unticked). */
+    /** Draws again now (Show names or Project on screens was ticked or unticked). */
     refresh: () => { for (const v of views) v.drawnAt = 0; wake(); },
     select: (id) => {
       world.selected = id;

@@ -17,7 +17,7 @@
       : { method: 'POST', headers: { 'x-aho-key': KEY, 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 403) { setTimeout(() => location.reload(), 500); throw { error: { fault: 'The office was restarted.', reason: 'This page is from its earlier run.', wayOut: 'It reloads by itself.' } }; }
     const d = await r.json().catch(() => ({}));
-    if (!r.ok || d.ok === false) throw { error: d.fault ? { fault: d.fault, reason: d.reason || '', wayOut: d.wayOut || '' } : { fault: typeof d.error === 'string' ? d.error : `The office answered ${r.status}.`, reason: '', wayOut: '' } };
+    if (!r.ok || d.ok === false) throw { error: d.fault ? { fault: d.fault, reason: d.reason || '', wayOut: d.wayOut || '' } : { fault: typeof d.error === 'string' ? d.error : `The office answered ${r.status}.`, reason: '', wayOut: typeof d.error === 'string' ? '' : 'Try again; if it keeps happening, restart the office (Settings › About › Quit, then start it again).' } };
     return d;
   }
   app.engine = engine;
@@ -121,7 +121,7 @@
         `Start-line prompt copied for ${p.name}. Paste it into the AI you use.`, true)],
     [el('button', { type: 'button', class: 'btn', onclick: () => app.closeWindow() }, 'Close')]);
   }
-  const noStartButton = (p, extra = '') => el('button', { type: 'button', class: `btn${extra}`, title: 'No start command in the project\'s .claude/launch.json or project.json: see how to add one', onclick: (e) => { const menu = e.currentTarget.closest('details'); if (menu) menu.open = false; noStartWindow(p); } }, 'No start command…');
+  const noStartButton = (p, extra = '', label = 'No start command…') => el('button', { type: 'button', class: `btn${extra}`, title: 'No start command in the project\'s .claude/launch.json or project.json: see how to add one', 'aria-label': `No start command for ${p.name}: see how to add one`, onclick: (e) => { const menu = e.currentTarget.closest('details'); if (menu) menu.open = false; noStartWindow(p); } }, label);
 
   /** Before a project's start command first runs (or after it changed): the whole command, where it comes from, and a
    * choice. Resolves true for Run it; false for Cancel, Escape or a click beside the window. Cancel has the focus. */
@@ -161,7 +161,7 @@
     app.draw();
     try {
       if (what === 'run' || what === 'move') {
-        // Re-allocate (move): another program holds its port, so it starts on a clean one, kept for next time.
+        // Use another port (move): another program holds its port, so it starts on a clean one, kept for next time.
         const body = { id, key: p.commands[0]?.key, open: true, move: what === 'move' };
         let r = await engine('/api/start', body);
         // The first run of this command (or a changed one): nothing started; the person sees it and says yes first.
@@ -193,7 +193,7 @@
         const port = p.portInUse;
         const o = ((await engine('/api/port-owners', {})).owners || []).find((x) => x.port === port);
         if (!o) { say(`Port ${port} is not held by another program any more.`); return; }
-        if (o.why) { say(`The program on port ${port} (${o.name}) is not stopped: ${o.why}.`); return; }
+        if (o.why) { say(`The program on port ${port} (${o.name}) is not stopped: ${o.why}. Use another port starts ${p.name} on a clean port instead, or close that program yourself.`); return; }
         if (!confirm(`Stop ${o.name} (program id ${o.pid})? It holds port ${port}, which ${p.name} needs. Anything unsaved in it is lost.`)) return;
         const r = await engine('/api/stop-port', { port, pid: o.pid });
         say(r.dryRun ? `Test copy, not stopped: ${r.dryRun}` : r.free ? `Port ${port} is free now.` : `${r.name || o.name} was stopped: port ${port} is free.`);
@@ -209,28 +209,25 @@
   /** A small button on a project's tile, greyed while that project is busy. */
   const tileBtn = (p, what, label, title, primary) => el('button', { type: 'button', class: `btn small${primary ? ' primary' : ''}`, disabled: eng.busy.has(p.id), title, 'data-act': what, 'data-id': p.id,
     onclick: (e) => { const menu = e.currentTarget.closest('details'); if (menu) menu.open = false; act(p.id, what); } }, label);
-  /** What Run does now: [what, label, title]. Re-allocate when another program holds its port (it starts on a clean
+  /** What Run does now: [what, label, title]. Use another port when another program holds its port (it starts on a clean
    * port instead of stopping that program; the move is kept, so it stays rare); null with no start command. */
   function runOf(p) {
     if (!p.commands.length) return null;
     const busy = eng.busy.has(p.id);
-    if (p.portInUse) return ['move', busy ? 'Starting…' : 'Re-allocate', `Another program holds port ${p.portInUse}. Re-allocate starts ${p.name} on a clean port instead (the same one again next time, while ${p.portInUse} stays taken). To stop that program instead: Free port, under More.`];
+    if (p.portInUse) return ['move', busy ? 'Starting…' : 'Use another port', `Another program holds port ${p.portInUse}. Use another port starts ${p.name} on a clean port instead (the same one again next time, while ${p.portInUse} stays taken). To stop that program instead: Free port, under More.`];
     return ['run', busy ? 'Starting…' : 'Run', `Start ${p.name}'s local copy (${p.commands[0].name || 'its start command'}${p.commands[0].port ? `, port ${p.commands[0].port}` : ''}) and open it`];
   }
-  /** Free port: stops the program holding the project's port (it asks first). Kept under More: Re-allocate comes first. */
+  /** Free port: stops the program holding the project's port (it asks first). Kept under More: Use another port comes first. */
   const freePortOf = (p) => (p.portInUse && !p.running ? ['free-port', `Free port ${p.portInUse}`, `Stop the program holding port ${p.portInUse} so ${p.name} can use its own port (it names the program and asks first)`] : null);
-  /** Run, Re-allocate or Stop, on the tile's title line left of the port; nothing there when it has no start command. */
+  /** Run, Use another port or Stop, on the tile's title line left of the port; with no start command, a "No start"
+   * badge in Run's place that opens how to add one (as the Bridge's tiles do). */
   function runButton(p) {
     if (p.running) return tileBtn(p, 'stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`);
     const r = runOf(p);
-    return r ? tileBtn(p, ...r, true) : null;
+    return r ? tileBtn(p, ...r, true) : noStartButton(p, ' small no-start', 'No start…');
   }
   /** Browser, at the end of the Audit / Git / Live marks: only when the project has a local address. */
   const browserButton = (p) => (p.running || p.commands.some((c) => c.port) ? tileBtn(p, 'browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null);
-  /** Under the marks, only when the project has no start command. */
-  function portLine(p) {
-    return p.commands.length ? null : el('div', { class: 'row proj-actions' }, noStartButton(p, ' small'));
-  }
   /** The tile's More menu (Free port when shown, Copy prompt, Folder, Terminal, Hide, Remove from list), at the end of
    * the marks line. */
   function moreMenu(p, open) {
@@ -296,7 +293,7 @@
     const focusKey = had?.dataset.act ? `[data-act="${CSS.escape(had.dataset.act)}"][data-id="${CSS.escape(had.dataset.id || '')}"]` : '';
     // The top of a tile: its staff's faces on the left, its title, description and meta lines beside them.
     const top = (head, sub, meta, faces) => el('div', { class: 'proj-top' }, el('div', { class: 'staff-row' }, faces),
-      el('div', { class: 'proj-text' }, head, el('span', { class: 'proj-sub', text: sub }), el('span', { class: 'proj-meta', text: meta })));
+      el('div', { class: 'proj-text' }, head, el('span', { class: 'proj-sub', text: sub, title: sub }), el('span', { class: 'proj-meta', text: meta })));
     const tile = (p) => {
       const staff = staffOf(p);
       return el('li', { class: `proj${p.running ? ' is-running' : ''}` },
@@ -304,7 +301,7 @@
           runButton(p), p.running ? el('span', { class: 'run-dot', title: `Running on port ${p.running.port}` }, `● ${p.running.port}`) : null),
         p.description || p.folder, [p.tokens ? `${tokens(p.tokens)} tokens` : '', p.updated ? `updated ${ago(p.updated)}` : ''].filter(Boolean).join(' · '),
         staff.length ? staff.map(face) : el('span', { class: 'note', text: 'Nobody in today' })),
-        app.checkMarks?.(p, browserButton(p), moreMenu(p, openMore.has(p.id))), portLine(p));
+        app.checkMarks?.(p, browserButton(p), moreMenu(p, openMore.has(p.id))));
     };
     // Desks with no project on the list (the projects folder itself: Consultants, or a folder elsewhere) keep a plain tile.
     const linked = new Set(Object.keys(links));

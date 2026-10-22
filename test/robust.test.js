@@ -130,6 +130,20 @@ async function main() {
     const r = platform.runnable(path.join(WS, 'tool.cmd'), ['a&calc']);
     assert(r.error && /command/.test(r.error), JSON.stringify(r));
   });
+  await check('X-04: a .cmd script in a folder named with & runs whole; a folder with % or ! is refused', () => {
+    if (process.platform !== 'win32') return;
+    const rd = path.join(WS, 'R&D'); fs.mkdirSync(rd, { recursive: true });
+    fs.writeFileSync(path.join(rd, 'go.cmd'), '@echo ran-whole\r\n');
+    const r = platform.runnable(path.join(rd, 'go.cmd'), []);
+    const out = spawnSync(r.exe, r.args, { windowsVerbatimArguments: r.windowsVerbatimArguments, encoding: 'utf8' });
+    assert(/ran-whole/.test(out.stdout), JSON.stringify(r) + ' ' + out.stdout + out.stderr);
+    for (const name of ['100%done', 'wow!']) {
+      const pc = path.join(WS, name); fs.mkdirSync(pc, { recursive: true });
+      fs.writeFileSync(path.join(pc, 'go.cmd'), '@echo hi\r\n');
+      const p = platform.runnable(path.join(pc, 'go.cmd'), []);
+      assert(p.error && /Rename the folder/.test(p.error), name + ' ' + JSON.stringify(p));
+    }
+  });
 
   // ---- 3. Live addresses (L1, S11) ----
   await check('L1: another tenant of a shared host is not "the site itself"', () => {
@@ -256,7 +270,7 @@ async function main() {
       assert.strictEqual(got.cwd.toLowerCase(), path.join(WS, 'env-root', 'web').toLowerCase());
       assert.strictEqual(got.browser, 'none');
     });
-    await check('Re-allocate keeps the start file\'s other env settings: a moved copy still sees BROWSER=none', async () => {
+    await check('Use another port keeps the start file\'s other env settings: a moved copy still sees BROWSER=none', async () => {
       const held = http.createServer((q, s) => s.end(PAGE)); await new Promise(r => held.listen(0, '127.0.0.1', r)); outside.push(held);
       const pHeld = held.address().port;
       make('env-moved', { '.claude/launch.json': launch({ name: 'x', runtimeExecutable: NODE, runtimeArgs: ['-e', ENV_SITE], env: { PORT: String(pHeld), BROWSER: 'none' }, port: pHeld }) });

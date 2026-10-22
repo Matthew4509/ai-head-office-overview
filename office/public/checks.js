@@ -13,7 +13,7 @@
   const when = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
   const hostOf = (u) => { try { return new URL(u).host; } catch { return String(u || ''); } };
   const oneLine = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
-  const faultText = (e) => { const f = e?.error || {}; return f.fault ? `${f.fault} ${f.reason || ''}`.trim() : String(e?.message || e); };
+  const faultText = (e) => app.faultText(e);
 
   // ---- the window ----
   function open(title, body, buttons, wide = true) {

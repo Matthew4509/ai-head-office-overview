@@ -106,6 +106,26 @@ test('a settings file that is not valid JSON is never touched', () => {
   }
 });
 
+test('X-03: an office folder whose path bash or cmd would read ($, backtick, ", %) is refused, and the file is untouched', () => {
+  const h = tempHome();
+  try {
+    const file = withSettings(h, BEEPS);
+    const before = fs.readFileSync(file, 'utf8');
+    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts });
+    for (const bad of ['C:\\x\\$(calc)\\office\\hook.mjs', 'C:\\x\\`calc`\\office\\hook.mjs', 'C:\\x\\a"b\\office\\hook.mjs', 'C:\\x\\100%\\office\\hook.mjs']) {
+      const r = apply(office, { advanced: true }, { port: 8884, hookScript: bad });
+      assert.match(r.error?.fault || '', /cannot be turned on/, bad);
+      assert.match(r.error.wayOut, /Move the office/);
+    }
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+    // Going back to easy setup is never refused for the path.
+    assert.ok(apply(office, { advanced: false }, { port: 8884, hookScript: 'C:\\x\\$y\\office\\hook.mjs' }).ok);
+  } finally {
+    delete process.env.AHO_SETTINGS;
+    h.done();
+  }
+});
+
 test('no settings file yet: advanced setup makes one with only its hooks', () => {
   const merged = withOurs({}, hookCommand('C:/a/hook.mjs', 8884));
   assert.deepEqual(Object.keys(merged.hooks).sort(), ['Notification', 'Stop', 'UserPromptSubmit']);

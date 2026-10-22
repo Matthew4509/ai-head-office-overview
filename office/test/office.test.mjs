@@ -205,3 +205,44 @@ test('Answered covers the need it was pressed for: a permission prompt that come
     h.done();
   }
 });
+
+test('X-01: threads started in 4 sibling project folders: the folder they sit in is the root, so none are Consultants', () => {
+  const h = tempHome();
+  try {
+    const kids = ['alpha', 'bravo', 'charlie', 'delta'];
+    kids.forEach((k, i) => {
+      const cwd = `${ROOT}\\${k}`;
+      // Each project has more threads than the next, as in real life: the busiest one must not become the root.
+      for (let n = 0; n <= 3 - i; n++) lines(`${k}${n}`).prompt(0, 'go', cwd).tool(1, 'Write', { file_path: `${cwd}\\a.md` }, 10, cwd).reply(2, 'Done.', 10, cwd).write(file(h, `${k}${n}`));
+    });
+    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts, now: () => at(3) });
+    office.scan();
+    assert.equal(office.root(), ROOT);
+    const s = office.snapshot();
+    assert.deepEqual([...new Set(s.people.map((p) => p.folder))].sort(), kids);
+    assert.ok(s.people.every((p) => p.folder), 'nobody is a Consultant');
+  } finally {
+    h.done();
+  }
+});
+
+test('X-01: with no projects folder set, a working folder (Settings › Folders) the threads started under is the root', () => {
+  const h = tempHome();
+  try {
+    const cwd = `${ROOT}\\alpha`;
+    for (const id of ['a1', 'a2', 'a3']) lines(id).prompt(0, 'go', cwd).reply(1, 'Done.', 10, cwd).write(file(h, id));
+    lines('elsewhere').prompt(0, 'go', 'D:\\other').reply(1, 'Done.', 10, 'D:\\other').write(file(h, 'elsewhere'));
+    let folders = ['E:\\empty', `${ROOT}\\`];
+    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts, now: () => at(2), workingFolders: () => folders });
+    office.scan();
+    assert.equal(office.root(), `${ROOT}\\`, 'the working folder holding the threads, not the first one listed');
+    folders = ['E:\\empty'];
+    assert.equal(office.root(), `${ROOT}\\alpha`, 'no working folder holds a thread: back to the guess from the threads');
+    office.settings.root = 'F:\\mine';
+    assert.equal(office.root(), 'F:\\mine', 'the office\'s own setting always wins');
+    const fresh = new Office({ dataDir: path.join(h.dir, 'data2'), transcriptsDir: path.join(h.dir, 'none'), workingFolders: () => ['E:\\empty', 'G:\\two'] });
+    assert.equal(fresh.root(), 'E:\\empty', 'no threads yet: the first working folder');
+  } finally {
+    h.done();
+  }
+});

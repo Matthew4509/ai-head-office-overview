@@ -64,7 +64,8 @@
     return `${(s / 3600).toFixed(1)} h`;
   }
   const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const projectName = (folder) => folder || 'Consultants';
+  // A desk's project by the name the project list gives it ("Harbour Lane Bakery"), else its folder's name.
+  const projectName = (folder) => app.projectOfFolder?.(folder)?.name || folder || 'Consultants';
   const where = (p) => `${p.folder || 'Projects folder'}, seat ${p.seat}`;
 
   function stateTag(state) {
@@ -92,6 +93,14 @@
     box.hidden = false;
   }
   app.showFault = showFault;
+  /** A fault in one line with its way out (what went wrong, why, what to do), for a window's status line. Every window
+   * says it this way, so no error is left without a next step. */
+  app.faultText = (e) => {
+    const f = e?.error || {};
+    if (f.fault) return `${f.fault} ${f.reason || ''} ${f.wayOut || ''}`.replace(/\s+/g, ' ').trim();
+    if (typeof e?.error === 'string') return e.error;
+    return 'The office did not answer. Check that the AI Head Office Overview window is still open (or start it again), then try again.';
+  };
 
   // Every request carries the key this page was served with; the office's own API lives under /api/office/.
   const KEY = document.querySelector('meta[name="aho-key"]')?.content || '';
@@ -119,8 +128,8 @@
   app.setChatMode = (m) => { try { localStorage.setItem('aho-chat', m); } catch { /* fine */ } window.officeView?.refresh?.(); draw(); };
   /** Is the project planner shown (Settings › Office)? Off until ticked; kept in this browser. */
   app.plannerOn = () => { try { return localStorage.getItem('aho-planner') === 'on'; } catch { return false; } };
-  // Above Filter by: Show names (the staff's names in the office) and PC name (the project's name above each desk's
-  // computer), both on until unticked, to see the staff better or for a screenshot. Kept in this browser only.
+  // Above Filter by: Show names (the staff's names in the office) and Project on screens (the project's name above
+  // each desk's computer), both on until unticked, to see the staff better or for a screenshot. Kept in this browser only.
   const remembered = (k) => { try { return localStorage.getItem(k) !== 'off'; } catch { return true; } };
   app.showNames = remembered('aho-show-names');
   app.showPcName = remembered('aho-show-pc-name');
@@ -191,15 +200,15 @@
         })];
     } else {
       items = [row(app.project === null, () => pickProject(null), 'All projects', `${n(prs.length, 'project', 'projects')} · ${n(peopleIn(prs), 'person', 'people')}`, 'Show everyone in every project'),
-        ...prs.map((pr) => row(app.project === pr.folder, () => pickProject(pr.folder), projectName(pr.folder), says(pr), `Show only ${projectName(pr.folder)}: ${n(pr.people.length, 'person', 'people')}`))];
+        ...prs.map((pr) => row(app.project === pr.folder, () => pickProject(pr.folder), projectName(pr.folder), says(pr), `${pr.folder ? `Folder: ${pr.folder}. ` : ''}Show only ${projectName(pr.folder)}: ${n(pr.people.length, 'person', 'people')}`))];
     }
     swap(nav, el('div', { class: 'filter-head' }, el('h2', { id: 'filter-title', text: 'Filter by' }), choose),
       el('ul', { class: 'filter-list' }, ...items), foot,
       prs.length || app.filterBy === 'category' ? null : el('p', { class: 'empty', text: 'No threads today yet.' }));
   }
 
-  /** One row under the tabs, above the office: Show names (the staff's names), PC name (the project's name above each
-   * desk's computer) and Show general chit-chat (the office chat; unticked, Thoughts keeps only what the threads are
+  /** One row under the tabs, above the office: Show names (the staff's names), Project on screens (the project's name
+   * above each desk's computer) and Show general chit-chat (the office chat; unticked, Thoughts keeps only what the threads are
    * doing, as Work only under Settings › Office). Shown with the office only. All three are on until unticked. */
   function drawViewTicks() {
     const row = document.getElementById('view-ticks');
@@ -211,7 +220,7 @@
     const focused = [...row.querySelectorAll('input')].indexOf(document.activeElement);
     const drawn = swap(row,
       tick('Show names', app.showNames, 'The staff\'s names under them in the office', (on) => { app.showNames = on; keep('aho-show-names', on); window.officeView?.refresh?.(); }),
-      tick('PC name', app.showPcName, 'The project\'s name above each desk\'s computer', (on) => { app.showPcName = on; keep('aho-show-pc-name', on); window.officeView?.refresh?.(); }),
+      tick('Project on screens', app.showPcName, 'The project\'s name above each desk\'s computer', (on) => { app.showPcName = on; keep('aho-show-pc-name', on); window.officeView?.refresh?.(); }),
       tick('Show general chit-chat', app.chatMode() === 'all', 'The office banter in Thoughts. Untick to keep only what the threads are doing (Settings › Office also has Off)', (on) => app.setChatMode(on ? 'all' : 'work')));
     if (drawn && focused >= 0) row.querySelectorAll('input')[focused]?.focus();
   }
@@ -649,14 +658,16 @@
     if (e.key !== 'Escape') return;
     for (const id of ['setup', 'edit', 'check']) {
       const sheet = document.getElementById(id);
+      // Escape on the Welcome is an answer too ("Not now"), so it is not asked again at every start.
+      if (!sheet.hidden && sheet.querySelector('#welcome-title') && app.welcomeAnswer) { app.welcomeAnswer(false); continue; }
       sheet.hidden = true;
       if (id !== 'setup') sheet.replaceChildren(); // the look editor's turning figure stops drawing once it is gone
     }
   });
 
-  // The windows (Settings, Edit, and every project window): Tab and Shift+Tab stay inside the open one, and closing it
-  // (Close, Escape, a click beside it) puts the focus back where it was, on what opened it, for keyboard and screen
-  // reader use. One place for all of them, so a new window gets it too.
+  // The windows (Settings, Edit, and every project window): opening one moves the focus into it, Tab and Shift+Tab stay
+  // inside the open one, and closing it (Close, Escape, a click beside it) puts the focus back where it was, on what
+  // opened it, for keyboard and screen reader use. One place for all of them, so a new window gets it too.
   const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
   let lastOutside = null;
   document.addEventListener('focusin', (e) => { if (!e.target.closest?.('.sheet')) lastOutside = e.target; });
@@ -666,6 +677,19 @@
     const b = e.target.closest?.('button, a[href], summary, [tabindex]');
     if (b && !b.closest('.sheet')) lastOutside = b;
   }, true);
+  // Into a window that just opened: a box marked autofocus, else its first text field, else its main button, else the
+  // window itself (read out by its title). Nothing moves when the focus is already inside it.
+  function focusInto(sheet) {
+    if (sheet.hidden || sheet.contains(document.activeElement)) return;
+    const shown = (n) => n && n.offsetParent !== null;
+    const field = [...sheet.querySelectorAll('[autofocus], input:not([type=checkbox]):not([type=radio]):not([type=file]):not([disabled]), textarea:not([disabled])')].find(shown);
+    const main = [...sheet.querySelectorAll('.sheet-foot .btn.primary:not([disabled])')].find(shown);
+    const box = sheet.querySelector('.sheet-box');
+    const to = field || main || box;
+    if (!to) return;
+    if (to === box && !box.hasAttribute('tabindex')) box.setAttribute('tabindex', '-1');
+    to.focus({ preventScroll: true });
+  }
   for (const id of ['setup', 'edit', 'check']) {
     const sheet = document.getElementById(id);
     if (!sheet) continue;
@@ -674,7 +698,10 @@
     let back = null;
     new MutationObserver(() => {
       const open = isOpen();
-      if (open && !wasOpen) back = lastOutside;
+      if (open && !wasOpen) {
+        back = lastOutside;
+        setTimeout(() => focusInto(sheet), 0);
+      }
       if (!open && wasOpen) {
         const was = back;
         back = null;

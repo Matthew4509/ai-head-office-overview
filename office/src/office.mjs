@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { emptyThread, readFrom, localDay } from './transcript.mjs';
 import { newTally, tallyLine, monthOf } from './tokens.mjs';
-import { folderOf, stateOf, assignSeats, defaultName, projectOf } from './people.mjs';
+import { folderOf, stateOf, assignSeats, defaultName, projectOf, normPath } from './people.mjs';
 import { cleanLook } from './look.mjs';
 import { AppLinks } from './applinks.mjs';
 
@@ -15,6 +15,10 @@ import { AppLinks } from './applinks.mjs';
 const WAITING_DAYS = 7;
 /** Bump when the summary's shape changes: the cache is then read again from the start. */
 const CACHE_VERSION = 6;
+/** Names that would reach Object.prototype if used as a key in the office's plain-object records (seats, hooks, done):
+ * a folder or thread called one of these is refused. */
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+export const safeKey = (k) => !UNSAFE_KEYS.has(String(k));
 
 /** A file of the office's own: not there = `fallback`; there but unreadable (cut short, edited by hand) = copied aside
  * first (<name>.damaged-<time>.json), so the next save cannot wipe what was in it (the ledger holds what was earned). */
@@ -35,7 +39,9 @@ function writeJson(file, data) {
 
 export class Office {
   /**
-   * @param {{ dataDir: string, transcriptsDir?: string, now?: () => number }} o
+   * @param {{ dataDir: string, transcriptsDir?: string, now?: () => number, workingFolders?: () => string[] }} o
+   * workingFolders: the head office's working folders (Settings › Folders), asked each time: the projects folder when
+   * the office has none of its own set.
    */
   constructor(o) {
     this.dataDir = o.dataDir;
@@ -43,6 +49,7 @@ export class Office {
     this.now = o.now || (() => Date.now());
     // Tokens added to the spending balance on top of what the AI wrote: only the demo has any (to try every reward).
     this.bonus = Math.max(0, Number(o.bonus) || 0);
+    this.workingFolders = o.workingFolders || (() => []);
     this.file = (n) => path.join(this.dataDir, n);
     this.settings = readJson(this.file('settings.json'), {});
     if (!this.settings.openedAt) {
@@ -170,13 +177,44 @@ export class Office {
     return 1;
   }
 
-  /** The projects folder: the setting, else the folder most threads started in. */
+  /**
+   * The projects folder: the setting; else the working folder (Settings › Folders) most threads started in or under
+   * (the first one when no thread has started yet); else the folder most threads started in, or, when threads start
+   * inside each project's own folder (siblings), the folder those sit in. Taking one project's folder as the root
+   * would make every other project's threads Consultants.
+   */
   root() {
     if (this.settings.root) return this.settings.root;
-    const count = {};
-    for (const r of Object.values(this.files)) if (!r.parent && r.t.startCwd) count[r.t.startCwd] = (count[r.t.startCwd] || 0) + 1;
-    const best = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
-    return best ? best[0] : '';
+    const starts = [];
+    for (const r of Object.values(this.files)) if (!r.parent && r.t.startCwd) starts.push(r.t.startCwd);
+    const under = (p, dir) => { const n = normPath(p), d = normPath(dir); return !!d && (n === d || n.startsWith(`${d}/`)); };
+    const wfs = (() => { try { return (this.workingFolders() || []).filter((w) => typeof w === 'string' && w.trim()); } catch { return []; } })();
+    if (wfs.length) {
+      const ranked = wfs.map((w, i) => ({ w, i, n: starts.filter((s) => under(s, w)).length })).sort((a, b) => b.n - a.n || a.i - b.i);
+      if (ranked[0].n || !starts.length) return ranked[0].w;
+    }
+    const count = new Map();
+    for (const s of starts) {
+      const k = normPath(s);
+      const c = count.get(k) || { path: s, n: 0 };
+      c.n++;
+      count.set(k, c);
+    }
+    const best = [...count.values()].sort((a, b) => b.n - a.n)[0];
+    if (!best) return '';
+    // Start folders grouped by the folder they sit in: two or more siblings holding more threads than the top one.
+    const parents = new Map();
+    for (const c of count.values()) {
+      const parent = path.dirname(c.path);
+      if (!parent || normPath(parent) === normPath(c.path) || /^[a-z]:[\\/]?$/i.test(parent) || parent === '/') continue;
+      const k = normPath(parent);
+      const g = parents.get(k) || { path: parent, kids: 0, n: 0 };
+      g.kids++;
+      g.n += c.n;
+      parents.set(k, g);
+    }
+    const group = [...parents.values()].filter((g) => g.kids >= 2).sort((a, b) => b.n - a.n)[0];
+    return group && group.n > best.n ? group.path : best.path;
   }
 
   /** The folders in the projects folder, as they are spelt on disk. */
@@ -186,18 +224,20 @@ export class Office {
 
   /** Remembers a hook event (advanced setup) for a thread. */
   hook(id, kind, words = '') {
-    if (!id) return;
+    if (!id || !safeKey(id)) return;
     this.hooks[id] = { kind, words, at: this.now() };
   }
 
   setNickname(folder, seat, nick) {
     const f = String(folder ?? '');
+    if (!safeKey(f)) return false;
     const s = String(Math.max(1, Math.floor(Number(seat) || 1)));
     const name = String(nick || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     this.seatNames[f] = this.seatNames[f] || {};
     if (name) this.seatNames[f][s] = { ...(this.seatNames[f][s] || {}), nick: name };
     else if (this.seatNames[f][s]) delete this.seatNames[f][s].nick;
     writeJson(this.file('seats.json'), this.seatNames);
+    return true;
   }
 
   /**
@@ -207,6 +247,7 @@ export class Office {
    */
   setFavourite(folder, seat, on) {
     const f = String(folder ?? '');
+    if (!safeKey(f)) return false;
     const s = String(Math.max(1, Math.floor(Number(seat) || 1)));
     this.seatNames[f] = this.seatNames[f] || {};
     const rec = { ...(this.seatNames[f][s] || {}) };
@@ -215,6 +256,7 @@ export class Office {
     delete rec.favHidden;
     this.seatNames[f][s] = rec;
     writeJson(this.file('seats.json'), this.seatNames);
+    return true;
   }
   setFavouriteProject(folder, on) {
     const f = String(folder ?? '');
@@ -226,6 +268,7 @@ export class Office {
   }
   setFavouriteHidden(folder, seat, hidden) {
     const f = String(folder ?? '');
+    if (!safeKey(f)) return false;
     const s = String(Math.max(1, Math.floor(Number(seat) || 1)));
     this.seatNames[f] = this.seatNames[f] || {};
     const rec = { ...(this.seatNames[f][s] || {}) };
@@ -233,11 +276,13 @@ export class Office {
     else delete rec.favHidden;
     this.seatNames[f][s] = rec;
     writeJson(this.file('seats.json'), this.seatNames);
+    return true;
   }
 
   /** A seat's look (EDIT on the card): a checked look, or null for the made-up one again. Answers false if refused. */
   setLook(folder, seat, look) {
     const f = String(folder ?? '');
+    if (!safeKey(f)) return false;
     const s = String(Math.max(1, Math.floor(Number(seat) || 1)));
     this.seatNames[f] = this.seatNames[f] || {};
     const rec = { ...(this.seatNames[f][s] || {}) };
@@ -264,8 +309,8 @@ export class Office {
 
   /** Takes a thread off the Needs attention list until it needs you again (a new reply, or a new hook event). */
   markDone(id) {
+    if (!safeKey(id) || !Object.hasOwn(this.ledger.threads, id)) return false;
     const rec = this.ledger.threads[id];
-    if (!rec) return false;
     this.done[id] = this.needKey(id, rec.lastAt);
     writeJson(this.file('done.json'), this.done);
     return true;

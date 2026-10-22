@@ -106,7 +106,7 @@ running).
   donuts and coffee bought together all arrive. The foods sit side by side on the kitchen table. Whoever gets something
   turns to face you and waves a thank-you.
 - One row under the tabs, above the office, all ticked to start with: **Show names** (the staff's names under them)
-  and **PC name** (the project's name above each desk's computer): untick either to see the staff better, or for a
+  and **Project on screens** (the project's name above each desk's computer): untick either to see the staff better, or for a
   screenshot; and **Show general chit-chat**: untick it and Thoughts keeps only what the threads are doing (the same
   as Work only under Settings › Office). Remembered in this browser.
 - **Filter by** (left of the office), with a choice of **Project** or **Working folder** (and **Category** while the
@@ -143,7 +143,7 @@ running).
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
   beside the port. The first time a start command runs, or after it changes, Run asks first: a window shows the program,
   its arguments, the folder and the file it comes from, because it runs with your Windows permissions (check it for a
-  project you downloaded). Its output goes to a log in the office's data folder, cut back past 5 MB. When another program holds its port, Run becomes **Re-allocate**: it starts the project on the
+  project you downloaded). Its output goes to a log in the office's data folder, cut back past 5 MB. When another program holds its port, Run becomes **Use another port**: it starts the project on the
   next clean port (one no other project uses) instead of stopping that program, and keeps that port for next time while
   the old one stays taken, so moves stay rare; the start port is always tried first. Under them: its **Audit / Git /
   Live** marks with **Browser** and **More** at their end (a project with no live site shows **+ Live URL**). **More**
@@ -460,7 +460,8 @@ audit lists the record of every rule it shows that someone has judged.
 - **Port 8880 is taken by another program**: start it with `node server.js --port=8885` (any free port), or set
   `AHO_PORT`. Advanced setup's hooks carry the port: turn advanced setup off and on again after changing it.
 - **A project shows "No start command"**: add a `start` for it in `projects.json` (see above).
-- **Nobody in the office**: Settings › Office: the projects folder must be the folder your project folders sit in.
+- **Nobody in the office**, or everyone a Consultant: Settings › Office: the projects folder must be the folder your
+  project folders sit in. Left empty, the office uses the working folder (Settings › Folders) your threads start in.
 - **Your folders or prompts are suddenly back to the start**: the file that held them could not be read. The office
   kept it in its `data` folder as `settings.damaged-<time>.json` or `prompts.damaged-<time>.json`. Quit the office,
   copy back what you need, and start it again.

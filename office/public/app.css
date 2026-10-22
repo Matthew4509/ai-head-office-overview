@@ -176,6 +176,10 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 #office { display: flex; gap: 14px; align-items: flex-start; justify-content: center; }
 #office canvas { flex: none; }
 .office-strip { flex: 0 0 240px; margin: 0; }
+/* A wide panel with room below: the strip under the office (office.js fit() decides), so the office fills the panel. */
+#office.office-stacked { flex-direction: column; align-items: center; }
+#office.office-stacked .office-strip { flex: none; align-self: stretch; margin: 6px 0 0; min-height: 4.4em; }
+#office.office-stacked .thoughts li:nth-child(n + 4) { display: none; }
 /* Nobody picked: the staff's latest thoughts, newest first (three on a narrow screen). */
 .thoughts { list-style: none; margin: 6px 0 8px; padding: 0; display: grid; gap: 8px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 /* A chat message: the writer's small head on the left, their name and when above the words (like a team chat). */
@@ -323,7 +327,11 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .proj-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .proj-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .run-dot { color: var(--working); font-size: 13px; font-weight: 600; white-space: nowrap; }
+/* No start command: a quiet badge in Run's place (dashed, not a main button), opening how to add one. */
+.btn.no-start { flex: none; border-style: dashed; color: var(--soft); white-space: nowrap; }
 .proj-sub, .proj-meta { min-width: 0; color: var(--soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1.35em; }
+/* The description gets two lines before it is cut (the whole of it is the hover title). */
+.proj-sub { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .staff-row { display: flex; flex-wrap: wrap; gap: 4px; min-height: 34px; align-items: center; }
 .staff { border: 2px solid transparent; background: none; padding: 0; border-radius: 50%; line-height: 0; }
 .staff .face, .staff .face canvas { width: 30px; height: 30px; }

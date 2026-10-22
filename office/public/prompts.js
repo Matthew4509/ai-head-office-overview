@@ -11,7 +11,7 @@
   const sheet = document.getElementById('check');
   const st = { prompts: null, cats: [], cat: '', q: '' };
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  const fault = (e) => { const f = e?.error || {}; return f.fault || String(e?.message || e); };
+  const fault = (e) => app.faultText(e);
   const catOf = (id) => st.cats.find((c) => c.id === id);
   const inCat = (id) => st.prompts.filter((p) => p.category === id);
   const btn = (label, onclick, primary = false) => el('button', { type: 'button', class: `btn${primary ? ' primary' : ''}`, onclick }, label);
