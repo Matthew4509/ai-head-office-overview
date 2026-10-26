@@ -206,8 +206,9 @@ async function main() {
   if (held.length) console.log('  Note: port' + (held.length > 1 ? 's ' : ' ') + held.join(', ') + (held.length > 1 ? ' are' : ' is')
     + " held by another program (My Project Bridge's demo uses the same ports). The demo carries on; those sites may show as another program's.");
   // Fresh settings, audits and logs each time; site pictures are kept (they take a few seconds each).
-  for (const f of ['settings.json', 'run.json', 'priorities.json', 'categories.json']) fs.rmSync(path.join(DATA, f), { force: true });
+  for (const f of ['settings.json', 'run.json', 'priorities.json', 'categories.json', 'backups.json']) fs.rmSync(path.join(DATA, f), { force: true });
   for (const d of ['audits', 'logs', 'office', 'transcripts']) fs.rmSync(path.join(DATA, d), { recursive: true, force: true });
+  fs.rmSync(require('../lib/backup').DEMO_DRIVE, { recursive: true, force: true }); // the made-up backup drive, in temp
   build();
   // The made-up office: threads at the projects' desks, read by the office from data-demo/transcripts.
   writeThreads(path.join(DATA, 'transcripts'), WS, path.join(DATA, 'office'));
@@ -279,6 +280,15 @@ async function main() {
   }
   await call(key, '/api/priorities/replan', {}); // the last-hour pair from the scores just set
   console.log('  project planner: 3 categories, 9 projects scored');
+
+  // Backups: a made-up drive (a folder in temp, outside the office's folder), five projects on the list, three of them backed up now.
+  const drive = await call(key, '/api/backup/drive/add', {});
+  const ticked = ['harbour-lane-bakery', 'nimbus-notes', 'pixel-forge-studio', 'lumen-analytics', 'field-notes'].map(f => byFolder(f).id);
+  await call(key, '/api/backup/list', { ids: ticked, on: true });
+  const started = await call(key, '/api/backup/start', { ids: ticked.slice(0, 3) });
+  let job = started.job;
+  for (let i = 0; i < 120 && job && !job.finished; i++) { await sleep(250); job = (await call(key, '/api/backup/status')).job; }
+  console.log('  backups: ' + (drive.ok ? drive.drive.path : drive.fault) + ', ' + (job ? job.items.filter(x => x.state === 'done').length : 0) + ' of 5 on the list backed up');
 
   if (process.argv.includes('--no-window')) return console.log('\nReady at http://127.0.0.1:' + PORT + '/ (no window opened).');
   const edge = findEdge(), url = 'http://127.0.0.1:' + PORT + '/';

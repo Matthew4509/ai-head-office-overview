@@ -789,6 +789,49 @@ async function main() {
     assert((await api('/api/live/every', { minutes: 15 })).json.ok);
   });
 
+  // ----- backups: a made-up backup folder in temp, outside the working folder -----
+  const BK = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-bk-'));
+  await check('backups: the folder window is only reported in a test copy; a typed folder becomes Drive 1', async () => {
+    const pick = (await api('/api/backup/drive/add', {})).json;
+    assert(pick.ok && /backups go/.test(pick.dryRun || ''), JSON.stringify(pick));
+    const r = (await api('/api/backup/drive/add', { path: BK })).json;
+    assert(r.ok && r.drive.name === 'Drive 1' && r.drive.here, JSON.stringify(r));
+    const v = (await api('/api/backup')).json;
+    assert.strictEqual(v.drives.length, 1);
+    assert.strictEqual(v.keepLast, 0, 'every backup is kept unless the person says otherwise');
+  });
+  await check('backups: a backup folder inside a project or the working folder is refused', async () => {
+    const r1 = (await api('/api/backup/drive/add', { path: path.join(alphaDir, 'backups') })).json;
+    assert(!r1.ok && /inside/.test(r1.fault), JSON.stringify(r1));
+    const r2 = (await api('/api/backup/drive/add', { path: WS })).json;
+    assert(!r2.ok && /working folder/.test(r2.fault), JSON.stringify(r2));
+  });
+  await check('backups: the list takes project ids; a path in the request is never what is backed up', async () => {
+    const alpha = (await api('/api/projects')).json.projects.find(p => p.folder === 'alpha-site');
+    assert((await api('/api/backup/list', { ids: [alpha.id], on: true })).json.ok);
+    const row = (await api('/api/projects')).json.projects.find(p => p.id === alpha.id).backup;
+    assert(row.listed && row.attention === 'never', JSON.stringify(row));
+    const pl = (await api('/api/backup/plan', { ids: [alpha.id], dir: os.homedir(), path: os.homedir() })).json;
+    assert(pl.ok && pl.rows.length === 1 && pl.rows[0].id === alpha.id && pl.fits === true, JSON.stringify(pl).slice(0, 300));
+    const unknown = (await api('/api/backup/plan', { ids: ['not-a-project'] })).json;
+    assert(!unknown.ok && /not on the list/.test(unknown.fault));
+    assert(!(await api('/api/backup/plan', { path: os.homedir() })).json.ok);
+  });
+  await check('backups: Start runs in the background, then the zip is on the drive, checked, and the row says so', async () => {
+    const alpha = (await api('/api/projects')).json.projects.find(p => p.folder === 'alpha-site');
+    const s = (await api('/api/backup/start', { ids: [alpha.id] })).json;
+    assert(s.ok, JSON.stringify(s));
+    let j;
+    for (let i = 0; i < 100; i++) { j = (await api('/api/backup/status')).json.job; if (j && j.finished) break; await sleep(150); }
+    assert(j && j.finished && j.items[0].state === 'done', JSON.stringify(j));
+    const zips = fs.readdirSync(path.join(BK, 'AI Head Office Backups', 'alpha-site')).filter(n => n.endsWith('.zip'));
+    assert.strictEqual(zips.length, 1);
+    const row = (await api('/api/projects')).json.projects.find(p => p.id === alpha.id).backup;
+    assert(row.last && row.last.drive === 'Drive 1' && row.attention === null, JSON.stringify(row));
+    const h = (await api('/api/backup/history?id=' + alpha.id)).json;
+    assert(h.history.length === 1 && h.history[0].checked && h.history[0].driveName === 'Drive 1', JSON.stringify(h));
+  });
+
   await check('a second office on the same port exits cleanly (one office at a time)', async () => {
     const code = await new Promise(res => { const b = spawn(NODE, [path.join(__dirname, '..', 'server.js'), '--dry-run'], { env: { ...process.env, AHO_PORT: String(PORT), AHO_DATA: DATA, AHO_ROOT: WS }, stdio: 'ignore' }); b.on('exit', res); });
     assert.strictEqual(code, 0);
@@ -801,7 +844,7 @@ async function main() {
   });
 
   srv.kill();
-  for (const d of [DATA, extra, wf, WS]) fs.rmSync(d, { recursive: true, force: true });
+  for (const d of [DATA, extra, wf, WS, BK]) fs.rmSync(d, { recursive: true, force: true });
   console.log(failures ? failures + ' FAILED' : 'all passed');
   process.exit(failures ? 1 : 0);
 }

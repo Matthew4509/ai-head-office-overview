@@ -77,7 +77,9 @@ folder's own `origin`), and checks the signature against the key the office carr
   key the page was served with; the one exception, `/api/office/hook`, takes only a JSON event. Code: `lib/routes/index.js`.
 - **Reads:** `~/.claude/projects` (transcripts), `~/.codex/sessions` (token counts), the project folders in its
   working folders, and the Claude desktop app's thread records (the Open button). It never writes to any of them.
-- **Writes:** its own `data` folder only; the AI app's `~/.claude/settings.json` only when the user turns advanced
+- **Writes:** its own `data` folder; when the user runs a backup, a zip, a .txt and `backups-index.json` in the
+  backup folder they chose (`lib/backup.js`; it never changes a project's files, and deletes old zips only when the
+  user turned on Keep last N); the AI app's `~/.claude/settings.json` only when the user turns advanced
   setup on or off, and uninstall takes its own hooks out again (a copy is saved first each time; code:
   `office/src/setup.mjs`, `lib/setup.js`); the start link is set again on every start (start.cmd), and the shortcuts
   only through setup (`lib/setup.js`).

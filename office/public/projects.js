@@ -59,7 +59,7 @@
     try {
       eng.stats = await engine('/api/stats');
       app.welcome?.(eng.stats);
-      const rev = [eng.stats.rowsRev, eng.stats.tokensAt, eng.stats.liveRev].join('|');
+      const rev = [eng.stats.rowsRev, eng.stats.tokensAt, eng.stats.liveRev, eng.stats.backupRev].join('|');
       if (rev !== eng.rev || Date.now() - eng.at > 30000) { eng.rev = rev; await loadProjects(); }
       drawPC();
     } catch { /* app.js says when the office is not answering */ }
@@ -241,6 +241,7 @@
           onclick: (e) => { e.currentTarget.closest('details').open = false; app.gitWindow?.(p.id); } }, '○ No git…') : null,
         b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
         b('folder', 'Folder', `Open ${p.name}'s folder`), b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
+        ...(app.backupMenuItems?.(p) || []),
         p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
         b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`)));
     return more;
@@ -258,6 +259,7 @@
       b('folder', 'Folder', `Open ${p.name}'s folder`),
       b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
       p.running || p.commands.some((c) => c.port) ? b('browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null,
+      ...(app.backupMenuItems?.(p, 'btn') || []),
       p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
       b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`),
     ];
@@ -301,7 +303,7 @@
           runButton(p), p.running ? el('span', { class: 'run-dot', title: `Running on port ${p.running.port}` }, `● ${p.running.port}`) : null),
         p.description || p.folder, [p.tokens ? `${tokens(p.tokens)} tokens` : '', p.updated ? `updated ${ago(p.updated)}` : ''].filter(Boolean).join(' · '),
         staff.length ? staff.map(face) : el('span', { class: 'note', text: 'Nobody in today' })),
-        app.checkMarks?.(p, browserButton(p), moreMenu(p, openMore.has(p.id))));
+        app.checkMarks?.(p, app.backupTick?.(p), app.backupMark?.(p), browserButton(p), moreMenu(p, openMore.has(p.id))));
     };
     // Desks with no project on the list (the projects folder itself: Consultants, or a folder elsewhere) keep a plain tile.
     const linked = new Set(Object.keys(links));
@@ -312,7 +314,7 @@
     const toggle = el('div', { class: 'row note' }, el('label', {}, el('input', { type: 'checkbox', checked: app.showAll, onchange: (e) => { app.showAll = e.target.checked; app.draw(); } }), ' Show everyone, not only today'),
       hiddenN ? el('label', {}, el('input', { type: 'checkbox', checked: !!app.showHidden, onchange: (e) => { app.showHidden = e.target.checked; app.draw(); } }), ` Show hidden (${hiddenN})`) : null);
     const loading = !eng.at ? el('p', { class: 'note', text: 'Reading the project list…' }) : null;
-    const drawn = swap(box, toggle, loading, el('ul', { class: 'proj-tiles' }, ...loose.map(looseTile), ...sorted.map(tile)),
+    const drawn = swap(box, toggle, eng.at && eng.projects.length ? app.backupBar?.(shown) : null, loading, el('ul', { class: 'proj-tiles' }, ...loose.map(looseTile), ...sorted.map(tile)),
       eng.at && !sorted.length && !loose.length ? el('p', { class: 'empty', text: eng.projects.length ? 'No project in what Filter by shows. Pick All projects to see them all.' : 'No projects yet. Add a working folder under Settings.' }) : null);
     if (drawn && focusKey) box.querySelector(focusKey)?.focus();
   };

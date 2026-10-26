@@ -1,5 +1,5 @@
 // Settings: one window for everything that is not the office itself. Folders (working folders, projects added one by
-// one, projects taken off the list), Setup (the start link, desktop shortcut and Start with Windows; advanced setup,
+// one, projects taken off the list), Backups (drawn by backups.js), Setup (the start link, desktop shortcut and Start with Windows; advanced setup,
 // the AI app's hooks, as its last step), Office (theme, projects folder, gone-home time, live checks), Private details, Update
 // (a newer version from GitHub, taken in one click), Help
 // and About (version, the Git program, Quit, Uninstall). Opened by Settings at the top. The welcome on the first start
@@ -10,7 +10,7 @@
   const app = window.aiOffice;
   const { el } = app;
   const sheet = document.getElementById('setup');
-  const SECTIONS = [['folders', 'Folders'], ['setup', 'Setup'], ['office', 'Office'], ['private', 'Private details'], ['update', 'Update'], ['help', 'Help'], ['about', 'About']];
+  const SECTIONS = [['folders', 'Folders'], ['backups', 'Backups'], ['setup', 'Setup'], ['office', 'Office'], ['private', 'Private details'], ['update', 'Update'], ['help', 'Help'], ['about', 'About']];
   let section = 'folders';
   const said = el('p', { class: 'note check-said', role: 'status', 'aria-live': 'polite' });
   const say = (t) => { said.textContent = t; };
@@ -217,6 +217,10 @@
       li('Audit checks the code (and the running copy and live site, when there are) against about 130 rules: keys, injection, sign-in and payment gaps, uploads, exposed files, trackers, private details. It catches common faults, not everything. Not a fault… sets one place aside with your reason; Review with AI… builds a prompt to paste into the AI you use.',
         'Git: ● backed up, ▲ unsaved or not pushed or only on this PC, ○ no git. The window gives the exact commands to copy, and See what changed shows every changed line. The office only reads git: it never commits, pushes or changes a folder.',
         'Live: the address a project is hosted at, checked when the office starts and every 5, 10 or 15 minutes with one plain request: ● up, ▲ unsure, ✕ down.'),
+      h3('Backups'),
+      li('Settings › Backups › Turn on backups: choose where they go (a USB drive is best). Tick Backup on each project tile to put it on the backup list.',
+        'Run backups now (Projects tab, top line) lists every project on the list with its size and the time it should take, checks it fits on the drive, then zips each one and reads it back from the drive to check every file. The office keeps working meanwhile.',
+        'Backups are only ever added. When a drive is full, plug in another and add it: the full one keeps its backups. With two drives plugged in, Run backups now asks which one to use.'),
       h3('Prompts'),
       p('Prompts you use again and again, a tile per category: Copy, Edit (which can move it), Remove; New category, Add prompt, Rename and Delete category. Words in [brackets] are yours to fill in. Kept on this PC only.'),
       h3('What leaves this PC'),
@@ -328,7 +332,7 @@
     ];
   }
 
-  const DRAW = { folders: drawFolders, setup: drawSetup, office: drawOffice, private: drawPrivate, update: drawUpdate, help: drawHelp, about: drawAbout };
+  const DRAW = { folders: drawFolders, backups: () => app.drawBackupSettings(say, () => show('backups')), setup: drawSetup, office: drawOffice, private: drawPrivate, update: drawUpdate, help: drawHelp, about: drawAbout };
 
   // ---- The first start: Start with Windows and a desktop shortcut, offered ticked, asked once ----
   let welcomed = false;

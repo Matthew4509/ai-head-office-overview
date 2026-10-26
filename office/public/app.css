@@ -608,3 +608,17 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .copy-block textarea { width: 100%; }
 .welcome-start-line { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
 .welcome-start-line .note { margin: 4px 0 10px; }
+
+/* Backups (backups.js): the tick box on a tile, the top line, the Run window's rows */
+.bk-tick { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; color: var(--soft); }
+.bk-tick input { margin: 0; }
+.bk-tick:has(input:checked) { color: var(--ink); }
+.bk-bar { margin: 0 0 10px; gap: 6px 10px; }
+.bk-row { border-left-color: var(--line); }
+.bk-pick { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.bk-pick input { margin-top: 4px; }
+.bk-when { text-align: right; flex: none; max-width: 45%; }
+.bk-progress { width: 100%; height: 6px; accent-color: var(--accent); }
+.bk-typed summary { cursor: pointer; margin: 4px 0; }
+.bk-sum p { margin: 4px 0; }
+@media (max-width: 700px) { .bk-row { flex-wrap: wrap; } .bk-when { text-align: left; max-width: none; } }

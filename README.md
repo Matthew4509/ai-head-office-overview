@@ -208,6 +208,12 @@ Each mark opens its window:
   the last save, to read before you commit.
 - **Live**: the address the project is hosted at, checked when the office starts and every 5, 10 or 15 minutes with one
   plain request: ● up, ▲ unsure, ✕ down.
+- **Backups**: tick **Backup** on a tile to put the project on the backup list. **Run backups now** (Projects tab, top
+  line) lists every project on it with its size, the time it should take and the drive's free space, refuses before
+  starting when it will not fit, then zips each one to your backup drive, one at a time, while the office keeps
+  working. Every zip is read back from the drive and each file's size and CRC-32 checked before it counts; until then it
+  is a `.zip.partial`. The mark on the tile: ● backed up, ▲ changed since, ○ never, ✕ the last try failed (also in
+  Needs attention). **Back up now…** is in a tile's More menu too.
 
 ![An audit](screenshots/audit.png)
 
@@ -215,6 +221,14 @@ Each mark opens its window:
 
 - **Folders**: working folders (every folder inside one is a project), projects added one by one, projects taken off the
   list (bring one back), **Scan folders**.
+- **Backups**: **Turn on backups** opens the folder window: choose where they go (a USB drive is best). Each project
+  gets `AI Head Office Backups\<project>\<project>-<date>-<time>.zip` with a .txt beside it saying what is in it
+  (files, what was left out, anything locked, the check). The git history (.git) goes in; folders a project rebuilds
+  by itself (node_modules, .venv, .next, vendor beside composer.json, bin/obj beside a .NET project, target beside
+  Cargo.toml) stay out. Backups are only ever added: when a drive is full, plug in another and **Add another drive**;
+  the full one keeps its backups and stays listed. A drive is known by its serial number, so a new letter does not
+  matter, and the drive carries its own index, so another PC sees what it holds. With two plugged in, Run backups now
+  asks which to use. **Keep** the last 3, 5 or 10 per project is there, off to start with.
 - **Setup**: step 1, the desktop shortcut, Start with Windows and the start link; step 2 (advanced), the AI app's
   hooks, below.
 - **Office**: the theme (**Auto**, **Light** (the one to start with), **Dark**, or **Match Windows**, which follows
