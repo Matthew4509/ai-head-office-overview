@@ -12,6 +12,9 @@
 //   lib/runner.js        start/stop local copies, port owners     lib/desktop.js   windows/browsers (dry run aware)
 //   lib/platform/        every operating-system call              public/          the page, app.css, js/
 'use strict';
+// The office works from its own folder, however it was started: Windows looks for a program named without its path
+// (git) in the working folder first, and a folder the office does not own must not get to choose it.
+process.chdir(__dirname);
 const cli = require('./lib/cli');
 if (cli.wanted()) cli.runCli();
 else {

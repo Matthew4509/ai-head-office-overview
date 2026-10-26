@@ -9,7 +9,7 @@ const path = require('path');
 const zlib = require('zlib');
 const assert = require('assert');
 const { execFileSync, spawnSync } = require('child_process');
-const { disclosurePass, autoDetails, savePrivateList, readPrivateList, listForPage } = require('../lib/disclosure');
+const { disclosurePass, autoDetails, savePrivateList, readPrivateList, listForPage, makeMatcher } = require('../lib/disclosure');
 const { runAudit, fingerprint } = require('../lib/audit');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-disclosure-test-'));
@@ -348,6 +348,24 @@ async function main() {
     assert.strictEqual(nameOf(path.join(tmp, 'work')).near, true);
     assert.strictEqual(nameOf(path.join(tmp, 'Projects')).near, true);
     assert(!nameOf(path.join(tmp, 'quill' + 'moor-ledger')).near, 'a distinctive folder name is looked for everywhere');
+  });
+
+  // A PC whose Windows account is "User" once failed the bake on ".user.ini", "user:token@host" and "the user\'s":
+  // a generic account or PC name is not a detail on its own, while that account's home folder still is.
+  check('a Windows account called "User" (or Admin, Owner) is not a detail on its own; its home folder still is', () => {
+    const homeOf = name => 'C:' + '\\Users\\' + name;
+    const hitsFor = (who, text) => makeMatcher({ details: autoDetails([], who), others: [], own: [] })(text).filter(h => h.rule === 'DISC-001');
+    const code = "const NOTE = /^\\.user\\.ini$/; // user:token@host, the user\\'s other sessions\n";
+    for (const name of ['User', 'Admin', 'Owner', 'Administrator']) {
+      const who = { username: name, hostname: 'DESKTOP', home: homeOf(name) };
+      assert(!autoDetails([], who).some(d => d.label === 'your user name on this PC'), name + ' is not a detail');
+      assert.strictEqual(hitsFor(who, code).length, 0, name + ': everyday code is not a hit');
+      assert.strictEqual(hitsFor(who, 'cd ' + homeOf(name) + '\\proj\n').length, 1, name + ': the home folder is still found');
+    }
+    assert(!autoDetails([], { username: 'Wren', hostname: 'DESKTOP', home: homeOf('Wren') }).some(d => d.label === 'this PC\'s name'), 'a PC called DESKTOP is not a detail');
+    const real = { username: 'rowan' + 'tree', hostname: 'RAVEN-PC7', home: homeOf('rowan' + 'tree') };
+    assert(autoDetails([], real).some(d => d.label === 'your user name on this PC'), 'a real account name still is');
+    assert.strictEqual(hitsFor(real, 'ssh ' + 'rowan' + 'tree' + '@host\n').length, 1, 'and is still found');
   });
 
   const HERE = path.resolve(__dirname, '..');
