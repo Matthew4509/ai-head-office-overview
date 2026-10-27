@@ -225,7 +225,9 @@ Each mark opens its window:
   gets `AI Head Office Backups\<project>\<project>-<date>-<time>.zip` with a .txt beside it saying what is in it
   (files, what was left out, anything locked, the check). The git history (.git) goes in; folders a project rebuilds
   by itself (node_modules, .venv, .next, vendor beside composer.json, bin/obj beside a .NET project, target beside
-  Cargo.toml) stay out. Backups are only ever added: when a drive is full, plug in another and **Add another drive**;
+  Cargo.toml) stay out, unless **Full backup** is ticked (Settings › Backups), which takes them too. The backup folder
+  can be on a USB drive, another drive in the PC, or a network share (a mapped drive, or a `\\server\share` path typed
+  in). Backups are only ever added: when a drive is full, plug in another and **Add another drive**;
   the full one keeps its backups and stays listed. A drive is known by its serial number, so a new letter does not
   matter, and the drive carries its own index, so another PC sees what it holds. With two plugged in, Run backups now
   asks which to use. **Keep** the last 3, 5 or 10 per project is there, off to start with.

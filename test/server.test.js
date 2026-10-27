@@ -799,6 +799,13 @@ async function main() {
     const v = (await api('/api/backup')).json;
     assert.strictEqual(v.drives.length, 1);
     assert.strictEqual(v.keepLast, 0, 'every backup is kept unless the person says otherwise');
+    assert.strictEqual(v.full, false, 'rebuildable folders are left out unless the person turns Full backup on');
+  });
+  await check('backups: Full backup turns on and off, and only a plain true turns it on', async () => {
+    assert.strictEqual((await api('/api/backup/full', { on: true })).json.full, true);
+    assert.strictEqual((await api('/api/backup')).json.full, true);
+    assert.strictEqual((await api('/api/backup/full', { on: 'yes' })).json.full, false);
+    assert.strictEqual((await api('/api/backup')).json.full, false);
   });
   await check('backups: a backup folder inside a project or the working folder is refused', async () => {
     const r1 = (await api('/api/backup/drive/add', { path: path.join(alphaDir, 'backups') })).json;

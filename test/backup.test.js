@@ -294,6 +294,81 @@ check('engine: two drives plugged in means choosing one; never backed up and cha
   assert.deepStrictEqual(b.needs([later]), [], 'off the list: never in Needs attention');
 });
 
+check('full backup: off by default; on, the rebuildable folders go in too, the zip says so, and the setting is kept', async () => {
+  const p = project('Nu');
+  const w = await Backup.walk(p.dir, { full: true });
+  const n = names(w);
+  for (const inside of ['Nu/node_modules/left/index.js', 'Nu/deep/node_modules/also/index.js', 'Nu/php/vendor/lib.php', 'Nu/net/bin/App.dll', 'Nu/net/obj/x.cache', 'Nu/rust/target/debug/x', 'Nu/.claude/worktrees/wt/file.txt'])
+    assert.ok(n.includes(inside), 'a full walk takes ' + inside);
+  assert.deepStrictEqual(w.leftOut, {});
+  const b = engine();
+  const usb = path.join(tmp, 'usb9');
+  assert.ok((await b.addDrive(usb, { projects: [p] })).ok);
+  assert.strictEqual((await b.view()).full, false, 'off until it is turned on');
+  assert.strictEqual((await b.plan([p])).full, false);
+  const partFiles = (await b.plan([p])).rows[0].files;
+  assert.ok(b.setFull(true).ok);
+  const pl = await b.plan([p]);
+  assert.strictEqual(pl.full, true);
+  assert.strictEqual(pl.rows[0].files, partFiles + 7, 'the plan counts the 7 rebuildable files once it is on');
+  await b.start([p]); const j = await waitJob(b);
+  assert.strictEqual(j.items[0].state, 'done', JSON.stringify(j.items[0]));
+  assert.strictEqual(j.full, true);
+  const dir = path.join(usb, Backup.FOLDER_NAME, 'Nu');
+  const zip = fs.readdirSync(dir).find(f => f.endsWith('.zip'));
+  const list = (await listZip(path.join(dir, zip))).map(e => e.name);
+  assert.ok(list.includes('Nu/node_modules/left/index.js') && list.includes('Nu/.claude/worktrees/wt/file.txt'), 'the zip holds them');
+  const txt = fs.readFileSync(path.join(dir, zip.replace(/\.zip$/, '.txt')), 'utf8');
+  assert.match(txt, /Kind: full backup/);
+  assert.match(txt, /Left out \(rebuildable\): nothing/);
+  const idx = JSON.parse(fs.readFileSync(path.join(usb, Backup.FOLDER_NAME, Backup.INDEX_NAME), 'utf8'));
+  assert.strictEqual(idx.backups[0].full, true);
+  // Kept in data/backups.json; a new office reads it back. Turned off again, the next backup leaves them out.
+  const again = Backup.create({ dataDir: path.join(tmp, 'data' + dataN), listDrives: async () => vols, keyOf });
+  assert.strictEqual((await again.view()).full, true);
+  assert.strictEqual(again.setFull(false).full, false);
+  assert.strictEqual((await again.plan([p])).rows[0].files, partFiles);
+});
+
+// A network share as the backup folder: \\localhost\<share>\… reaches this PC's own temp folder the way a NAS share is
+// reached (SMB, no drive letter, no serial). Skipped, and said, on a PC where no such path can be written.
+check('a network folder (\\\\server\\share\\…) as the backup drive: added by its path, backed up, checked, and shown as network', async () => {
+  const t = path.join(tmp, 'nas');
+  fs.mkdirSync(t, { recursive: true });
+  const m = /^[A-Za-z]:\\Users(\\.*)$/i.exec(t);
+  const tries = [m && '\\\\localhost\\Users' + m[1], '\\\\localhost\\' + t[0] + '$' + t.slice(2)].filter(Boolean);
+  const unc = tries.find(u => { try { fs.writeFileSync(path.join(u, 'probe'), 'x'); fs.rmSync(path.join(u, 'probe')); return true; } catch { return false; } });
+  if (!unc) { console.log('skip network folder: no \\\\localhost share can be written on this PC (it needs file sharing on)'); return; }
+  const b = engine();
+  const p = project('Xi');
+  const r = await b.addDrive(unc, { projects: [p] });
+  assert.ok(r.ok, r.fault);
+  assert.strictEqual(r.drive.here, true);
+  assert.strictEqual(r.drive.network, true);
+  assert.strictEqual(r.drive.letter, null, 'a share path has no drive letter');
+  assert.ok(r.drive.free > 0 && r.drive.total >= r.drive.free, 'free space is read over the network');
+  const pl = await b.plan([p]);
+  assert.strictEqual(pl.drive.speed, Backup.FIRST_GUESS.network, 'the first guess at speed is a network one');
+  assert.ok(pl.fits);
+  await b.start([p]); const j = await waitJob(b);
+  assert.strictEqual(j.items[0].state, 'done', JSON.stringify(j.items[0]));
+  // Written through the share, it is there on the disk behind it, and reads back clean.
+  const dir = path.join(t, Backup.FOLDER_NAME, 'Xi');
+  const zip = fs.readdirSync(dir).find(f => f.endsWith('.zip'));
+  assert.ok(zip, 'the zip is on the share');
+  const w = await Backup.walk(p.dir);
+  const list = await listZip(path.join(dir, zip));
+  assert.strictEqual(list.length, w.items.length);
+  assert.ok(fs.existsSync(path.join(t, Backup.FOLDER_NAME, Backup.INDEX_NAME)));
+  // The share unreachable (the NAS off): not plugged in, and Start says so instead of failing half way.
+  fs.renameSync(t, t + '-off');
+  try {
+    assert.strictEqual((await b.view()).drives[0].here, false);
+    const s = await b.start([p]);
+    assert.strictEqual(s.ok, false); assert.match(s.fault, /No backup drive is plugged in/);
+  } finally { fs.renameSync(t + '-off', t); }
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); console.log('ok   ' + name); } catch (e) { failures++; console.log('FAIL ' + name + ': ' + (e && e.stack || e)); }

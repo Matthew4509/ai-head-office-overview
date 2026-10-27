@@ -24,6 +24,7 @@
   const faultText = (e) => app.faultText(e);
   const btn = (label, onclick, primary = false, extra = {}) => el('button', { type: 'button', class: `btn${primary ? ' primary' : ''}`, onclick, ...extra }, label);
   const closeMenu = (e) => { const m = e.currentTarget.closest('details'); if (m) m.open = false; };
+  const driveKind = (d) => (d.network ? 'network folder' : d.removable ? 'USB / removable' : 'fixed drive');
   const driveName = (d) => `${d.name}${d.label ? ` "${d.label}"` : ''}${d.letter ? ` (${d.letter}:)` : ''}`;
 
   async function setListed(ids, on) {
@@ -143,7 +144,7 @@
         el('p', { class: 'note', text: 'Plug one in and press Look again, or add another drive under Settings › Backups.' }));
     } else {
       const d = pl.drive;
-      driveLine = el('p', {}, el('b', { text: `To ${driveName(d)}` }), ` · ${d.removable ? 'USB / removable' : 'fixed drive'} · ${size(d.free || 0)} free${d.movedFrom ? ` · found under ${d.letter}: (it was ${d.movedFrom}: before)` : ''}`,
+      driveLine = el('p', {}, el('b', { text: `To ${driveName(d)}` }), ` · ${driveKind(d)} · ${size(d.free || 0)} free${d.movedFrom ? ` · found under ${d.letter}: (it was ${d.movedFrom}: before)` : ''}`,
         here.length > 1 ? el('button', { type: 'button', class: 'btn link', onclick: () => { run.drive = null; run.plan.choose = true; drawPlan(); } }, ' Change drive') : null);
     }
     const on = (r) => !r.error && !run.off.has(r.id);
@@ -168,7 +169,8 @@
       b.disabled = true; b.textContent = 'Starting…'; // the drive is looked for again first (a few seconds)
       try { const r = await app.engine('/api/backup/start', { ids: picked.map((r) => r.id), drive: run.drive }); drawJob(r.job); app.loadProjects(); } catch (err) { said.textContent = faultText(err); b.disabled = false; b.textContent = 'Start'; }
     }, true, { disabled: !(d && fits && picked.length), title: 'Each project is zipped, then read back from the drive and checked, one at a time. The office keeps working meanwhile.' });
-    app.openWindow('Run backups now', [driveLine, said, el('ul', { class: 'open-list' }, rows), sum,
+    const kind = el('p', { class: 'note', text: pl.full ? 'Full backup: the rebuildable folders (node_modules and the like) go in too. Settings › Backups › What is in a backup.' : 'Rebuildable folders (node_modules and the like) are left out. Settings › Backups › Full backup takes them too.' });
+    app.openWindow('Run backups now', [driveLine, said, el('ul', { class: 'open-list' }, rows), sum, kind,
       el('p', { class: 'note', text: 'Each zip is read back from the drive and every file checked before it counts. Backups are only added: nothing on the drive is deleted.' })],
     [look, btn('Close', app.closeWindow), start]);
     markWindow();
@@ -235,7 +237,7 @@
     const driveRow = (d) => el('div', { class: 'set-row' },
       el('div', { class: 'set-txt' }, el('b', { text: driveName(d) }),
         el('span', { class: 'note', text: d.here
-          ? [d.removable ? 'USB / removable' : 'fixed drive', d.free != null ? `${size(d.free)} free of ${size(d.total)}` : '', plural(d.backups, 'backup', 'backups'), d.lastAt ? `last ${ago(d.lastAt)}` : '', d.movedFrom ? `now ${d.letter}:, was ${d.movedFrom}:` : ''].filter(Boolean).join(' · ')
+          ? [driveKind(d), d.free != null ? `${size(d.free)} free of ${size(d.total)}` : '', plural(d.backups, 'backup', 'backups'), d.lastAt ? `last ${ago(d.lastAt)}` : '', d.movedFrom ? `now ${d.letter}:, was ${d.movedFrom}:` : ''].filter(Boolean).join(' · ')
           : `Not plugged in · ${plural(d.backups, 'backup', 'backups')} on it${d.lastAt ? `, the last ${ago(d.lastAt)}` : ''}` }),
         el('span', { class: 'note', text: d.path || '' })),
       el('div', { class: 'row set-acts' },
@@ -260,7 +262,12 @@
       el('div', { class: 'row' }, keep, btn('Save', async () => { try { const r = await app.engine('/api/backup/keep', { keep: Number(keep.value) }); say(r.keepLast ? `The last ${r.keepLast} backups of each project are kept on each drive; older ones are deleted after a new one passes its check.` : 'Every backup is kept. Nothing is deleted.'); } catch (e) { say(faultText(e)); } }, true)),
       el('p', { class: 'note', text: 'Only zips the office made and recorded are ever deleted, and only after a newer one passed its check.' }),
       el('h3', { text: 'What is in a backup' }),
-      el('p', { class: 'note', text: `Everything in the project's folder, the git history (.git) included. Left out, since a project rebuilds them by itself: ${v.leaveOut}. A file that is locked or in use is listed in the .txt beside the zip; the rest still go in.` }),
+      el('p', { class: 'note', text: v.full
+        ? 'Everything in the project\'s folder: the git history (.git) and the rebuildable folders too. A file that is locked or in use is listed in the .txt beside the zip; the rest still go in.'
+        : `Everything in the project's folder, the git history (.git) included. Left out, since a project rebuilds them by itself: ${v.leaveOut}. A file that is locked or in use is listed in the .txt beside the zip; the rest still go in.` }),
+      el('label', { class: 'tick-row' }, el('input', { type: 'checkbox', checked: v.full, 'data-act': 'backup-full', onchange: async (e) => {
+        try { const r = await app.engine('/api/backup/full', { on: e.target.checked }); say(r.full ? 'Full backup is on: the rebuildable folders go in too, so backups are bigger and slower.' : 'Full backup is off: the rebuildable folders are left out again.'); again(); } catch (err) { say(faultText(err)); e.target.checked = !e.target.checked; }
+      } }), el('span', {}, el('b', { text: 'Full backup' }), el('br'), el('span', { class: 'note', text: 'Take the rebuildable folders too (node_modules and the rest): bigger and slower, but nothing to rebuild after a restore.' }))),
       el('p', { class: 'note', text: `On the drive: ${v.folderName}\\<project>\\<project>-<date>-<time>.zip, a .txt beside each saying what is in it, and an index the office reads when the drive is added on another PC. To restore one: right-click it › Extract All.` }),
     ];
   };
