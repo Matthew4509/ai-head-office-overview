@@ -25,7 +25,9 @@ set AHO_OPEN=1
 if /i "%~2"=="quiet" set AHO_OPEN=0
 node server.js
 if errorlevel 1 if /i not "%~2"=="quiet" pause
-exit /b
+rem This window was opened by "start" above, which keeps it open after the script ends: closed here, so Quit and
+rem Uninstall leave no empty console window behind.
+exit
 
 :no_node
 echo.

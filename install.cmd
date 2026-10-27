@@ -29,7 +29,8 @@ if errorlevel 1 (
 if /i "%AHO_INSTALL_NO_START%"=="1" exit /b 0
 echo.
 echo  Starting the office...
-start "" "%~dp0start.cmd"
+rem Called, not started: "start" would run it in a window that stays open, empty, after it hands over to the office.
+call "%~dp0start.cmd"
 exit /b 0
 
 :old_node
