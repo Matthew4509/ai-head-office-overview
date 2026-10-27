@@ -35,9 +35,13 @@ including how to check an update's signature and see what it changes before taki
 
 ## Install and start
 
-1. Download or clone the repository, and put the folder **inside the folder that holds your projects** (for example
-   `C:\Users\you\projects\ai-head-office-overview`): on its first start the office lists the folders next to it.
-   Anywhere else works too; you then add your projects folder under **Settings › Folders**.
+1. Get it **inside the folder that holds your projects** (for example `C:\Users\you\projects`): on its first start
+   the office lists the folders next to it. Anywhere else works too; you then add your projects folder under
+   **Settings › Folders**.
+   - **Best: clone it with git**, so it can update itself later in one click. In that folder, run
+     `git clone https://github.com/Matthew4509/ai-head-office-overview.git`
+   - **Or download the zip** (the green **Code** button › **Download ZIP**, or a release zip) and unzip it there. A zip
+     copy works the same, but cannot update itself: see **Update** below.
 2. Double-click **`install.cmd`**. It checks Node.js (and offers to install it), asks whether you want a desktop
    shortcut and to start the office when you sign in to Windows (Enter = yes), sets up the start link, then starts the
    office. It opens in its own window. A small console window titled "AI Head Office Overview" starts minimised: that
@@ -52,6 +56,15 @@ Start with Windows. From then on, open it from the desktop icon, from **`index.h
 **Stop it:** Settings › About › **Quit**, or close the minimised console window. Either one stops the office and every
 local copy it started. From a command line: `node server.js --stop`, and `node server.js --status` (exit code 0 =
 running).
+
+**Update:** Settings › **Update** checks GitHub, shows what the newer version changes, and takes it in one click (only
+a version signed by the office's maker; **Go back** undoes it). That needs a copy cloned with git. A zip copy: **Quit** the
+office, unzip the new zip to a new folder, copy the old folder's **`data`** folder into it (your settings, prompts and
+records), double-click the new folder's `install.cmd`, then delete the old folder.
+
+**Uninstall:** Settings › About › **Uninstall**, or double-click **`uninstall.cmd`**. Either one stops the office and
+removes the desktop shortcut, Start with Windows, the start link and advanced setup's hooks. Your files are left
+alone: delete the office's folder afterwards to remove it completely (its `data` folder holds your settings).
 
 ## The window
 
