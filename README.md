@@ -211,8 +211,10 @@ Each mark opens its window:
 - **Backups**: tick **Backup** on a tile to put the project on the backup list. **Run backups now** (Projects tab, top
   line) lists every project on it with its size, the time it should take and the drive's free space, refuses before
   starting when it will not fit, then zips each one to your backup drive, one at a time, while the office keeps
-  working. Every zip is read back from the drive and each file's size and CRC-32 checked before it counts; until then it
-  is a `.zip.partial`. The mark on the tile: ● backed up, ▲ changed since, ○ never, ✕ the last try failed (also in
+  working. Every zip is read back and each file's size and CRC-32 checked before it counts; until then it
+  is a `.zip.partial`. Links and junctions are not followed: the run says how many, and the .txt beside the zip names
+  them. On a FAT32 drive (how most USB sticks come) no file can reach 4 GB, so a project whose zip would is left out
+  of the run and told why. The mark on the tile: ● backed up, ▲ changed since, ○ never, ✕ the last try failed (also in
   Needs attention). **Back up now…** is in a tile's More menu too.
 
 ![An audit](screenshots/audit.png)

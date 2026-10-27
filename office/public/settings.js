@@ -219,7 +219,7 @@
         'Live: the address a project is hosted at, checked when the office starts and every 5, 10 or 15 minutes with one plain request: ● up, ▲ unsure, ✕ down.'),
       h3('Backups'),
       li('Settings › Backups › Turn on backups: choose where they go (a USB drive is best). Tick Backup on each project tile to put it on the backup list.',
-        'Run backups now (Projects tab, top line) lists every project on the list with its size and the time it should take, checks it fits on the drive, then zips each one and reads it back from the drive to check every file. The office keeps working meanwhile.',
+        'Run backups now (Projects tab, top line) lists every project on the list with its size and the time it should take, checks it fits on the drive, then zips each one and reads it back to check every file. The office keeps working meanwhile.',
         'Backups are only ever added. When a drive is full, plug in another and add it: the full one keeps its backups. With two drives plugged in, Run backups now asks which one to use.'),
       h3('Prompts'),
       p('Prompts you use again and again, a tile per category: Copy, Edit (which can move it), Remove; New category, Add prompt, Rename and Delete category. Words in [brackets] are yours to fill in. Kept on this PC only.'),

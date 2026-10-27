@@ -812,6 +812,11 @@ async function main() {
     assert(!r1.ok && /inside/.test(r1.fault), JSON.stringify(r1));
     const r2 = (await api('/api/backup/drive/add', { path: WS })).json;
     assert(!r2.ok && /working folder/.test(r2.fault), JSON.stringify(r2));
+    // The office's own folder (refused before anything is made there, so nothing to clean up).
+    const inOffice = path.join(__dirname, '..', 'backups-should-not-exist');
+    const r3 = (await api('/api/backup/drive/add', { path: inOffice })).json;
+    assert(!r3.ok && /office's own folder/.test(r3.fault), JSON.stringify(r3));
+    assert(!fs.existsSync(inOffice), 'nothing was made inside the office folder');
   });
   await check('backups: the list takes project ids; a path in the request is never what is backed up', async () => {
     const alpha = (await api('/api/projects')).json.projects.find(p => p.folder === 'alpha-site');

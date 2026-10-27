@@ -51,7 +51,8 @@
     const l = markOf(p);
     if (!l) return null;
     const b = p.backup;
-    const tip = b.fault ? `${b.fault.fault} ${b.fault.reason || ''}` : b.drives?.length ? `Last backups: ${b.drives.map((d) => `${ago(d.at)} on ${d.drive}`).join(' · ')}` : 'No backup yet';
+    const left = (d) => [d.links ? `${d.links} ${d.links === 1 ? 'link or junction' : 'links or junctions'} not followed` : '', d.skipped ? `${d.skipped} ${d.skipped === 1 ? 'file' : 'files'} not read` : ''].filter(Boolean).join(', ');
+    const tip = b.fault ? `${b.fault.fault} ${b.fault.reason || ''}` : b.drives?.length ? `Last backups: ${b.drives.map((d) => `${ago(d.at)} on ${d.drive}${left(d) ? ` (${left(d)}: listed in the .txt beside the zip)` : ''}`).join(' · ')}` : 'No backup yet';
     return el('button', { type: 'button', class: `mark ${l.cls}`, title: tip, 'aria-label': `Backup: ${l.text}`, 'data-act': 'backup', 'data-id': p.id, onclick: () => history(p.id) },
       el('span', { 'aria-hidden': 'true' }, l.mark), ` ${l.text}`);
   };
@@ -168,10 +169,10 @@
       const b = e.currentTarget;
       b.disabled = true; b.textContent = 'Starting…'; // the drive is looked for again first (a few seconds)
       try { const r = await app.engine('/api/backup/start', { ids: picked.map((r) => r.id), drive: run.drive }); drawJob(r.job); app.loadProjects(); } catch (err) { said.textContent = faultText(err); b.disabled = false; b.textContent = 'Start'; }
-    }, true, { disabled: !(d && fits && picked.length), title: 'Each project is zipped, then read back from the drive and checked, one at a time. The office keeps working meanwhile.' });
+    }, true, { disabled: !(d && fits && picked.length), title: 'Each project is zipped, then read back and checked, one at a time. The office keeps working meanwhile.' });
     const kind = el('p', { class: 'note', text: pl.full ? 'Full backup: the rebuildable folders (node_modules and the like) go in too. Settings › Backups › What is in a backup.' : 'Rebuildable folders (node_modules and the like) are left out. Settings › Backups › Full backup takes them too.' });
     app.openWindow('Run backups now', [driveLine, said, el('ul', { class: 'open-list' }, rows), sum, kind,
-      el('p', { class: 'note', text: 'Each zip is read back from the drive and every file checked before it counts. Backups are only added: nothing on the drive is deleted.' })],
+      el('p', { class: 'note', text: 'Each zip is read back and every file checked before it counts. Backups are only added: nothing on the drive is deleted.' })],
     [look, btn('Close', app.closeWindow), start]);
     markWindow();
   }
@@ -247,7 +248,7 @@
           try { await app.engine('/api/backup/drive/forget', { drive: d.id }); say(`${d.name} is forgotten. Its backups were not touched.`); await app.loadProjects(); again(); } catch (e) { say(faultText(e)); }
         })));
     return [
-      el('p', { text: 'A backup is a zip of a project on a drive you choose: a USB drive is best, so a copy survives this PC. Each zip is read back from the drive and every file checked before it counts.' }),
+      el('p', { text: 'A backup is a zip of a project on a drive you choose: a USB drive is best, so a copy survives this PC. Each zip is read back and every file checked before it counts.' }),
       v.drives.length ? null : el('div', { class: 'row' }, btn('Turn on backups: choose where they go…', () => add(), true)),
       v.drives.length ? null : typedPath(add),
       v.drives.length ? el('h3', { text: 'Backup drives' }) : null,

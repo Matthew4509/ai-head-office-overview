@@ -369,6 +369,187 @@ check('a network folder (\\\\server\\share\\…) as the backup drive: added by i
   } finally { fs.renameSync(t + '-off', t); }
 });
 
+// ---- the 26 Oct audit's backup items (AHO-02, 03, 04, 10, 11, 14, 15) ----
+const txtOf = dir => fs.readFileSync(path.join(dir, fs.readdirSync(dir).find(f => f.endsWith('.txt'))), 'utf8');
+
+check('AHO-02: nothing says the read-back comes from the drive (Windows serves it from its cache): the page, README and the .txt', async () => {
+  const root = path.join(__dirname, '..');
+  for (const f of ['lib/backup.js', 'lib/zip.js', 'office/public/backups.js', 'office/public/settings.js', 'README.md'])
+    assert.ok(!/reads? (it )?back from the drive/i.test(fs.readFileSync(path.join(root, f), 'utf8')), f + ' still says "read back from the drive"');
+  const b = engine();
+  const p = project('Omicron');
+  const usb = path.join(tmp, 'usb10');
+  assert.ok((await b.addDrive(usb, { projects: [p] })).ok);
+  await b.start([p]); await waitJob(b);
+  const txt = txtOf(path.join(usb, Backup.FOLDER_NAME, 'Omicron'));
+  assert.match(txt, /Check: passed\. Every file was read back and matched its size and CRC-32/);
+  assert.ok(!/from the drive/.test(txt));
+});
+
+check('AHO-03: on a FAT32 drive a zip that would reach 4 GB is left out of the plan and says why; a run that hits the limit says FAT32, not full, and the rest go on', async () => {
+  const before = vols;
+  const p = project('Pi'), q = project('Rho');
+  try {
+    vols = [{ ...before[0], fs: 'FAT32' }];
+    // fatMax brought down to a few KB so a made-up project counts as too big (the real limit is 4 GiB).
+    const small = engine({ fatMax: 4000 });
+    assert.ok((await small.addDrive(path.join(tmp, 'usb11'), { projects: [p, q] })).ok);
+    const pl = await small.plan([p, q]);
+    assert.strictEqual(pl.drive.fs, 'FAT32');
+    assert.match(pl.rows[0].error, /Too big for Drive 1: it is formatted FAT32/);
+    assert.match(pl.rows[0].error, /exFAT or NTFS/);
+    assert.match(pl.rows[1].error, /FAT32/);
+    assert.strictEqual(pl.total.zip, 0, 'a row left out does not count towards the space needed');
+    vols = [{ ...before[0], fs: 'NTFS' }];
+    const pl2 = await small.plan([p, q]);
+    assert.ok(!pl2.rows[0].error && !pl2.rows[1].error, 'the same projects pass on NTFS');
+    vols = [{ ...before[0], fs: 'exFAT' }];
+    assert.ok(!(await small.plan([p, q])).rows[0].error, 'exFAT has no 4 GB limit');
+    // The run: FAT32 answers "disk full" at the limit. A made-up writer leaves a partial that size and says ENOSPC once.
+    vols = [{ ...before[0], fs: 'FAT32' }];
+    let hits = 0;
+    const run = engine({ fatMax: 50000, write: async (partial, items, o) => {
+      if (hits++ === 0) { fs.writeFileSync(partial, Buffer.alloc(50000)); throw Object.assign(new Error('no space'), { code: 'ENOSPC' }); }
+      return writeZip(partial, items, o);
+    } });
+    const usb = path.join(tmp, 'usb12');
+    assert.ok((await run.addDrive(usb, { projects: [p, q] })).ok);
+    await run.start([p, q]); const j = await waitJob(run);
+    assert.strictEqual(j.items[0].state, 'failed', JSON.stringify(j.items[0]));
+    assert.match(j.items[0].fault.fault, /too big for Drive 1/);
+    assert.match(j.items[0].fault.reason, /formatted FAT32, where a single file cannot reach 4 GB/);
+    assert.strictEqual(j.items[1].state, 'done', 'the next project is still backed up: the drive is not full');
+    assert.deepStrictEqual(fs.readdirSync(path.join(usb, Backup.FOLDER_NAME, 'Pi')).filter(n => n.endsWith('.partial')), [], 'the unfinished zip was removed');
+    // A real "disk full" (not near the limit) still stops the rest, as before.
+    hits = 0;
+    const full = engine({ fatMax: 50000, write: async (partial) => { fs.writeFileSync(partial, Buffer.alloc(100)); throw Object.assign(new Error('no space'), { code: 'ENOSPC' }); } });
+    assert.ok((await full.addDrive(path.join(tmp, 'usb12b'), { projects: [p, q] })).ok);
+    await full.start([p, q]); const j2 = await waitJob(full);
+    assert.match(j2.items[0].fault.fault, /filled up/);
+    assert.strictEqual(j2.items[1].state, 'skipped');
+  } finally { vols = before; }
+});
+
+if (process.platform === 'win32') check('AHO-04: a junction is not followed, is counted in the run note and on the tile, and is listed in the .txt', async () => {
+  const p = project('Sigma');
+  const target = path.join(tmp, 'elsewhere'); mk(target, 'big.bin', Buffer.alloc(5000, 3));
+  const CMD = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'cmd.exe');
+  const r = spawnSync(CMD, ['/c', 'mklink', '/J', path.join(p.dir, 'linked'), target], { encoding: 'utf8' });
+  assert.strictEqual(r.status, 0, r.stderr || r.stdout);
+  const w = await Backup.walk(p.dir);
+  assert.deepStrictEqual(w.links, ['Sigma/linked']);
+  assert.ok(!names(w).some(n => n.includes('linked/')), 'nothing behind the junction is taken');
+  const b = engine();
+  const usb = path.join(tmp, 'usb13');
+  assert.ok((await b.addDrive(usb, { projects: [p] })).ok);
+  await b.start([p]); const j = await waitJob(b);
+  assert.strictEqual(j.items[0].state, 'done', JSON.stringify(j.items[0]));
+  assert.match(j.items[0].note, /^1 link or junction not followed: listed in Sigma-.*\.txt\.$/);
+  assert.strictEqual(b.rowOf(p).last.links, 1);
+  assert.match(txtOf(path.join(usb, Backup.FOLDER_NAME, 'Sigma')), /Links and junctions not followed: Sigma\/linked/);
+  // The drive's own index carries the count to another office.
+  const b2 = engine();
+  assert.strictEqual((await b2.addDrive(usb, { projects: [p] })).imported, 1);
+  assert.strictEqual(b2.rowOf(p).last.links, 1);
+});
+
+check('AHO-10: when the office must stop mid-backup, the run is cancelled, the half-written zip removed and the fault recorded; Restart and Uninstall wait like Quit', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const b = engine({ check: async (f, e, o) => { await held; return checkZip(f, e, o); } });
+  const p = project('Tau'), q = project('Upsilon');
+  const usb = path.join(tmp, 'usb14');
+  assert.ok((await b.addDrive(usb, { projects: [p, q] })).ok);
+  await b.start([p, q]);
+  for (let i = 0; i < 400 && b.status().items[0].state !== 'checking'; i++) await new Promise(r => setTimeout(r, 25));
+  assert.strictEqual(b.status().items[0].state, 'checking');
+  const dir = path.join(usb, Backup.FOLDER_NAME, 'Tau');
+  assert.strictEqual(fs.readdirSync(dir).filter(n => n.endsWith('.zip.partial')).length, 1);
+  assert.strictEqual(b.stopNow(), true);
+  const j = b.status();
+  assert.ok(j.finished && j.cancelled);
+  assert.strictEqual(j.items[0].state, 'failed'); assert.match(j.items[0].fault.fault, /stopped when the office closed/);
+  assert.strictEqual(j.items[1].state, 'cancelled');
+  assert.deepStrictEqual(fs.readdirSync(dir).filter(n => n.endsWith('.zip.partial')), [], 'the half-written zip is gone');
+  assert.match(b.rowOf(p).fault.fault, /stopped when the office closed/);
+  assert.strictEqual(b.stopNow(), false, 'nothing running now');
+  release();
+  await new Promise(r => setTimeout(r, 300));
+  assert.deepStrictEqual(fs.readdirSync(dir).filter(n => /\.zip(\.partial)?$/.test(n)), [], 'nothing more was written after the stop');
+  assert.strictEqual(b.status().items[0].state, 'failed', 'the held step says nothing more once stopped');
+  assert.ok(!fs.existsSync(path.join(usb, Backup.FOLDER_NAME, 'Upsilon')), 'the next project was never started');
+  // The routes: a test copy of the office's state in temp, with a backup "running".
+  process.env.AHO_DATA = path.join(tmp, 'route-data'); process.env.AHO_ROOT = path.join(tmp, 'work');
+  const { state } = require('../lib/state');
+  const system = require('../lib/routes/system');
+  state.backups = { status: () => ({ finished: null, items: [] }) };
+  for (const route of ['/api/update/restart', '/api/uninstall', '/api/quit']) {
+    const r = await system.post[route]({ body: {} });
+    assert.strictEqual(r.ok, false, route); assert.match(r.fault, /A backup is running/, route);
+  }
+});
+
+check('AHO-11: the drive going away after a passing check fails that project plainly, records the fault, and the rest are still tried', async () => {
+  let once = true;
+  // The .partial vanishes (drive pulled out) between the check and its renaming.
+  const b = engine({ check: async (f, e, o) => { const r = await checkZip(f, e, o); if (once) { once = false; fs.rmSync(f); } return r; } });
+  const p = project('Phi'), q = project('Chi');
+  const usb = path.join(tmp, 'usb15');
+  assert.ok((await b.addDrive(usb, { projects: [p, q] })).ok);
+  b.setListed([p.dir, q.dir], true);
+  await b.start([p, q]); const j = await waitJob(b);
+  assert.strictEqual(j.items[0].state, 'failed', JSON.stringify(j.items[0]));
+  assert.match(j.items[0].fault.fault, /could not be finished on Drive 1 \(ENOENT\)/);
+  assert.match(j.items[0].fault.reason, /passed its check/);
+  assert.strictEqual(j.items[1].state, 'done');
+  assert.strictEqual(b.needs([p, q]).find(x => x.id === p.id).kind, 'failed');
+  assert.ok(!b.rowOf(p).last, 'nothing counts as a backup of it');
+  assert.ok(b.rowOf(q).last, 'the next one does');
+  // Kept in the office's record, so a new office still shows the fault.
+  const again = Backup.create({ dataDir: path.join(tmp, 'data' + dataN), listDrives: async () => vols, keyOf });
+  assert.match(again.rowOf(p).fault.fault, /could not be finished/);
+});
+
+check('AHO-14: a damaged or crafted backups-index.json (a __proto__ or constructor key) does not break Add drive, and nothing is polluted', async () => {
+  const usb = path.join(tmp, 'usb16');
+  const p = project('Psi');
+  const good = { key: keyOf(p.dir), file: 'Psi\\Psi-2026-10-01-1200.zip', at: Date.now() - 864e5, bytes: 10, source: 20, files: 1, checked: true };
+  mk(path.join(usb, Backup.FOLDER_NAME), Backup.INDEX_NAME, JSON.stringify({ backups: [
+    { ...good, key: '__proto__' }, { ...good, key: 'constructor' }, { ...good, key: 'toString' }, { ...good, key: 'hasOwnProperty' },
+    { ...good, key: 'relative\\path' }, { ...good, key: 42 }, null, 'text', { ...good, file: 5 }, { ...good, at: 'yesterday' }, good,
+  ] }));
+  const b = engine();
+  const r = await b.addDrive(usb, { projects: [p] });
+  assert.ok(r.ok, r.fault);
+  assert.strictEqual(r.imported, 1, 'only the real record is counted');
+  assert.strictEqual(({}).polluted, undefined);
+  assert.strictEqual(typeof ({}).constructor, 'function', 'Object itself is as it was');
+  assert.strictEqual(b.rowOf(p).last.drive, 'Drive 1');
+  assert.strictEqual(b.history(p).length, 1);
+  // The office's own record damaged the same way loads clean, and a backup still runs on it.
+  const file = path.join(tmp, 'data' + dataN, 'backups.json');
+  const txt = fs.readFileSync(file, 'utf8').replace(/"history":\s*\{/, '"history":{"__proto__":[{"file":"x.zip","drive":"d","at":1}],"constructor":"text","toString":[null],');
+  assert.ok(txt.includes('"__proto__"'));
+  fs.writeFileSync(file, txt);
+  const b2 = Backup.create({ dataDir: path.join(tmp, 'data' + dataN), listDrives: async () => vols, keyOf });
+  assert.strictEqual(b2.rowOf(p).last.drive, 'Drive 1');
+  assert.strictEqual((await b2.view()).drives[0].backups, 1);
+  await b2.start([p]); const j = await waitJob(b2);
+  assert.strictEqual(j.items[0].state, 'done', JSON.stringify(j.items[0]));
+  assert.ok(!fs.readFileSync(file, 'utf8').includes('"__proto__"'), 'the bad keys are not written back');
+});
+
+check('AHO-15: a backup folder inside the office\'s own folder is refused, and nothing is made there', async () => {
+  const office = path.join(tmp, 'office'); fs.mkdirSync(office, { recursive: true });
+  const b = engine({ appDir: office });
+  const p = project('Omega');
+  for (const bad of [office, path.join(office, 'backups'), path.join(office, Backup.FOLDER_NAME)]) {
+    const r = await b.addDrive(bad, { projects: [p] });
+    assert.strictEqual(r.ok, false, bad); assert.match(r.fault, /office's own folder/);
+  }
+  assert.deepStrictEqual(fs.readdirSync(office), [], 'nothing was made there');
+  assert.ok((await b.addDrive(path.join(tmp, 'usb17'), { projects: [p] })).ok, 'a folder beside it is fine');
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); console.log('ok   ' + name); } catch (e) { failures++; console.log('FAIL ' + name + ': ' + (e && e.stack || e)); }
