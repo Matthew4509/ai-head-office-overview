@@ -104,6 +104,80 @@ check('the check catches one changed byte and a zip cut short', async () => {
   assert.match(r2.fault, /could not be read back/);
 });
 
+check('the check compares each file\'s own header with the zip\'s list (AHO-13)', async () => {
+  const p = project('Epsilon');
+  const w = await Backup.walk(p.dir);
+  const z = path.join(tmp, 'epsilon.zip');
+  const made = await writeZip(z, w.items);
+  const e = (await listZip(z)).find(x => x.name === 'Epsilon/README.md');
+  const bad = fs.readFileSync(z); bad[e.offset + 14] ^= 0xff; // the local CRC; the list and the data are left alone
+  fs.writeFileSync(path.join(tmp, 'epsilon-bad.zip'), bad);
+  const r = await checkZip(path.join(tmp, 'epsilon-bad.zip'), made.entries);
+  assert.strictEqual(r.ok, false);
+  assert.match(r.fault, /README\.md: its own header in the zip disagrees with the zip's list/);
+});
+
+if (hasTar) check('a zip Windows tar made (sizes after each file, flag 8) passes the check with no list given', async () => {
+  const d = path.join(tmp, 'tarred');
+  mk(d, 'a.txt', 'hello\n'.repeat(1000)); mk(d, 'sub/b.bin', Buffer.alloc(50000, 3));
+  const z = path.join(tmp, 'tarred.zip');
+  const t = spawnSync(TAR, ['-a', '-c', '-f', z, '-C', d, '.'], { encoding: 'utf8' });
+  assert.strictEqual(t.status, 0, t.stderr);
+  const r = await checkZip(z);
+  assert.ok(r.ok, r.fault);
+  assert.strictEqual(r.files, 2);
+});
+
+check('a fault writing the zip while a big file streams in is the zip\'s, not a file left out (AHO-12)', async () => {
+  const d = path.join(tmp, 'zeta');
+  const big = mk(d, 'big.bin', require('crypto').randomBytes(5 << 20)); // 5 MB that does not deflate: streamed
+  const z = path.join(tmp, 'zeta.zip');
+  const open = fs.promises.open;
+  fs.promises.open = async (f, ...a) => {
+    const fh = await open(f, ...a);
+    if (f !== z) return fh;
+    // One write fails part way through the big file; every write after it works (so only that fault can fail the zip).
+    let n = 0, failed = false; const write = fh.write.bind(fh);
+    fh.write = (buf, ...b) => {
+      if (!failed && (n += buf.length) > 2 << 20) { failed = true; return Promise.reject(Object.assign(new Error('the drive went away'), { code: 'EIO' })); }
+      return write(buf, ...b);
+    };
+    return fh;
+  };
+  try {
+    await assert.rejects(writeZip(z, [{ name: 'big.bin', abs: big, size: 5 << 20, mtimeMs: Date.now() }]), { code: 'EIO' });
+  } finally { fs.promises.open = open; }
+});
+
+check('a big file that cannot be read to its end is left out and written over, whether or not it reached the drive yet', async () => {
+  const d = path.join(tmp, 'eta');
+  const a = mk(d, 'a.txt', 'before\n'.repeat(100)), c = mk(d, 'c.txt', 'after\n'.repeat(100));
+  const big = mk(d, 'big.bin', require('crypto').randomBytes(5 << 20));
+  const orig = fs.createReadStream;
+  for (const failAt of [512 << 10, 3 << 20]) { // still gathered in memory; already written 1 MB at a time
+    fs.createReadStream = (p, o) => {
+      if (p !== big) return orig(p, o);
+      const data = fs.readFileSync(big); let at = 0;
+      const r = new (require('stream').Readable)({ read() {
+        if (at >= failAt) return this.destroy(Object.assign(new Error('read fault'), { code: 'EIO' }));
+        const n = Math.min(1 << 18, data.length - at); this.push(data.subarray(at, at + n)); at += n;
+      } });
+      process.nextTick(() => r.emit('open'));
+      return r;
+    };
+    const z = path.join(tmp, `eta-${failAt}.zip`);
+    let made;
+    try {
+      made = await writeZip(z, [a, big, c].map(f => ({ name: path.basename(f), abs: f, size: fs.statSync(f).size, mtimeMs: Date.now() })));
+    } finally { fs.createReadStream = orig; }
+    assert.deepStrictEqual(made.skipped.map(s => s.name), ['big.bin']);
+    assert.deepStrictEqual(made.entries.map(e => e.name), ['a.txt', 'c.txt']);
+    assert.strictEqual(fs.statSync(z).size, made.bytes);
+    const r = await checkZip(z, made.entries);
+    assert.ok(r.ok, r.fault);
+  }
+});
+
 if (process.platform === 'win32') check('a file that cannot be read is listed, and the backup still passes', async () => {
   const p = project('Delta');
   const locked = mk(p.dir, 'locked.txt', 'secret');
