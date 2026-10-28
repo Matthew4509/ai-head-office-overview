@@ -12,8 +12,8 @@ locally. If you prefer the office overview only, it's [AI Office Overview](https
 
 It runs only on your PC. It reads the AI app's transcripts already on your PC and never changes or sends them. The
 only requests that leave your PC: plain page requests to the live addresses you add (their checks, and the audit's
-look at the live site, with a DNS lookup of its mail settings), a look at this repository's release tags when you open
-Settings › Update, and, only if you turn it on, a daily check with GitHub for the newest Git version. A live address
+look at the live site, with a DNS lookup of its mail settings), a look at this repository's release tags when you press
+Settings › About › Check for updates, and, only if you turn it on, a daily check with GitHub for the newest Git version. A live address
 in a project's own project.json is only a suggestion: nothing is asked of it until you add it. The version you have is under Settings › About.
 
 Free for **noncommercial** use under the PolyForm Noncommercial License 1.0.0 (see [Licence](#licence)). For any
@@ -260,8 +260,12 @@ Each mark opens its window:
 
 ## Settings
 
-- **Folders**: working folders (every folder inside one is a project), projects added one by one, projects taken off the
-  list (bring one back), **Scan folders**.
+Each tab shows its controls and one line; the longer explanations fold away under **More**. A choice is saved as soon
+as it is made.
+
+- **Folders**: working folders (every folder inside one is a project), projects added one by one, **Scan folders**, the
+  **projects folder** the office's desks come from, and projects taken off the list (shown only when there are some, to
+  bring one back).
 - **Backups**: **Turn on backups** opens the folder window: choose where they go (a USB drive is best). Each project
   gets `AI Head Office Backups\<project>\<project>-<date>-<time>.zip` with a .txt beside it saying what is in it
   (files, what was left out, anything locked, the check). The git history (.git) goes in; folders a project rebuilds
@@ -272,23 +276,25 @@ Each mark opens its window:
   the full one keeps its backups and stays listed. A drive is known by its serial number, so a new letter does not
   matter, and the drive carries its own index, so another PC sees what it holds. With two plugged in, Run backups now
   asks which to use. **Keep** the last 3, 5 or 10 per project is there, off to start with.
-- **Setup**: step 1, the desktop shortcut, Start with Windows and the start link; step 2 (advanced), the AI app's
-  hooks, below.
+- **Setup**: the desktop shortcut, Start with Windows and the start link; then advanced setup, the AI app's hooks
+  (below).
 - **Office**: the theme (**Auto**, **Light** (the one to start with), **Dark**, or **Match Windows**, which follows
-  Windows' own light or dark setting; dark dims the office itself too), the projects folder the desks come from, the
+  Windows' own light or dark setting; dark dims the office itself too), the
   gone-home time, how often live sites are checked, the **Thoughts chat** (Everything, Work only or Off), and **Show
   the Project planner tab** (off to start with).
 - **Private details**: what an audit looks for in what you would publish (your email, phone, street, full name). Typed
   once and never shown again; a finding shows only its label. They are kept as plain text in the office's data folder
   (`data/private-details.json`): never sent and never published, but readable by anyone who can open that folder or a
   copy of it. **Delete all** removes the file.
-- **Update**: a newer version from GitHub, shown before it is taken and taken in one click. Only a version signed by
+- **About**: the version, **Update**, the Git program's own security state, Quit and Uninstall (it removes the
+  shortcuts, the start link and advanced setup's hooks, and leaves the folder for you to delete).
+- **Update** (in About): **Check for updates** asks GitHub for a newer version (nothing is asked until you press it),
+  shown before it is taken and taken in one click. Only a version signed by
   the office's maker is offered (a `v<version>` tag whose signature is checked against the key the office carries),
   only from the office's own GitHub address (never the folder's git settings). It is started once as a test copy
   before it is taken, so a version that does not start never replaces yours; then it is a fast-forward to exactly the
   signed commit, refused when files here were changed. **Go back** returns to the version before the last update.
-- **Help** and **About** (the version, the Git program's own security state, Quit, Uninstall: it removes the
-  shortcuts, the start link and advanced setup's hooks, and leaves the folder for you to delete).
+- **Help**: a short guide, one folded section per part of the office.
 
 ### Easy or advanced setup
 
@@ -517,7 +523,7 @@ audit lists the record of every rule it shows that someone has judged.
 - **Port 8880 is taken by another program**: start it with `node server.js --port=8885` (any free port), or set
   `AHO_PORT`. Advanced setup's hooks carry the port: turn advanced setup off and on again after changing it.
 - **A project shows "No start command"**: add a `start` for it in `projects.json` (see above).
-- **Nobody in the office**, or everyone a Consultant: Settings › Office: the projects folder must be the folder your
+- **Nobody in the office**, or everyone a Consultant: Settings › Folders: the projects folder must be the folder your
   project folders sit in. Left empty, the office uses the working folder (Settings › Folders) your threads start in.
 - **Your folders or prompts are suddenly back to the start**: the file that held them could not be read. The office
   kept it in its `data` folder as `settings.damaged-<time>.json` or `prompts.damaged-<time>.json`. Quit the office,
@@ -549,7 +555,7 @@ audit lists the record of every rule it shows that someone has judged.
   into `lib/release.js`. Each bake signs the zip (`.zip.sig`) and, when everything is committed, writes the signed tag
   message for the commit you are on; `node tools/sign-release.js tag` does that part alone. Publish it with
   `git tag -a v<version> -F _releases/ai-head-office-overview-<version>.tag.txt` and `git push origin v<version>`:
-  Settings › Update offers a version only once its signed tag is on GitHub. Lost the key? `--new-key` makes a new one;
+  Settings › About › Update offers a version only once its signed tag is on GitHub. Lost the key? `--new-key` makes a new one;
   copies that carry the old key then take that one version by hand. Tests point the address at a temp repository with
   `AHO_RELEASE_GIT`.
 
@@ -565,7 +571,7 @@ audit lists the record of every rule it shows that someone has judged.
 | `lib/state.js`, `lib/views.js` | Settings, the project list, local copies, token counts; what the page is sent |
 | `lib/runner.js`, `lib/desktop.js`, `lib/platform/` | Starting and stopping local copies; windows, browsers, terminals, shortcuts; every call to Windows |
 | `lib/setup.js`, `tools/setup.js` | Setup and uninstall (start link, desktop shortcut, Start with Windows) |
-| `lib/update.js`, `lib/release.js`, `tools/sign-release.js` | Settings › Update (signed tags, the test start, Go back), the release key and signatures, signing a release |
+| `lib/update.js`, `lib/release.js`, `tools/sign-release.js` | Settings › About › Update (signed tags, the test start, Go back), the release key and signatures, signing a release |
 | `lib/audit*.js`, `lib/rules-more.js`, `lib/cross.js`, `lib/disclosure.js`, `lib/judged.js`, `lib/review.js` | The audit, its saved reports, Not a fault, Review with AI |
 | `lib/live*.js`, `lib/gitstate.js`, `lib/git-program.js` | Live checks, git marks and See what changed, the Git program's version |
 | `lib/tokens.js`, `lib/prompts.js`, `lib/sensors.js` | Codex token counts and the matcher both counts use, saved prompts, This PC |

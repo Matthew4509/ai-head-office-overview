@@ -1,16 +1,17 @@
 // Settings: one window for everything that is not the office itself. Folders (working folders, projects added one by
-// one, projects taken off the list), Backups (drawn by backups.js), Setup (the start link, desktop shortcut and Start with Windows; advanced setup,
-// the AI app's hooks, as its last step), Office (theme, projects folder, gone-home time, live checks), Private details, Update
-// (a newer version from GitHub, taken in one click), Help
-// and About (version, the Git program, Quit, Uninstall). Opened by Settings at the top. The welcome on the first start
-// is here too.
+// one, the projects folder, projects taken off the list), Backups (drawn by backups.js), Setup (the start link,
+// desktop shortcut and Start with Windows; advanced setup, the AI app's hooks), Office (theme, gone-home time, live
+// checks, Thoughts chat, the planner), Private details, Help, and About (version, Update: a newer version from GitHub,
+// taken in one click; the Git program, Quit, Uninstall). Opened by Settings at the top. The welcome on the first start
+// is here too. Each tab shows its controls and one line; the longer explanations fold away under "More ▸" (more()).
+// A choice is saved as soon as it is made (no Save buttons), except lists typed out in full (private details).
 'use strict';
 
 (() => {
   const app = window.aiOffice;
   const { el } = app;
   const sheet = document.getElementById('setup');
-  const SECTIONS = [['folders', 'Folders'], ['backups', 'Backups'], ['setup', 'Setup'], ['office', 'Office'], ['private', 'Private details'], ['update', 'Update'], ['help', 'Help'], ['about', 'About']];
+  const SECTIONS = [['folders', 'Folders'], ['backups', 'Backups'], ['setup', 'Setup'], ['office', 'Office'], ['private', 'Private details'], ['help', 'Help'], ['about', 'About']];
   let section = 'folders';
   const said = el('p', { class: 'note check-said', role: 'status', 'aria-live': 'polite' });
   const say = (t) => { said.textContent = t; };
@@ -18,8 +19,13 @@
   const btn = (label, onclick, primary = false, extra = {}) => el('button', { type: 'button', class: `btn${primary ? ' primary' : ''}`, onclick, ...extra }, label);
   const row = (title, sub, ...acts) => el('div', { class: 'set-row' }, el('div', { class: 'set-txt' }, el('b', { text: title }), sub ? el('span', { class: 'note', text: sub }) : null), el('div', { class: 'row set-acts' }, ...acts));
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  /** The longer explanation of a part, folded away: "More ▸" (or `title`) opens it. */
+  const more = (title, ...kids) => el('details', { class: 'set-more' }, el('summary', { text: title || 'More' }), ...kids.flat().filter(Boolean));
+  app.settingsMore = more;
+  const note = (t) => el('p', { class: 'note', text: t });
 
   async function show(which) {
+    if (which === 'update') which = 'about'; // Update is part of About now
     if (which) section = which;
     // A tab pressed from the keyboard keeps the focus on the (new) tab when the window is drawn again.
     const onTab = sheet.contains(document.activeElement) && document.activeElement.getAttribute('role') === 'tab';
@@ -61,20 +67,33 @@
         try { const r = await app.engine('/api/scan', {}); after(`Scan finished: ${plural(r.total, 'project', 'projects')}.${r.added.length ? ` New: ${r.added.join(', ')}.` : ''}${r.gone.length ? ` Gone: ${r.gone.join(', ')}.` : ''}${!r.added.length && !r.gone.length ? ' Nothing new since the last scan.' : ''}`); } catch (e) { say(fault(e)); }
       }), el('span', { class: 'note', text: f.lastScan ? `Last scan ${new Date(f.lastScan).toLocaleString()}` : '' })),
       el('h3', { text: 'Projects added one by one' }),
-      el('p', { class: 'note', text: 'For a project kept outside your working folders. The office only reads the folder; it never changes its files.' }),
+      note('For a project kept outside your working folders.'),
       ...f.extraProjects.map((x) => row(x.name, x.exists ? x.path : `${x.path} (not found)`, btn('Remove', async () => {
         const p = app.engineData.projects.find((r) => r.dir.toLowerCase() === x.path.toLowerCase());
         try { if (p) await app.engine('/api/projects/remove', { id: p.id }); else await app.engine('/api/projects/forget', { path: x.path }); after(`${x.name} is off the list. Its files were not touched.`); } catch (e) { say(fault(e)); }
       }))),
       await folderPicker('project', 'Add project', async (p) => { const r = await app.engine('/api/projects/add', { path: p }); after(`${r.name} added to the list.`); }),
-      el('h3', { text: 'Taken off the list' }),
-      f.hidden.length ? f.hidden.map((x) => row(x.name, x.path + (x.exists ? '' : ' (not found)'), btn('Show again', async () => { try { await app.engine('/api/projects/show', { path: x.path }); after(`${x.name} is back on the list.`); } catch (e) { say(fault(e)); } })))
-        : el('p', { class: 'note', text: 'Nothing. A project taken off the list (Remove, on its tile) shows here, to bring back.' }),
+      ...projectsFolder(),
+      // Only when there is something to bring back.
+      f.hidden.length ? el('h3', { text: 'Taken off the list' }) : null,
+      ...f.hidden.map((x) => row(x.name, x.path + (x.exists ? '' : ' (not found)'), btn('Show again', async () => { try { await app.engine('/api/projects/show', { path: x.path }); after(`${x.name} is back on the list.`); } catch (e) { say(fault(e)); } }))),
+    ];
+  }
+  /** The projects folder (where the office's desks come from): saved as soon as it is changed. */
+  function projectsFolder() {
+    const st = app.data?.setup || {};
+    const rootIn = el('input', { type: 'text', class: 'field-text', value: st.root || '', placeholder: 'Worked out from your threads', 'aria-label': 'Projects folder', spellcheck: 'false' });
+    rootIn.addEventListener('change', async () => { try { await app.api('/api/settings', { root: rootIn.value }); await app.refresh(); say(rootIn.value.trim() ? 'Projects folder saved.' : 'Projects folder cleared: it is worked out from your threads.'); } catch (e) { say(fault(e)); } });
+    return [
+      el('h3', { text: 'Projects folder (the office)' }),
+      note('Each folder in it is a desk in the office. Empty: worked out from your threads.'),
+      rootIn,
+      more('More', note('A thread working in the projects folder itself is a Consultant. Empty means the working folder (above) your threads start in; with none there, the folder most threads start in, or the folder those sit in when they start inside each project.')),
     ];
   }
 
   // ---- Setup: the start link, the desktop shortcut, Start with Windows; then advanced setup (hooks) ----
-  const ITEMS = [['link', 'Start link', 'The office\'s launcher page (index.html) starts the office with it (ai-head-office://start). start.cmd sets it up each time it starts.'],
+  const ITEMS = [['link', 'Start link', 'Lets the office\'s start page (index.html) start it.'],
     ['desktop', 'Desktop shortcut', 'Double-click it to open the office.'], ['startup', 'Start with Windows', 'Starts the office quietly when you sign in.']];
   async function drawSetup() {
     const s = await app.engine('/api/setup');
@@ -84,8 +103,9 @@
     const advanced = st.mode === 'advanced';
     const heard = st.lastHookAt ? `Last heard from the AI app ${new Date(st.lastHookAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` : 'Nothing heard from the AI app yet since the office started.';
     return [
-      el('h3', { text: 'Step 1: shortcuts and the start link' }),
-      el('p', { class: 'note', text: `Node.js ${s.node.version}${s.node.ok ? '' : ` is too old (needs ${s.node.min} or newer): quit and run install.cmd, which can update it`}. Ticked = set up, unticked = taken away, for your Windows user only; your projects and settings are not touched.` }),
+      el('h3', { text: 'Shortcuts' }),
+      note('Ticked = set up, unticked = taken away, for your Windows user only.'),
+      s.node.ok ? null : el('p', { class: 'm-bad', text: `Node.js ${s.node.version} is too old (needs ${s.node.min} or newer): quit and run install.cmd, which can update it.` }),
       ...ticks,
       el('div', { class: 'row' }, btn('Apply', async () => {
         const body = {};
@@ -98,11 +118,10 @@
           show('setup');
         } catch (e) { say(fault(e)); }
       }, true)),
-      el('p', { class: 'note', text: `The office's folder: ${s.folder}. If you moved it, Apply points the shortcuts and the link at the new place.` }),
-      el('h3', { text: 'Step 2 (advanced): hooks in the AI app' }),
-      el('p', {}, el('b', { text: advanced ? 'Now: advanced setup is on.' : 'Now: easy setup.' }), ` ${heard}`),
-      el('p', { text: 'Easy setup (the default) reads the AI app\'s transcripts on this PC every 3 seconds and changes nothing in the app. What it cannot do: "Needs you" is worked out from the last reply (one whose last lines ask a question), a permission prompt may not show at all, and what someone is doing can be up to 3 seconds behind.' }),
-      el('p', { text: `Advanced setup also adds three small hooks to the AI app's settings file (${st.settingsFile || '~/.claude/settings.json'}): when a thread gets a message, waits for your permission, or finishes a reply, the app runs a small script that tells the office straight away. It sends only to this PC (127.0.0.1), prints nothing back, and gives up in under a second if the office is closed. Hooks you already have stay as they are, a copy of the file is saved first, and going back to easy setup takes out only this office's three.` }),
+      more('Moved the office\'s folder?', note(`The office's folder: ${s.folder}. If you moved it, Apply points the shortcuts and the link at the new place.`)),
+      el('h3', { text: 'Advanced: instant news from the AI app' }),
+      el('p', {}, el('b', { text: advanced ? 'On.' : 'Off (easy setup).' }), ` ${heard}`),
+      note('Adds three small hooks to the AI app, so the office hears at once when a thread needs you or waits for your permission.'),
       el('div', { class: 'row' }, btn(advanced ? 'Go back to easy setup' : 'Turn on advanced setup', async (e) => {
         e.currentTarget.disabled = true;
         try {
@@ -114,18 +133,20 @@
           show('setup');
         } catch (err) { say(fault(err)); e.currentTarget.disabled = false; }
       }, !advanced)),
-      el('details', {}, el('summary', { text: 'What advanced setup adds to the file' }),
+      more('What it does and changes',
+        note('Easy setup (the default) reads the AI app\'s transcripts on this PC every 3 seconds and changes nothing in the app. What it cannot do: "Needs you" is worked out from the last reply (one whose last lines ask a question), a permission prompt may not show at all, and what someone is doing can be up to 3 seconds behind.'),
+        note(`Advanced setup adds three small hooks to the AI app's settings file (${st.settingsFile || '~/.claude/settings.json'}): when a thread gets a message, waits for your permission, or finishes a reply, the app runs a small script that tells the office straight away. It sends only to this PC (127.0.0.1), prints nothing back, and gives up in under a second if the office is closed. Hooks you already have stay as they are, a copy of the file is saved first, and going back to easy setup takes out only this office's three. This is what it adds:`),
         el('pre', { class: 'code', text: JSON.stringify({ hooks: Object.fromEntries(['UserPromptSubmit', 'Notification', 'Stop'].map((ev) => [ev, [{ hooks: [{ type: 'command', command: st.hookCommand || 'node "<ai head office overview folder>/office/hook.mjs" 8880 --ai-head-office-hook', timeout: 3 }] }]])) }, null, 2) })),
     ];
   }
 
-  // ---- Office: theme, projects folder, gone-home time, live checks ----
+  // ---- Office: theme, gone-home time, live checks, Thoughts chat, the planner. Each saved as soon as it changes. ----
   async function drawOffice() {
     const st = app.data?.setup || {};
-    const rootIn = el('input', { type: 'text', class: 'field-text', value: st.root || '', 'aria-label': 'Projects folder', spellcheck: 'false' });
     const quietIn = el('input', { type: 'number', class: 'field-text short', min: '5', max: '1440', value: String(st.quietMinutes || 60), 'aria-label': 'Gone-home time in minutes' });
+    quietIn.addEventListener('change', async () => { try { await app.api('/api/settings', { quietMinutes: quietIn.value }); await app.refresh(); say(`Staff go home after ${quietIn.value} minutes with nothing happening.`); } catch (e) { say(fault(e)); } });
     const every = el('select', { class: 'field-text short', 'aria-label': 'Check the live sites every' }, [5, 10, 15].map((m) => el('option', { value: String(m), selected: (app.engineData.stats?.liveEvery || 15) === m }, `${m} minutes`)));
-    const save = (body, done) => async () => { try { await app.api('/api/settings', body()); await app.refresh(); say(done); } catch (e) { say(fault(e)); } };
+    every.addEventListener('change', async () => { try { const r = await app.engine('/api/live/every', { minutes: Number(every.value) }); say(`Live sites are checked every ${r.every} minutes.`); } catch (e) { say(fault(e)); } });
     // The theme the page was served in is the one in use (the office's choice, or its default).
     const now = document.documentElement.dataset.themeChoice || 'light';
     const THEMES = [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark'], ['system', 'Match Windows']];
@@ -140,31 +161,24 @@
         } catch (e) { say(fault(e)); }
       },
     }, name);
+    const chat = el('select', { class: 'field-text short', 'aria-label': 'Thoughts chat', title: 'The office chat is the staff\'s banter: each has a character of their own, and every line answers something that really happened in a thread. Kept in this browser.',
+      onchange: (e) => {
+        app.setChatMode?.(e.target.value);
+        say({ all: 'Thoughts: work lines and the office chat.', work: 'Thoughts: work only. No office chat, just what the threads are doing.', off: 'Thoughts is off.' }[e.target.value]);
+      } }, ...[['all', 'Everything: work and office chat'], ['work', 'Work only: no office chat'], ['off', 'Off']].map(([v, w]) => el('option', { value: v, selected: (app.chatMode?.() ?? 'all') === v }, w)));
+    const field = (label, ...input) => el('div', { class: 'row set-line' }, el('span', { class: 'set-label', text: label }), ...input);
     return [
       el('h3', { text: 'Theme' }),
       el('div', { class: 'row', role: 'group', 'aria-label': 'Theme' }, ...THEMES.map(themeBtn)),
-      el('p', { class: 'note', text: `Auto is light from sunrise to sunset and dark at night: ${sun.theme.today()} Dark dims the office for the evening: the page, the rooms and the beach. Match Windows follows Settings › Personalisation › Colours in Windows. The sun, moon and auto switch on the top line does the same.` }),
-      el('h3', { text: 'Projects folder' }),
-      el('p', { class: 'note', text: 'The folder your project folders sit in: each folder in it is a desk, and a thread working in the folder itself is a Consultant. Empty = the working folder (Folders) your threads start in; with none there, the folder most threads start in, or the folder those sit in when they start inside each project.' }),
-      el('div', { class: 'row' }, rootIn, btn('Save folder', save(() => ({ root: rootIn.value }), 'Projects folder saved.'), true)),
-      el('h3', { text: 'Gone home' }),
-      el('div', { class: 'row' }, el('span', { text: 'After' }), quietIn, el('span', { text: 'minutes with nothing happening.' }), btn('Save time', save(() => ({ quietMinutes: quietIn.value }), 'Gone-home time saved.'), true)),
-      el('h3', { text: 'Live sites' }),
-      el('div', { class: 'row' }, el('span', { text: 'Check every live URL every' }), every, btn('Save', async () => {
-        try { const r = await app.engine('/api/live/every', { minutes: Number(every.value) }); say(`Live sites are checked every ${r.every} minutes.`); } catch (e) { say(fault(e)); }
-      }, true), btn('Check all now', async () => { try { await app.engine('/api/live/check-all', {}); say('Checking the live sites, one at a time…'); } catch (e) { say(fault(e)); } })),
-      // The Thoughts chat: everything, work only (no office chat), or off. Speech bubbles in the office stay either way.
-      el('h3', { text: 'Thoughts chat' }),
-      el('div', { class: 'row' }, el('select', { class: 'field-text short', 'aria-label': 'Thoughts chat', onchange: (e) => {
-        app.setChatMode?.(e.target.value);
-        say({ all: 'Thoughts: work lines and the office chat.', work: 'Thoughts: work only. No office chat, just what the threads are doing.', off: 'Thoughts is off.' }[e.target.value]);
-      } }, ...[['all', 'Everything: work and office chat'], ['work', 'Work only: no office chat'], ['off', 'Off']].map(([v, w]) => el('option', { value: v, selected: (app.chatMode?.() ?? 'all') === v }, w)))),
-      el('p', { class: 'note', text: 'The office chat is the staff\'s banter: each has a character of their own, and every line answers something that really happened in a thread (tests, a commit or push, a bug found, the same file again). Work only keeps what the threads are doing and the plain facts. Kept in this browser.' }),
+      note(`Auto: light by day, dark at night. ${sun.theme.today()}`),
+      el('h3', { text: 'The office' }),
+      field('Staff go home after', quietIn, el('span', { text: 'minutes with nothing happening' })),
+      field('Thoughts chat', chat),
+      field('Live sites: check every', every, btn('Check all now', async () => { try { await app.engine('/api/live/check-all', {}); say('Checking the live sites, one at a time…'); } catch (e) { say(fault(e)); } })),
       // The project planner is off until ticked: its tab, its check-ins in Needs attention and Filter by › Category.
-      el('h3', { text: 'Project planner' }),
-      el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: !!app.plannerOn?.(), onchange: (e) => { app.setPlannerOn?.(e.target.checked); say(e.target.checked ? 'The Project planner tab is shown, beside Prompts.' : 'The Project planner is hidden. Its scores and categories are kept.'); } }),
-        ' Show the Project planner tab: it scores every project and splits your day between them'),
-      el('p', { class: 'note', text: 'Shown, it also adds today\'s check-ins to Needs attention and Category to Filter by. Kept in this browser.' }),
+      el('label', { class: 'row set-line', title: 'Shown, it also adds today\'s check-ins to Needs attention and Category to Filter by. Kept in this browser.' },
+        el('input', { type: 'checkbox', checked: !!app.plannerOn?.(), onchange: (e) => { app.setPlannerOn?.(e.target.checked); say(e.target.checked ? 'The Project planner tab is shown, beside Prompts.' : 'The Project planner is hidden. Its scores and categories are kept.'); } }),
+        ' Show the Project planner tab (scores your projects and splits your day)'),
     ];
   }
 
@@ -181,10 +195,7 @@
     list.append(...s.details.map(line));
     if (!s.details.length) list.append(line(null));
     return [
-      el('p', { text: 'What should never appear in a project you publish: your email, phone, street, full name, a customer\'s name. Every audit looks for them in the files git would publish, the git history, commit emails and release zips.' }),
-      el('p', { class: 'note', text: 'A finding shows the label, never the detail, so a report is safe to paste into an AI. Once saved, a detail is not shown again here.' }),
-      // Where they are kept, plainly: a file on this PC that is not locked away, and how to remove it.
-      el('p', { class: 'note', text: `Kept on this PC only, as plain text in ${s.file}. The office never sends them anywhere and git never publishes that folder, but anyone who can open it (or a copy or backup of it) can read them. Delete all removes the file.` }),
+      note('What must never appear in a project you publish (your email, phone, street, full name, a customer\'s name). Every audit looks for them; a report shows only the label.'),
       list,
       el('div', { class: 'row' }, btn('Add detail', () => { const r = line(null); list.append(r); r.querySelector('input').focus(); }), btn('Save', async () => {
         const details = [...list.querySelectorAll('.pd-row')].map((r) => ({ id: r.dataset.id || undefined, label: r.querySelector('.pd-label').value, value: r.querySelector('.pd-value').value })).filter((d) => d.id || d.label.trim() || d.value.trim());
@@ -193,7 +204,12 @@
         if (!confirm(`Delete every private detail you saved? The file ${s.file} is removed. Audits then look only for this PC's own details and your project names, until you add them again.`)) return;
         try { await app.engine('/api/private-details/delete', {}); say('Every saved private detail is deleted: the file is gone.'); show('private'); } catch (e) { say(fault(e)); }
       }) : null),
-      el('p', { class: 'note', text: `Also looked for, read from this PC each time: ${s.auto.join(', ')}; and the names of your other projects.` }),
+      el('div', { class: 'row pd-auto' }, el('span', { class: 'note', text: 'Also looked for, by itself:' }),
+        ...[...s.auto, 'your other projects\' names'].map((a) => el('span', { class: 'mark m-none', text: a }))),
+      // Where they are kept, plainly: a file on this PC that is not locked away, and how to remove it.
+      more('Where they are kept',
+        note('Once saved, a detail is not shown again here. The audit searches the files git would publish, the git history, commit emails and release zips.'),
+        note(`Kept on this PC only, as plain text in ${s.file}. The office never sends them anywhere and git never publishes that folder, but anyone who can open it (or a copy or backup of it) can read them. Delete all removes the file.`)),
     ];
   }
 
@@ -202,7 +218,7 @@
     const h3 = (t) => el('h3', { text: t });
     const p = (t) => el('p', { text: t });
     const li = (...t) => el('ul', {}, t.map((x) => el('li', { text: x })));
-    return [
+    const parts = [
       p('AI Head Office Overview shows your AI coding threads as staff in an office, beside your projects: their local copies, audits, git backups and live sites. It runs only on this PC.'),
       h3('The office'),
       li('Each thread is one person at their project\'s desk: the project folder they write in, or the one their first message says START HERE in. Work in two or more projects makes a Consultant.',
@@ -229,7 +245,7 @@
       h3('Prompts'),
       p('Prompts you use again and again, a tile per category: Copy, Edit (which can move it), Remove; New category, Add prompt, Rename and Delete category. Words in [brackets] are yours to fill in. Kept on this PC only.'),
       h3('What leaves this PC'),
-      p('Nothing about you or your projects. The only requests that leave this PC are plain page requests to the live addresses you add, and, only if you tick it under About, one request a day to GitHub for the newest Git version, and, when you open Settings › Update, a look at GitHub for the newest signed release of the office. Transcripts are read, never changed or sent.'),
+      p('Nothing about you or your projects. The only requests that leave this PC are plain page requests to the live addresses you add, and, only if you tick it under About, one request a day to GitHub for the newest Git version, and, when you press About › Check for updates, a look at GitHub for the newest signed release of the office. Transcripts are read, never changed or sent.'),
       h3('If something goes wrong'),
       li('The page says the office is not answering: it stopped. Double-click start.cmd (or the desktop shortcut); the page catches up by itself.',
         '"Needs Node.js 22 or newer": double-click install.cmd; it offers to install it.',
@@ -239,15 +255,21 @@
       h3('Uninstall'),
       p('About › Uninstall (or uninstall.cmd) stops the office and removes its desktop shortcut, Start with Windows and the start link. Your files stay: delete the office\'s folder yourself to remove it completely. Its data folder holds your settings, audits, prompts and the office\'s own records.'),
     ];
+    // Each section folded under its heading, so the page shows only the headings until one is opened.
+    const out = [];
+    let sec = null;
+    for (const n of parts) {
+      if (n.tagName === 'H3') { sec = el('details', { class: 'set-more help-sec' }, el('summary', { text: n.textContent })); out.push(sec); } else if (sec) sec.append(n); else out.push(n);
+    }
+    return out;
   }
 
-  // ---- Update: asks GitHub for a newer signed release when this tab is opened (or Check is pressed), takes it in one
+  // ---- About › Update: asks GitHub for a newer signed release only when Check for updates is pressed, takes it in one
   // click (after starting it once as a test copy), and goes back to the version before the last update ----
-  async function drawUpdate() {
-    const stats = app.engineData.stats || await app.engine('/api/stats');
+  async function updatePart() {
     let st = null;
     try { st = await app.engine('/api/update'); } catch { /* shown without the last update */ }
-    const box = el('div', { class: 'update-box', 'aria-live': 'polite' }, el('p', { class: 'note', text: 'Asking GitHub for the newest version…' }));
+    const box = el('div', { class: 'update-box', 'aria-live': 'polite' });
     const said = (...kids) => box.replaceChildren(...kids.flat().filter(Boolean));
     // After an update the office starts again; the page waits for it and then reloads itself (a new run, a new key).
     async function backAgain() {
@@ -286,37 +308,41 @@
       const when = `Checked ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
       if (!r.version) return said(el('p', {}, el('b', { text: '● There is no signed release on GitHub yet.' })), el('p', { class: 'note', text: `Update takes only a version signed by the office's maker, and ${r.from} has none so far. ${when}` }), el('div', { class: 'row' }, again));
       if (!r.newer) return said(el('p', {}, el('b', { text: '● You have the newest version.' })), el('p', { class: 'note', text: `The newest signed release on ${r.from} is ${r.version}. ${when}` }), el('div', { class: 'row' }, again));
-      const zipNote = r.zip ? el('p', { class: 'note', text: `This copy came from a zip. Update now first links it to GitHub, after checking its files are ${r.mine} as released, then takes ${r.version}. Every update after that comes the same way.` }) : null;
+      const zipNote = r.zip ? note(`This copy came from a zip: Update now first links it to GitHub (after checking its files are ${r.mine} as released), then takes ${r.version}.`) : null;
       const list = el('ul', { class: 'update-list' }, r.commits.map((c) => el('li', {}, el('span', { class: 'note', text: `${c.date} ` }), c.text)));
       const blocked = r.changed.length ? `Files here were changed (${r.changed.slice(0, 3).join(', ')}${r.changed.length > 3 ? ', …' : ''}), so it will not update until they are kept or undone.`
         : r.own ? 'This copy has saved changes of its own that the new version does not, so it cannot simply move forward. Bring it up to date by hand (see AGENTS.md, "Update it").' : '';
-      const go = btn('Update now', (e) => take(e.currentTarget, r.version), true, { title: 'Takes the signed version from GitHub, starts it once as a test copy, then moves this copy to it and restarts the office. Your data folder (settings, audits, prompts, the office) is not touched.' });
-      said(el('p', {}, el('b', { text: `▲ Version ${r.version} is out, signed by the office's maker: ${plural(r.behind, 'change', 'changes')} since yours.` })),
+      const go = btn('Update now', (e) => take(e.currentTarget, r.version), true);
+      said(el('p', {}, el('b', { text: `▲ Version ${r.version} is out: ${plural(r.behind, 'change', 'changes')} since yours.` })),
         list, blocked ? el('p', { text: blocked }) : null, zipNote,
-        el('p', { class: 'note', text: `From ${r.from}, tag v${r.version} (commit ${r.commit}). This copy is at ${r.at}. ${when}` }),
         el('div', { class: 'row' }, blocked ? null : go, again),
-        el('p', { class: 'note', text: 'Update now checks the signature again, starts the new version once as a test copy (a version that does not start is never taken), then takes it and restarts the office (the page reloads itself). Your data folder is never touched, and nothing here is overwritten: an update that would is refused.' }));
+        more('How Update works',
+          note('Update now checks the signature again, starts the new version once as a test copy (a version that does not start is never taken), then takes it and restarts the office (the page reloads itself). Your data folder is never touched, and nothing here is overwritten: an update that would is refused.'),
+          note(`From ${r.from}, tag v${r.version} (commit ${r.commit}). This copy is at ${r.at}. ${when}`)));
     }
     // The last update taken here, and Go back to the version before it.
     const last = st?.last;
     const day = (iso) => { const d = new Date(iso); return Number.isNaN(+d) ? '' : ` on ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`; };
     const lastRow = !last ? null : row(last.back ? `Went back to ${last.to} (from ${last.from})${day(last.when)}` : `Last update: ${last.from} to ${last.to}${day(last.when)}`,
-      st.canGoBack ? `Go back moves this copy to ${last.from}, the version it had before, and restarts the office. Your data folder is not touched.` : last.back ? 'Go back was pressed in Settings › Update on this PC.' : 'Taken by Settings › Update on this PC.',
+      st.canGoBack ? `Go back returns to ${last.from} and restarts the office. Your data folder is not touched.` : '',
       st.canGoBack && st.here ? btn(`Go back to ${last.from}`, async (e) => {
         if (!confirm(`Go back to ${last.from}? The office moves back to the version it had before the last update and restarts.`)) return;
         e.currentTarget.disabled = true;
         said(el('p', { text: `Going back to ${last.from}…` }));
         try { await app.engine('/api/update/back', {}); await app.engine('/api/update/restart', {}).catch(() => null); backAgain(); } catch (x) { failed(x); }
       }) : null);
-    check();
-    return [row(`This copy: AI Head Office Overview ${stats.version}`, 'Updates come from the office\'s own GitHub address, and only as a version signed by its maker. Opening this tab asks GitHub once; nothing about you or your projects is sent.' + (st?.zip ? ' This copy came from a zip: its first update links it to GitHub, and it updates the same way from then on.' : '')), lastRow, box].filter(Boolean);
+    // Nothing is asked of GitHub until Check for updates is pressed.
+    said(el('div', { class: 'row' }, btn('Check for updates', check, true),
+      el('span', { class: 'note', text: 'Only a version signed by the office\'s maker is taken. Nothing about you is sent.' })));
+    return [el('h3', { text: 'Update' }), lastRow, box].filter(Boolean);
   }
 
   // ---- About ----
   async function drawAbout() {
     const stats = app.engineData.stats || await app.engine('/api/stats');
-    let git = null;
+    let git = null, node = '';
     try { git = await app.engine('/api/git-program'); } catch { /* shown as unknown */ }
+    try { node = (await app.engine('/api/setup')).node.version; } catch { /* left out */ }
     const gitLine = !git ? 'The Git version could not be read.' : git.missing ? 'Git is not installed: the git marks and See what changed need it (winget install --id Git.Git -e).'
       : !git.installed ? `The Git version could not be read${git.error ? `: ${git.error}` : '.'}`
         : git.judge?.old ? `▲ Git ${git.installed} is older than ${git.judge.fixedIn} (${git.judge.when}), which has the fixes for ${git.judge.what}. Update it: winget upgrade --id Git.Git -e, or download it from git-scm.com.`
@@ -324,15 +350,17 @@
     const online = el('input', { type: 'checkbox', checked: !!git?.online });
     online.addEventListener('change', async () => { try { const r = await app.engine('/api/git-online', { on: online.checked }); say(r.git.latest?.version ? `Newest Git: ${r.git.latest.version}.` : online.checked ? 'The office will ask GitHub once a day.' : 'Off: nothing is asked online.'); } catch (e) { say(fault(e)); } });
     return [
-      row(`AI Head Office Overview ${stats.version}${stats.dryRun ? ' (test copy: windows are reported, not opened)' : ''}${stats.demo ? ' (demo)' : ''}`, 'Runs only on this PC (127.0.0.1). PolyForm Noncommercial License 1.0.0.'),
+      row(`AI Head Office Overview ${stats.version}${stats.dryRun ? ' (test copy: windows are reported, not opened)' : ''}${stats.demo ? ' (demo)' : ''}`, `Runs only on this PC (127.0.0.1)${node ? ` with Node.js ${node}` : ''}. PolyForm Noncommercial License 1.0.0.`),
+      ...await updatePart(),
+      el('h3', { text: 'This PC' }),
       row('Git', gitLine),
       el('label', { class: 'tick-row' }, online, el('span', { text: 'Check online for a newer Git (asks GitHub once a day; off until you tick it)' })),
-      row('Quit the office', 'Stops the office and every local copy it started. Start it again with start.cmd or the desktop shortcut.', btn('Quit', async () => {
+      row('Quit the office', 'Stops it and every local copy it started.', btn('Quit', async () => {
         if (!confirm('Quit the office? It stops, and so does every local copy it started.')) return;
         try { await app.engine('/api/quit', {}); } catch (e) { if (e?.error?.fault) return say(fault(e)); /* else it is stopping */ }
         document.body.replaceChildren(el('p', { class: 'empty stopped', text: 'The office has stopped. You can close this window.' }));
       })),
-      row('Uninstall', 'Stops the office and removes its desktop shortcut, Start with Windows and the start link. Your files are not deleted.', btn('Uninstall…', async () => {
+      row('Uninstall', 'Removes its shortcuts and start link, and stops it. Your files stay.', btn('Uninstall…', async () => {
         if (!confirm('Uninstall AI Head Office Overview? It stops, and its shortcuts and start link are removed. Nothing is deleted: its folder stays, and you can remove it yourself.')) return;
         try {
           const r = await app.engine('/api/uninstall', {});
@@ -346,7 +374,7 @@
     ];
   }
 
-  const DRAW = { folders: drawFolders, backups: () => app.drawBackupSettings(say, () => show('backups')), setup: drawSetup, office: drawOffice, private: drawPrivate, update: drawUpdate, help: drawHelp, about: drawAbout };
+  const DRAW = { folders: drawFolders, backups: () => app.drawBackupSettings(say, () => show('backups')), setup: drawSetup, office: drawOffice, private: drawPrivate, help: drawHelp, about: drawAbout };
 
   // ---- The first start: Start with Windows and a desktop shortcut, offered ticked, asked once ----
   let welcomed = false;

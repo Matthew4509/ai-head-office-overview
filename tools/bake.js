@@ -120,7 +120,7 @@ execFileSync(TAR, ['-a', '-c', '-f', zip, 'ai-head-office-overview'], { cwd: sta
 fs.rmSync(stage, { recursive: true, force: true });
 const n = execFileSync(TAR, ['-t', '-f', zip], { encoding: 'utf8' }).trim().split(/\r?\n/).filter(x => !x.endsWith('/')).length;
 console.log('Baked ' + path.relative(HERE, zip) + ': ' + n + ' files, ' + Math.round(fs.statSync(zip).size / 1024) + ' KB. ' + checked[0].toUpperCase() + checked.slice(1));
-// Signed: the zip's .sig, and the signed tag message that Settings › Update needs before it offers this version.
+// Signed: the zip's .sig, and the signed tag message that Settings › About › Update needs before it offers this version.
 try { console.log(signing.signZip(zip, VERSION, key.pem)); }
 catch (e) { fs.rmSync(zip + '.sig', { force: true }); console.error('The zip was made but NOT signed: ' + e.message); process.exit(1); }
 console.log(signing.nextSteps(VERSION, signing.writeTag(VERSION, key.pem)));

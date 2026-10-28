@@ -47,7 +47,7 @@ https://github.com/Matthew4509/ai-office-overview. Explain the difference and le
 ## Update it
 A release is a tag `v<version>` on https://github.com/Matthew4509/ai-head-office-overview whose message carries an
 `aho-release {…}` line: a signature from the office's maker for that exact commit and its files. Pushes to `main`
-that have no such tag are not releases. Settings › Update takes only these, from that fixed address (never the
+that have no such tag are not releases. Settings › About › Update takes only these, from that fixed address (never the
 folder's own `origin`), and checks the signature against the key the office carries (`lib/release.js`).
 1. **See what is new before taking it:** in the app's folder,
    `git ls-remote --tags --refs https://github.com/Matthew4509/ai-head-office-overview.git` lists the release tags
@@ -58,7 +58,7 @@ folder's own `origin`), and checks the signature against the key the office carr
    `git diff --stat HEAD..refs/aho-update/v<version>` the files they change. Read the diff of anything that runs on
    the user's PC (`lib/`, `office/`, `*.cmd`, `server.js`) and summarise it for the user. Then remove the ref again:
    `git update-ref -d refs/aho-update/v<version>`.
-2. **Take it with Settings › Update › Update now** (the user presses it): it fetches the tag again, checks the
+2. **Take it with Settings › About › Update › Update now** (the user presses it): it fetches the tag again, checks the
    signature, refuses when files here were changed or this copy has commits of its own, starts the new version once as
    a test copy on a free port with throwaway data (a version that does not start is never taken), then moves this
    folder to exactly the signed commit with git hooks off, and restarts the office. **Go back** there returns to the
@@ -68,7 +68,7 @@ folder's own `origin`), and checks the signature against the key the office carr
    branch), then `npm test`, `cmd /c start "" start.cmd` and `node server.js --status`. This skips the signature check
    and the test start, so say so. If git refuses because files were changed here, stop and tell the user: do not
    reset, stash or overwrite their changes without their word.
-4. A copy from before signed updates follows `main` in its own Settings › Update until it runs a version that has
+4. A copy from before signed updates follows `main` in its own Settings › About › Update until it runs a version that has
    them; from that version on it takes signed tags only.
 5. **A copy unpacked from the release zip** (no `.git` folder, 0.1.13 or newer) updates the same way. Check looks
    from a scratch repository in the temp folder and writes nothing in the office's folder. The first Update now runs
@@ -94,12 +94,12 @@ folder's own `origin`), and checks the signature against the key the office carr
 - **Runs:** a project's own start command from that project's `.claude/launch.json` or `project.json` (never text
   from the page; code: `lib/projects.js`, `lib/runner.js`), and only after the person has seen the whole command in a
   first-run window and said yes (asked again when the command changes; `trustCheck` in `lib/runner.js`); `git`
-  read-only commands; and PowerShell helpers in `lib/platform/windows/`. Settings › Update runs git to fetch and take
+  read-only commands; and PowerShell helpers in `lib/platform/windows/`. Settings › About › Update runs git to fetch and take
   a signed release (in a zip copy, `git init` first), and, only when the user presses Install Git,
   `winget install --id Git.Git -e --source winget` in a window of its own (`installGit` in `lib/platform/windows.js`).
 - **Sends:** nothing about the user. The only requests that leave the PC are plain GETs to the live addresses the user
   adds (`lib/live.js`, `lib/audit.js`) and, only if ticked under About, one request a day to GitHub for the newest Git
-  version (`lib/git-program.js`), and, when the user opens Settings › Update, a `git ls-remote` of this repository's
+  version (`lib/git-program.js`), and, when the user presses Settings › About › Check for updates, a `git ls-remote` of this repository's
   tags plus, when one is newer, a `git fetch` of that one tag (`lib/update.js`; the address is fixed in
   `lib/release.js`). To check: search the code for `fetch(`, `http.get`, `http.request`, `git fetch`, `ls-remote`.
 - **Its own privacy check:** `node tools/disclose.js` scans the folder, its git history and any zip for private

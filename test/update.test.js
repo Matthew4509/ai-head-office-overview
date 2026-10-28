@@ -1,4 +1,4 @@
-// Signed updates (Settings › Update): the signature parts (lib/release.js), signing in the bake (tools/sign-release.js)
+// Signed updates (Settings › About › Update): the signature parts (lib/release.js), signing in the bake (tools/sign-release.js)
 // and the update itself (lib/update.js) against little repositories in a temp folder: a bare repository stands in for
 // the office's fixed GitHub address (AHO_RELEASE_GIT, which only tests set), a working repository makes the releases,
 // and a clone of it is the office that updates. A copy of this office stands in for the old and new versions, so the

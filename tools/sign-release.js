@@ -99,7 +99,7 @@ function nextSteps(version, tag) {
   if (tag.file) lines.push('Signed tag message: ' + path.relative(HERE, tag.file) + ' (commit ' + tag.commit.slice(0, 7) + '). To publish it:',
     '  git tag -a v' + version + ' -F "' + path.relative(HERE, tag.file) + '"', '  git push origin v' + version);
   else lines.push('No tag message yet: ' + tag.why + '.');
-  lines.push('Settings › Update offers a version only once its signed tag v' + version + ' is on GitHub.',
+  lines.push('Settings › About › Update offers a version only once its signed tag v' + version + ' is on GitHub.',
     'A GitHub Release is optional: https://github.com/' + REPO + '/releases/new  Tag: v' + version + '  Title: AI Head Office Overview ' + version,
     '  Attach both files: _releases/' + ZIP_NAME(version) + ' and _releases/' + ZIP_NAME(version) + '.sig, then Publish release.');
   return lines.join('\n');

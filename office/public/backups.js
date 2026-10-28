@@ -238,8 +238,12 @@
     const v = await app.engine('/api/backup');
     const after = async (r) => { say(r.words); if (r.added) { await app.loadProjects(); again(); } };
     const add = async (typed) => after(await addDrive(typed));
-    const keep = el('select', { class: 'field-text short', 'aria-label': 'How many backups to keep' },
+    const keep = el('select', { class: 'field-text short', 'aria-label': 'How many backups to keep', title: 'Only zips the office made and recorded are ever deleted, and only after a newer one passed its check.' },
       [[0, 'Keep every backup (nothing is deleted)'], [3, 'Keep the last 3 per project'], [5, 'Keep the last 5 per project'], [10, 'Keep the last 10 per project']].map(([n, t]) => el('option', { value: String(n), selected: v.keepLast === n, text: t })));
+    // Saved as soon as it is picked.
+    keep.addEventListener('change', async () => { try { const r = await app.engine('/api/backup/keep', { keep: Number(keep.value) }); say(r.keepLast ? `The last ${r.keepLast} backups of each project are kept on each drive; older ones are deleted after a new one passes its check.` : 'Every backup is kept. Nothing is deleted.'); } catch (e) { say(faultText(e)); } });
+    const more = (...a) => app.settingsMore(...a);
+    const note = (t) => el('p', { class: 'note', text: t });
     const listed = eng.projects.filter((p) => p.backup?.listed).length;
     const driveRow = (d) => el('div', { class: 'set-row' },
       el('div', { class: 'set-txt' }, el('b', { text: driveName(d) }),
@@ -254,28 +258,28 @@
           try { await app.engine('/api/backup/drive/forget', { drive: d.id }); say(`${d.name} is forgotten. Its backups were not touched.`); await app.loadProjects(); again(); } catch (e) { say(faultText(e)); }
         })));
     return [
-      el('p', { text: 'A backup is a zip of a project on a drive you choose: a USB drive is best, so a copy survives this PC. Each zip is read back and every file checked before it counts.' }),
+      note('Zips of your projects on a drive you choose (a USB drive is best), each read back and checked.'),
       v.drives.length ? null : el('div', { class: 'row' }, btn('Turn on backups: choose where they go…', () => add(), true)),
       v.drives.length ? null : typedPath(add),
       v.drives.length ? el('h3', { text: 'Backup drives' }) : null,
       ...v.drives.map(driveRow),
       v.drives.length ? el('div', { class: 'row' }, btn('Add another drive…', () => add()), typedPath(add, 'Add this folder')) : null,
-      v.drives.length ? el('p', { class: 'note', text: 'Backups are only ever added. When a drive is full, plug in another and add it here: the full one keeps its backups and stays on this list. With two plugged in, Run backups now asks which to use. A drive is known by its serial number, so a new letter (E: one day, F: the next) does not matter.' }) : null,
+      v.drives.length ? note('A full drive keeps its backups: plug in another and add it here.') : null,
+      v.drives.length ? more('How drives work', note('Backups are only ever added. When a drive is full, plug in another and add it here: the full one keeps its backups and stays on this list. With two plugged in, Run backups now asks which to use. A drive is known by its serial number, so a new letter (E: one day, F: the next) does not matter.')) : null,
       el('h3', { text: 'The backup list' }),
-      el('div', { class: 'row' }, el('span', { text: listed ? `${plural(listed, 'project', 'projects')} on the list.` : 'No project on the list yet.' }),
-        el('span', { class: 'note', text: 'Tick Backup on a project tile (Projects tab) to put it on the list.' }),
+      el('div', { class: 'row' }, el('span', { text: listed ? `${plural(listed, 'project', 'projects')} on the list.` : 'No project on the list yet: tick Backup on a project tile.' }),
         btn('Run backups now…', () => { document.getElementById('setup').hidden = true; openRun(); }, !!listed)),
-      el('h3', { text: 'Keep' }),
-      el('div', { class: 'row' }, keep, btn('Save', async () => { try { const r = await app.engine('/api/backup/keep', { keep: Number(keep.value) }); say(r.keepLast ? `The last ${r.keepLast} backups of each project are kept on each drive; older ones are deleted after a new one passes its check.` : 'Every backup is kept. Nothing is deleted.'); } catch (e) { say(faultText(e)); } }, true)),
-      el('p', { class: 'note', text: 'Only zips the office made and recorded are ever deleted, and only after a newer one passed its check.' }),
-      el('h3', { text: 'What is in a backup' }),
-      el('p', { class: 'note', text: v.full
-        ? 'Everything in the project\'s folder: the git history (.git) and the rebuildable folders too. A file that is locked or in use is listed in the .txt beside the zip; the rest still go in.'
-        : `Everything in the project's folder, the git history (.git) included. Left out, since a project rebuilds them by itself: ${v.leaveOut}. A file that is locked or in use is listed in the .txt beside the zip; the rest still go in.` }),
+      el('div', { class: 'row set-line' }, el('span', { class: 'set-label', text: 'Keep' }), keep),
+      el('h3', { text: 'What goes in' }),
+      note(v.full ? 'Everything in the project\'s folder, with its git history and the rebuildable folders.' : 'Everything in the project\'s folder, with its git history. Left out: folders a project rebuilds by itself (node_modules and the like).'),
       el('label', { class: 'tick-row' }, el('input', { type: 'checkbox', checked: v.full, 'data-act': 'backup-full', onchange: async (e) => {
         try { const r = await app.engine('/api/backup/full', { on: e.target.checked }); say(r.full ? 'Full backup is on: the rebuildable folders go in too, so backups are bigger and slower.' : 'Full backup is off: the rebuildable folders are left out again.'); again(); } catch (err) { say(faultText(err)); e.target.checked = !e.target.checked; }
-      } }), el('span', {}, el('b', { text: 'Full backup' }), el('br'), el('span', { class: 'note', text: 'Take the rebuildable folders too (node_modules and the rest): bigger and slower, but nothing to rebuild after a restore.' }))),
-      el('p', { class: 'note', text: `On the drive: ${v.folderName}\\<project>\\<project>-<date>-<time>.zip, a .txt beside each saying what is in it, and an index the office reads when the drive is added on another PC. To restore one: right-click it › Extract All.` }),
+      } }), el('span', {}, el('b', { text: 'Full backup' }), el('span', { class: 'note', text: ': take those too (bigger and slower, nothing to rebuild)' }))),
+      note('To restore: right-click a zip › Extract All.'),
+      more('What is left out, and where it goes',
+        v.full ? null : note(`Left out unless Full backup is ticked: ${v.leaveOut}.`),
+        note('A file that is locked or in use is listed in the .txt beside the zip; the rest still go in.'),
+        note(`On the drive: ${v.folderName}\\<project>\\<project>-<date>-<time>.zip, a .txt beside each saying what is in it, and an index the office reads when the drive is added on another PC.`)),
     ];
   };
 

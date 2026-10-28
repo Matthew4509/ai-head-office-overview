@@ -416,7 +416,7 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 /* Settings: section tabs, rows with their buttons on the right, ticks; Private details rows. */
 .set-body { min-height: 200px; }
 .set-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; border-bottom: 1px solid var(--line); padding: 8px 0; }
-/* Settings › Update: what is new on GitHub, newest first, in a short scrolling list. */
+/* Settings › About › Update: what is new on GitHub, newest first, in a short scrolling list. */
 .update-box { padding: 8px 0; }
 .update-list { margin: 6px 0; padding-left: 18px; max-height: 220px; overflow-y: auto; display: grid; gap: 3px; }
 .set-txt { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
@@ -662,3 +662,19 @@ details.more[open] > .more-menu { position: fixed; left: var(--more-left, auto);
 .todo-favs { border-style: dashed; }
 .todo-star { color: var(--needs); width: 13px; text-align: center; }
 .todo-fav { cursor: grab; }
+
+/* Settings, condensed (settings.js): one line per part, the rest folded under More; a setting on one line. */
+.set-more { margin: 2px 0 10px; }
+.set-more > summary { cursor: pointer; color: var(--soft); font-size: 13px; width: fit-content; }
+.set-more > summary:hover { color: var(--ink); }
+.set-more[open] > summary { margin-bottom: 4px; }
+.set-more > .note, .set-more > pre { margin: 4px 0 6px 14px; }
+.set-line { align-items: center; gap: 6px 8px; margin: 6px 0; }
+.set-label { min-width: 150px; }
+.set-line .field-text, .row.set-line > .field-text { margin: 0; flex: 0 0 auto; width: auto; min-width: 0; }
+.set-line input[type="number"].field-text { width: 80px; }
+.pd-auto { gap: 4px; align-items: center; margin: 8px 0; }
+.pd-auto .mark { font-size: 12px; }
+.help-sec { border-bottom: 1px solid var(--line); margin: 0; padding: 6px 0; }
+.help-sec > summary { font-weight: 600; color: var(--ink); font-size: 14px; }
+.help-sec ul { margin: 6px 0 4px; padding-left: 20px; }
