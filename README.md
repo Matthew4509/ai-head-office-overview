@@ -156,14 +156,14 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
   keeps what the threads are doing and the plain facts ("Tests passed."), **Off** stops the chat (the speech bubbles in
   the office stay).
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
-  favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or **Stop**
-  beside the port. The first time a start command runs, or after it changes, Run asks first: a window shows the program,
+  favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or, while it
+  runs, **Open** (opens it in the browser) beside the port. The first time a start command runs, or after it changes, Run asks first: a window shows the program,
   its arguments, the folder and the file it comes from, because it runs with your Windows permissions (check it for a
   project you downloaded). Its output goes to a log in the office's data folder, cut back past 5 MB. When another program holds its port, Run becomes **Use another port**: it starts the project on the
   next clean port (one no other project uses) instead of stopping that program, and keeps that port for next time while
   the old one stays taken, so moves stay rare; the start port is always tried first. Under them: its **Audit / Git /
-  Live** marks with **Browser** and **More** at their end (a project with no live site shows **+ Live URL**). **More**
-  holds: **Free port N** when another program holds its port (it names that program and asks before stopping it),
+  Live** marks with **Backup** and **More** at their end (a project with no live site shows **+ Live**). **More**
+  holds: **Stop** while it runs, **Browser** (its local address) while it does not, **Free port N** when another program holds its port (it names that program and asks before stopping it),
   **No git…** for a project not in git (its Git mark moves in here, to keep the tile tidy; it opens how to start one),
   **Copy prompt**
   (its name and full folder, to paste into the AI you use; the office never starts an AI itself), **Folder**,
@@ -204,7 +204,7 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
   furniture, room keys; **Transaction history** folds open to list what was bought lately, when, and for how much).
 - **A person's card:** a star beside their name and one on their project's heading (click to make them, or the whole
   project, a favourite; point at a star to read what that does), **EDIT** (their name and look; both belong to the
-  seat, so the next thread at that desk is the same person) and under it **Actions** (Run or Stop, Copy prompt, Folder,
+  seat, so the next thread at that desk is the same person) and under it **Actions** (Run, or Open and Stop while it runs, Copy prompt, Folder,
   Terminal, Browser, Hide, Remove from list), what they are doing now, **Earnings** (helpers and tokens today, since
   the office opened and in all; click to fold it open), their last messages and steps, **Open** in the AI desktop app
   when it has a record of the thread, and their project's marks.
@@ -230,8 +230,9 @@ Each mark opens its window:
   working. Every zip is read back and each file's size and CRC-32 checked before it counts; until then it
   is a `.zip.partial`. Links and junctions are not followed: the run says how many, and the .txt beside the zip names
   them. On a FAT32 drive (how most USB sticks come) no file can reach 4 GB, so a project whose zip would is left out
-  of the run and told why. The mark on the tile: ● backed up, ▲ changed since, ○ never, ✕ the last try failed (also in
-  Needs attention). **Back up now…** is in a tile's More menu too.
+  of the run and told why. The mark beside a tile's Backup tick (its words in its tooltip; click it for the backups):
+  ● backed up, ▲ changed since, ○ never, ✕ the last try failed (also in Needs attention). **Back up now…** is in a
+  tile's More menu too.
 
 ![An audit](screenshots/audit.png)
 

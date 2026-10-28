@@ -46,6 +46,41 @@
   }
   app.swap = swap;
 
+  /* An open More or Actions menu floats over the page (position: fixed in app.css), so a panel that scrolls on its own
+   * never hides it: placed under its button, right edges lined up, kept inside the window, and above the button when
+   * there is no room below. Its place goes on the page root (--more-left / --more-top), not on the menu, so a tile drawn
+   * again (swap compares the HTML) is not rebuilt under the pointer. One menu is open at a time. */
+  function placeMenu(d) {
+    const s = d.querySelector(':scope > summary'), m = d.querySelector(':scope > .more-menu');
+    if (!s || !m) return;
+    const r = s.getBoundingClientRect(), pad = 8;
+    // Its button scrolled out of sight (out of the window, or out of a panel that scrolls on its own): it closes.
+    let top0 = 0, bottom0 = innerHeight;
+    for (let p = d.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (!/(auto|scroll|hidden)/.test(getComputedStyle(p).overflowY)) continue;
+      const b = p.getBoundingClientRect(); top0 = Math.max(top0, b.top); bottom0 = Math.min(bottom0, b.bottom);
+    }
+    if (r.bottom <= top0 || r.top >= bottom0 || (!r.width && !r.height)) { d.open = false; return; }
+    const w = m.offsetWidth, h = m.offsetHeight;
+    const left = Math.max(pad, Math.min(r.right - w, innerWidth - w - pad));
+    let top = r.bottom + 4;
+    if (top + h > innerHeight - pad && r.top - h - 4 >= pad) top = r.top - h - 4;
+    top = Math.max(pad, Math.min(top, innerHeight - h - pad));
+    document.documentElement.style.setProperty('--more-left', `${Math.round(left)}px`);
+    document.documentElement.style.setProperty('--more-top', `${Math.round(top)}px`);
+  }
+  const openMenus = () => [...document.querySelectorAll('details.more[open]')];
+  document.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (!d.matches?.('details.more') || !d.open) return;
+    for (const o of openMenus()) if (o !== d) o.open = false;
+    placeMenu(d);
+  }, true);
+  const replace = () => { for (const d of openMenus()) placeMenu(d); };
+  addEventListener('resize', replace);
+  document.addEventListener('scroll', replace, true);
+  app.placeMenus = replace;
+
   const tokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n || 0));
   app.tokens = tokens;
   function ago(ms) {

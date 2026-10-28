@@ -56,9 +56,9 @@
     }
   }
   const LIVE = { up: { mark: '●', text: 'Live', cls: 'm-ok', word: 'Up' }, unsure: { mark: '▲', text: 'Live?', cls: 'm-warn', word: 'Unsure' }, down: { mark: '✕', text: 'Down', cls: 'm-bad', word: 'Down' } };
-  const liveLabel = (p) => (p.liveUrl ? (p.live && LIVE[p.live.state]) || { mark: '○', text: 'Not checked', cls: 'm-none', word: 'Not checked yet' } : { mark: '+', text: 'Live URL', cls: 'm-none', word: 'None' });
+  const liveLabel = (p) => (p.liveUrl ? (p.live && LIVE[p.live.state]) || { mark: '○', text: 'Not checked', cls: 'm-none', word: 'Not checked yet' } : { mark: '+', text: 'Live', cls: 'm-none', word: 'None' });
 
-  /** The three marks on a project tile (and a person's card): each opens its window. `after` (the tile's Browser and More) end the line. */
+  /** The three marks on a project tile (and a person's card): each opens its window. `after` (the tile's Backup and More) end the line. */
   app.checkMarks = (p, ...after) => {
     const mark = (l, label, what, title) => el('button', { type: 'button', class: `mark ${l.cls}`, title, 'aria-label': `${label}: ${l.text}`, onclick: () => what(p.id) }, el('span', { 'aria-hidden': 'true' }, l.mark), ` ${l.text}`);
     const a = auditLabel(p.audit), g = gitLabel(p.git), l = liveLabel(p);

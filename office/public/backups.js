@@ -33,9 +33,18 @@
   }
 
   // ---- on a tile ----
-  /** The Backup tick box: on the backup list or not. */
-  app.backupTick = (p) => el('label', { class: 'mark bk-tick', title: p.backup?.listed ? `${p.name} is on the backup list: Run backups now takes it` : `Put ${p.name} on the backup list` },
-    el('input', { type: 'checkbox', checked: !!p.backup?.listed, 'data-act': 'backup-tick', 'data-id': p.id, onchange: (e) => setListed([p.id], e.target.checked) }), ' Backup');
+  /** The Backup tick box (on the backup list or not) and, once there is something to say, the backups' state beside it in
+   * the same pill as a symbol (● ▲ ○ ✕, or ◐ and the percent while it runs), so the tile's marks stay on one line. The
+   * symbol opens the project's backups window; its words are in its tooltip. */
+  app.backupTick = (p) => {
+    const l = markOf(p);
+    const tick = el('label', { class: 'bk-check', title: p.backup?.listed ? `${p.name} is on the backup list: Run backups now takes it` : `Put ${p.name} on the backup list` },
+      el('input', { type: 'checkbox', checked: !!p.backup?.listed, 'data-act': 'backup-tick', 'data-id': p.id, onchange: (e) => setListed([p.id], e.target.checked) }), 'Backup');
+    const tip = l ? tipOf(p) : '';
+    const state = l ? el('button', { type: 'button', class: `bk-state ${l.cls}`, title: tip === 'No backup yet' ? l.text : `${l.text}. ${tip}`, 'aria-label': `Backup: ${l.text}`, 'data-act': 'backup', 'data-id': p.id, onclick: () => history(p.id) },
+      el('span', { 'aria-hidden': 'true' }, p.backup.busy ? `${l.mark}${p.backup.busy.state === 'waiting' ? '' : ` ${p.backup.busy.pct}%`}` : l.mark)) : null;
+    return el('span', { class: 'mark bk-tick' }, tick, state);
+  };
   /** What the backups say: running now, failed, changed since, backed up, or never. Opens the project's backups window. */
   function markOf(p) {
     const b = p.backup;
@@ -43,19 +52,16 @@
     if (b.busy) return { mark: '◐', text: b.busy.state === 'waiting' ? 'Backup waiting' : `${b.busy.state === 'checking' ? 'Checking' : 'Backing up'} ${b.busy.pct}%`, cls: 'm-none' };
     if (b.fault) return { mark: '✕', text: 'Backup failed', cls: 'm-bad' };
     if (b.last && b.changed) return { mark: '▲', text: `Changed since ${ago(b.last.at)}`, cls: 'm-warn' };
-    if (b.last) return { mark: '●', text: ago(b.last.at), cls: 'm-ok' };
+    if (b.last) return { mark: '●', text: `Backed up ${ago(b.last.at)}`, cls: 'm-ok' };
     if (b.listed) return { mark: '○', text: 'Never backed up', cls: 'm-none' };
     return null;
   }
-  app.backupMark = (p) => {
-    const l = markOf(p);
-    if (!l) return null;
+  /** The backups' tooltip: the failure, or each drive's last backup with what it did not follow or read. */
+  function tipOf(p) {
     const b = p.backup;
     const left = (d) => [d.links ? `${d.links} ${d.links === 1 ? 'link or junction' : 'links or junctions'} not followed` : '', d.skipped ? `${d.skipped} ${d.skipped === 1 ? 'file' : 'files'} not read` : ''].filter(Boolean).join(', ');
-    const tip = b.fault ? `${b.fault.fault} ${b.fault.reason || ''}` : b.drives?.length ? `Last backups: ${b.drives.map((d) => `${ago(d.at)} on ${d.drive}${left(d) ? ` (${left(d)}: listed in the .txt beside the zip)` : ''}`).join(' · ')}` : 'No backup yet';
-    return el('button', { type: 'button', class: `mark ${l.cls}`, title: tip, 'aria-label': `Backup: ${l.text}`, 'data-act': 'backup', 'data-id': p.id, onclick: () => history(p.id) },
-      el('span', { 'aria-hidden': 'true' }, l.mark), ` ${l.text}`);
-  };
+    return b.fault ? `${b.fault.fault} ${b.fault.reason || ''}` : b.drives?.length ? `Last backups: ${b.drives.map((d) => `${ago(d.at)} on ${d.drive}${left(d) ? ` (${left(d)}: listed in the .txt beside the zip)` : ''}`).join(' · ')}` : 'No backup yet';
+  }
   /** Back up now, in a tile's More menu and a person's Actions menu. */
   app.backupMenuItems = (p, cls = 'btn small') => [el('button', { type: 'button', class: cls, 'data-act': 'backup-now', 'data-id': p.id, title: `Zip ${p.name} to your backup drive now (it shows the size and time first)`,
     onclick: (e) => { closeMenu(e); openRun([p.id]); } }, 'Back up now…')];

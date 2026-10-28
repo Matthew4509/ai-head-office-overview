@@ -219,23 +219,24 @@
   }
   /** Free port: stops the program holding the project's port (it asks first). Kept under More: Use another port comes first. */
   const freePortOf = (p) => (p.portInUse && !p.running ? ['free-port', `Free port ${p.portInUse}`, `Stop the program holding port ${p.portInUse} so ${p.name} can use its own port (it names the program and asks first)`] : null);
-  /** Run, Use another port or Stop, on the tile's title line left of the port; with no start command, a "No start"
-   * badge in Run's place that opens how to add one (as the Bridge's tiles do). */
+  /** Run, Use another port or, once it runs, Open, on the tile's title line left of the port (Stop is then first under
+   * More); with no start command, a "No start" badge in Run's place that opens how to add one (as the Bridge's tiles do). */
   function runButton(p) {
-    if (p.running) return tileBtn(p, 'stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`);
+    if (p.running) return tileBtn(p, 'browser', 'Open', `Open ${p.running.url || p.name} in the browser`, true);
     const r = runOf(p);
     return r ? tileBtn(p, ...r, true) : noStartButton(p, ' small no-start', 'No start…');
   }
-  /** Browser, at the end of the Audit / Git / Live marks: only when the project has a local address. */
-  const browserButton = (p) => (p.running || p.commands.some((c) => c.port) ? tileBtn(p, 'browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null);
-  /** The tile's More menu (Free port when shown, Copy prompt, Folder, Terminal, Hide, Remove from list), at the end of
-   * the marks line. */
+  /** Stop, while it runs; Browser (its local address, served by something else), while it does not: both under More. */
+  const stopItem = (p, b) => (p.running ? b('stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`) : null);
+  const browserItem = (p, b) => (!p.running && p.commands.some((c) => c.port) ? b('browser', 'Browser', 'Open its local address in the browser') : null);
+  /** The tile's More menu (Stop or Browser, Free port when shown, Copy prompt, Folder, Terminal, Back up now, Hide,
+   * Remove from list), at the end of the marks line. */
   function moreMenu(p, open) {
     const b = (what, label, title) => tileBtn(p, what, label, title);
     const more = el('details', { class: 'more', open: !!open, 'data-id': p.id,
       onkeydown: (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } } },
     el('summary', { class: 'btn small', title: `More for ${p.name}`, 'data-act': 'more', 'data-id': p.id }, 'More'),
-      el('div', { class: 'more-menu' }, freePortOf(p) ? b(...freePortOf(p)) : null,
+      el('div', { class: 'more-menu' }, stopItem(p, b), browserItem(p, b), freePortOf(p) ? b(...freePortOf(p)) : null,
         // No git: kept in here rather than on the marks line, to tidy the tile; it opens the Git window (how to start one).
         p.git?.state === 'none' ? el('button', { type: 'button', class: 'btn small', 'data-act': 'git', 'data-id': p.id, title: 'Not in git: no saved history and no backup copy. Opens how to start one',
           onclick: (e) => { e.currentTarget.closest('details').open = false; app.gitWindow?.(p.id); } }, '○ No git…') : null,
@@ -253,12 +254,12 @@
     const b = (what, label, title) => el('button', { type: 'button', class: 'btn', disabled: busy, title, 'data-act': what, 'data-id': p.id,
       onclick: (e) => { e.currentTarget.closest('details').open = false; act(p.id, what); } }, label);
     const items = [
-      p.running ? b('stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`) : runOf(p) ? b(...runOf(p)) : null,
+      p.running ? b('browser', 'Open', `Open ${p.running.url || p.name} in the browser`) : runOf(p) ? b(...runOf(p)) : null,
+      stopItem(p, b), browserItem(p, b),
       freePortOf(p) ? b(...freePortOf(p)) : null,
       b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
       b('folder', 'Folder', `Open ${p.name}'s folder`),
       b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
-      p.running || p.commands.some((c) => c.port) ? b('browser', 'Browser', p.running ? `Open ${p.running.url}` : 'Open its local address') : null,
       ...(app.backupMenuItems?.(p, 'btn') || []),
       p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
       b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`),
@@ -303,7 +304,7 @@
           runButton(p), p.running ? el('span', { class: 'run-dot', title: `Running on port ${p.running.port}` }, `● ${p.running.port}`) : null),
         p.description || p.folder, [p.tokens ? `${tokens(p.tokens)} tokens` : '', p.updated ? `updated ${ago(p.updated)}` : ''].filter(Boolean).join(' · '),
         staff.length ? staff.map(face) : el('span', { class: 'note', text: 'Nobody in today' })),
-        app.checkMarks?.(p, app.backupTick?.(p), app.backupMark?.(p), browserButton(p), moreMenu(p, openMore.has(p.id))));
+        app.checkMarks?.(p, app.backupTick?.(p), moreMenu(p, openMore.has(p.id))));
     };
     // Desks with no project on the list (the projects folder itself: Consultants, or a folder elsewhere) keep a plain tile.
     const linked = new Set(Object.keys(links));

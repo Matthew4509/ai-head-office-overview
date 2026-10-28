@@ -323,7 +323,7 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 .proj-head .proj-name { white-space: normal; overflow-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 /* Narrower marks on a tile, so Browser and More fit on their line; a long mark (No audit, Live URL) still wraps it. */
 .proj .marks { gap: 3px; }
-.proj .marks .mark, .proj .marks .btn.small { padding: 1px 5px; font-size: 12px; }
+.proj .marks .mark, .proj .marks .btn.small { padding: 1px 4px; font-size: 12px; }
 .proj-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .proj-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .run-dot { color: var(--working); font-size: 13px; font-weight: 600; white-space: nowrap; }
@@ -451,6 +451,8 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .more > summary { list-style: none; cursor: pointer; }
 .more > summary::-webkit-details-marker { display: none; }
 .more-menu { position: absolute; right: 0; z-index: 5; display: grid; gap: 4px; padding: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); min-width: 170px; }
+/* Open, it floats over the page where app.js placed it (placeMenu), so a scrolling panel cannot hide it. */
+details.more[open] > .more-menu { position: fixed; left: var(--more-left, auto); top: var(--more-top, auto); right: auto; z-index: 50; max-height: calc(100vh - 16px); overflow: auto; }
 
 /* The project planner (planner.js). Placeholders use the soft ink (4.5:1 or more on a card in both themes), never the
    browser's pale default. */
@@ -610,9 +612,13 @@ textarea.field-text { font: 13px/1.4 ui-monospace, Consolas, monospace; resize: 
 .welcome-start-line .note { margin: 4px 0 10px; }
 
 /* Backups (backups.js): the tick box on a tile, the top line, the Run window's rows */
-.bk-tick { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; color: var(--soft); }
+.bk-tick { display: inline-flex; align-items: center; gap: 4px; color: var(--soft); }
+.bk-check { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
 .bk-tick input { margin: 0; }
 .bk-tick:has(input:checked) { color: var(--ink); }
+.bk-state { border: 0; background: none; padding: 0 1px; margin: 0; font: inherit; line-height: 1; cursor: pointer; }
+.bk-state.m-ok { color: var(--working); } .bk-state.m-warn { color: var(--needs); } .bk-state.m-bad { color: var(--bad); } .bk-state.m-none { color: var(--soft); }
+.bk-state:hover, .bk-state:focus-visible { text-decoration: underline; }
 .bk-bar { margin: 0 0 10px; gap: 6px 10px; }
 .bk-row { border-left-color: var(--line); }
 .bk-pick { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
