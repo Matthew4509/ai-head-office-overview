@@ -226,6 +226,9 @@
     const r = runOf(p);
     return r ? tileBtn(p, ...r, true) : noStartButton(p, ' small no-start', 'No start…');
   }
+  /** Add to To Do…: the To Do's Add window with this project picked (todo.js), for keyboard and touch as well as a drag. */
+  const todoItem = (p, cls) => el('button', { type: 'button', class: cls, 'data-act': 'todo', 'data-id': p.id, title: `Put ${p.name} on the To Do: Today, This week or This month`,
+    onclick: (e) => { const m = e.currentTarget.closest('details'); if (m) m.open = false; app.todoAdd?.(p.id); } }, 'Add to To Do…');
   /** Stop, while it runs; Browser (its local address, served by something else), while it does not: both under More. */
   const stopItem = (p, b) => (p.running ? b('stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`) : null);
   const browserItem = (p, b) => (!p.running && p.commands.some((c) => c.port) ? b('browser', 'Browser', 'Open its local address in the browser') : null);
@@ -242,6 +245,7 @@
           onclick: (e) => { e.currentTarget.closest('details').open = false; app.gitWindow?.(p.id); } }, '○ No git…') : null,
         b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
         b('folder', 'Folder', `Open ${p.name}'s folder`), b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
+        todoItem(p, 'btn small'),
         ...(app.backupMenuItems?.(p) || []),
         p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
         b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`)));
@@ -260,6 +264,7 @@
       b('copy', 'Copy prompt', `Copies ${p.name}'s name and full folder, to paste into the AI you use`),
       b('folder', 'Folder', `Open ${p.name}'s folder`),
       b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
+      todoItem(p, 'btn'),
       ...(app.backupMenuItems?.(p, 'btn') || []),
       p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
       b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`),
@@ -300,7 +305,7 @@
     const tile = (p) => {
       const staff = staffOf(p);
       return el('li', { class: `proj${p.running ? ' is-running' : ''}` },
-        top(el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: p.name, title: p.name }), app.projectStar?.(folderOfId[p.id] || p.folder, p.name),
+        top(el('div', { class: 'proj-head' }, el('b', { class: 'proj-name', text: p.name, title: `${p.name} (drag onto the To Do)`, draggable: 'true', 'data-todo-project': p.id }), app.projectStar?.(folderOfId[p.id] || p.folder, p.name),
           runButton(p), p.running ? el('span', { class: 'run-dot', title: `Running on port ${p.running.port}` }, `● ${p.running.port}`) : null),
         p.description || p.folder, [p.tokens ? `${tokens(p.tokens)} tokens` : '', p.updated ? `updated ${ago(p.updated)}` : ''].filter(Boolean).join(' · '),
         staff.length ? staff.map(face) : el('span', { class: 'note', text: 'Nobody in today' })),

@@ -206,7 +206,7 @@ async function main() {
   if (held.length) console.log('  Note: port' + (held.length > 1 ? 's ' : ' ') + held.join(', ') + (held.length > 1 ? ' are' : ' is')
     + " held by another program (My Project Bridge's demo uses the same ports). The demo carries on; those sites may show as another program's.");
   // Fresh settings, audits and logs each time; site pictures are kept (they take a few seconds each).
-  for (const f of ['settings.json', 'run.json', 'priorities.json', 'categories.json', 'backups.json']) fs.rmSync(path.join(DATA, f), { force: true });
+  for (const f of ['settings.json', 'run.json', 'priorities.json', 'categories.json', 'backups.json', 'todo.json']) fs.rmSync(path.join(DATA, f), { force: true });
   for (const d of ['audits', 'logs', 'office', 'transcripts']) fs.rmSync(path.join(DATA, d), { recursive: true, force: true });
   fs.rmSync(require('../lib/backup').DEMO_DRIVE, { recursive: true, force: true }); // the made-up backup drive, in temp
   build();
@@ -289,6 +289,19 @@ async function main() {
   let job = started.job;
   for (let i = 0; i < 120 && job && !job.finished; i++) { await sleep(250); job = (await call(key, '/api/backup/status')).job; }
   console.log('  backups: ' + (drive.ok ? drive.drive.path : drive.fault) + ', ' + (job ? job.items.filter(x => x.state === 'done').length : 0) + ' of 5 on the list backed up');
+
+  // The To Do: a made-up week, and two quick checks (one due today, so it comes into Today by itself).
+  const TODO = [
+    ['harbour-lane-bakery', 'today', 120, 'swap in the new menu photos'],
+    ['nimbus-notes', 'today', 60, 'sync fix for the phone app'],
+    ['pixel-forge-studio', 'week', 240, 'new gallery page'],
+    ['lumen-analytics', 'week', 15, 'reply about the export button'],
+    ['field-notes', 'month', 480, 'first draft of the cliffs chapter'],
+  ];
+  for (const [folder, zone, size, note] of TODO) await call(key, '/api/todo/add', { project: byFolder(folder).id, zone, size, note });
+  await call(key, '/api/todo/check', { project: byFolder('tidewater-yoga').id, every: 'week' });
+  await call(key, '/api/todo/check', { project: byFolder('peak-trail-fitness').id, every: 'month' });
+  console.log('  to do: ' + TODO.length + ' rows, 2 quick checks');
 
   if (process.argv.includes('--no-window')) return console.log('\nReady at http://127.0.0.1:' + PORT + '/ (no window opened).');
   const edge = findEdge(), url = 'http://127.0.0.1:' + PORT + '/';

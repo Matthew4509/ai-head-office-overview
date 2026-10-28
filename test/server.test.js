@@ -844,6 +844,33 @@ async function main() {
     assert(h.history.length === 1 && h.history[0].checked && h.history[0].driveName === 'Drive 1', JSON.stringify(h));
   });
 
+  await check('To Do: a fresh read writes nothing; rows take project ids only, move, tick and go; a quick check comes into Today', async () => {
+    const alpha = (await api('/api/projects')).json.projects.find(p => p.folder === 'alpha-site');
+    let v = (await api('/api/todo')).json;
+    assert(v.ok && v.open === 0 && v.zones.map(z => z.name).join() === 'Today,This week,This month', JSON.stringify(v).slice(0, 200));
+    assert(!fs.existsSync(path.join(DATA, 'todo.json')), 'a fresh office writes no To Do file on a read');
+    assert(!(await api('/api/todo/add', { project: path.join(WS, 'alpha-site'), zone: 'today' })).json.ok, 'a folder path is not a project');
+    assert(!(await api('/api/todo/add', { project: 'not-a-project', zone: 'today' })).json.ok);
+    const a = (await api('/api/todo/add', { project: alpha.id, size: 120, note: 'fix\u0007 the header', zone: 'today' })).json;
+    assert(a.ok && a.item.note === 'fix the header', JSON.stringify(a));
+    v = (await api('/api/todo')).json;
+    assert(v.zones[0].items[0].name === alpha.name && v.total.todayMin === 120 && v.open === 1, JSON.stringify(v.zones[0]));
+    assert((await api('/api/todo/move', { item: a.item.id, zone: 'week' })).json.ok);
+    assert((await api('/api/todo/settings', { dayHours: 12 })).json.ok);
+    v = (await api('/api/todo')).json;
+    assert(v.zones[1].items.length === 1 && v.total.text === 'Today 0 h of 12 h', JSON.stringify(v.total));
+    assert((await api('/api/todo/check', { project: alpha.id, every: 'week' })).json.ok);
+    v = (await api('/api/todo')).json;
+    const chk = v.zones[0].items.find(i => i.kind === 'check');
+    assert(chk && chk.project === alpha.id && chk.size === 15 && chk.check === 'week', JSON.stringify(v.zones[0]));
+    assert((await api('/api/todo/done', { item: chk.id, done: true })).json.ok);
+    v = (await api('/api/todo')).json;
+    assert(v.doneWeek.length === 1 && v.checks[0].due === false, 'ticked: in Done this week, the check due again a week on');
+    assert((await api('/api/todo/remove', { item: a.item.id })).json.ok);
+    assert(!(await api('/api/todo/remove', { item: a.item.id })).json.ok, 'gone already');
+    assert(JSON.parse(fs.readFileSync(path.join(DATA, 'todo.json'), 'utf8')).version === 1);
+  });
+
   await check('a second office on the same port exits cleanly (one office at a time)', async () => {
     const code = await new Promise(res => { const b = spawn(NODE, [path.join(__dirname, '..', 'server.js'), '--dry-run'], { env: { ...process.env, AHO_PORT: String(PORT), AHO_DATA: DATA, AHO_ROOT: WS }, stdio: 'ignore' }); b.on('exit', res); });
     assert.strictEqual(code, 0);

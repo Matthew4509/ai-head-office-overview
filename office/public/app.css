@@ -202,7 +202,7 @@ pre.code { background: var(--page); border: 1px solid var(--line); border-radius
 
 /* The right panel's tabs: Needs attention | Staff rewards. */
 .side-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
-.side-tabs button { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 4px 12px; }
+.side-tabs button { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 4px 9px; white-space: nowrap; }
 .side-tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 /* Staff rewards: tiles three across, each the same shape (picture, name, price and what is left to go, the button). */
 .side .shop-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -628,3 +628,28 @@ details.more[open] > .more-menu { position: fixed; left: var(--more-left, auto);
 .bk-typed summary { cursor: pointer; margin: 4px 0; }
 .bk-sum p { margin: 4px 0; }
 @media (max-width: 700px) { .bk-row { flex-wrap: wrap; } .bk-when { text-align: left; max-width: none; } }
+
+/* To Do (todo.js): the right panel's third tab. Short rows in three parts; a part lights up while a project is dragged over it. */
+.todo-head { justify-content: space-between; margin: 0 0 8px; }
+.todo-zone { border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px 8px; margin: 0 0 8px; background: var(--card); }
+.todo-zone.is-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.todo-zone-head { justify-content: space-between; margin: 0 0 4px; }
+.todo-zone h3 { font-size: 14px; margin: 0; }
+.todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.todo-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 3px 4px; border-radius: 6px; font-size: 13px; }
+.todo-row[draggable="true"] { cursor: grab; }
+.todo-row:hover { background: var(--page); }
+.todo-row.is-dragging { opacity: .5; }
+.todo-row input[type="checkbox"] { margin: 0; }
+.todo-row select.field-text { margin: 0; padding: 1px 2px; font-size: 12px; min-width: 0; width: auto; }
+.todo-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.todo-from { color: var(--needs); font-size: 12px; }
+.todo-row.is-done .todo-text { text-decoration: line-through; color: var(--soft); }
+.todo-empty { margin: 2px 0; }
+.todo-done summary { cursor: pointer; color: var(--soft); margin: 4px 0; }
+.todo-fields { gap: 10px; align-items: flex-end; }
+.todo-field { display: grid; gap: 2px; margin: 0 0 6px; }
+.todo-field .field-text { margin: 0; }
+.todo-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.todo-check-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); padding: 4px 0; }
+[data-todo-project][draggable="true"] { cursor: grab; }

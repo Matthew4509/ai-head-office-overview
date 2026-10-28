@@ -319,28 +319,32 @@
 
   }
 
-  const TABS = { needs: 'Needs attention', rewards: 'Staff rewards' };
+  const TABS = { needs: 'Needs attention', todo: 'To Do', rewards: 'Staff rewards' };
   app.sideTab = 'needs';
-  try { const s = localStorage.getItem('aho-side'); if (s === 'rewards') app.sideTab = s; } catch { /* fine */ }
+  try { const s = localStorage.getItem('aho-side'); if (s === 'rewards' || s === 'todo') app.sideTab = s; } catch { /* fine */ }
 
-  /** The right panel: its two tabs, or a person's card (or their nickname box) in their place. */
+  /** The right panel: its three tabs, or a person's card (or their nickname box) in their place. */
   function drawSide() {
     const showCard = app.editing || !!app.picked;
     document.querySelector('.side-tabs').hidden = showCard;
     document.getElementById('side-card').hidden = !showCard;
     const needsPane = document.getElementById('side-needs');
+    const todoPane = document.getElementById('side-todo');
     const rewardsPane = document.getElementById('side-rewards');
     const wasHidden = rewardsPane.hidden;
     needsPane.hidden = showCard || app.sideTab !== 'needs';
+    todoPane.hidden = showCard || app.sideTab !== 'todo';
     rewardsPane.hidden = showCard || app.sideTab !== 'rewards';
     for (const [id, word] of Object.entries(TABS)) {
       const b = document.getElementById(`tab-${id}`);
       b.setAttribute('aria-selected', String(app.sideTab === id));
-      const label = id === 'needs' ? `${word} (${waitingList().length + (app.moreWaiting?.(inFilter) || []).length + (app.plannerCheckins?.(inFilter) || []).length})` : word;
+      const todoOpen = id === 'todo' ? app.todoOpen?.() || 0 : 0;
+      const label = id === 'needs' ? `${word} (${waitingList().length + (app.moreWaiting?.(inFilter) || []).length + (app.plannerCheckins?.(inFilter) || []).length})` : todoOpen ? `${word} (${todoOpen})` : word;
       if (b.textContent !== label) b.textContent = label;
     }
     if (showCard) return;
     if (app.sideTab === 'needs') drawWaiting();
+    else if (app.sideTab === 'todo') app.drawTodo?.(todoPane);
     // Staff rewards is drawn when it is opened (and after a purchase); while open only its purse line changes.
     else if (wasHidden || !rewardsPane.childElementCount) window.officeView?.rewards?.(rewardsPane);
   }
@@ -355,6 +359,7 @@
   app.showTab = showTab;
   document.getElementById('tab-needs').addEventListener('click', () => showTab('needs'));
   document.getElementById('tab-rewards').addEventListener('click', () => showTab('rewards'));
+  document.getElementById('tab-todo').addEventListener('click', () => showTab('todo'));
   document.getElementById('purse').addEventListener('click', () => showTab('rewards'));
 
   const waitingList = () => (app.data?.waiting || []).filter((w) => inFilter(w.folder));
@@ -384,7 +389,10 @@
     const groups = folders.map((f) => {
       const list = shown.filter((p) => p.folder === f).sort((a, b) => a.seat - b.seat);
       const whole = (app.data.favProjects || []).includes(f);
-      return el('section', { class: 'group' }, el('h2', {}, projectName(f), whole ? el('span', { class: 'note', text: ' · the whole project' }) : null), el('ul', { class: 'people' }, list.map(tile)));
+      // A project on the list can be dragged from here onto the To Do (todo.js).
+      const id = app.data?.links?.[f];
+      const drag = id ? { draggable: 'true', 'data-todo-project': id, title: `Drag ${projectName(f)} onto the To Do` } : {};
+      return el('section', { class: 'group' }, el('h2', drag, projectName(f), whole ? el('span', { class: 'note', text: ' · the whole project' }) : null), el('ul', { class: 'people' }, list.map(tile)));
     });
     const toggle = hiddenCount || app.showHiddenFavs ? el('label', { class: 'row note' }, el('input', { type: 'checkbox', checked: !!app.showHiddenFavs, onchange: (e) => { app.showHiddenFavs = e.target.checked; draw(); } }), `Show hidden (${hiddenCount})`) : null;
     const intro = el('p', { class: 'note', text: 'Favourites stay on call, so they are either in the office or on the beach until needed.' });

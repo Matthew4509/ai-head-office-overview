@@ -46,9 +46,11 @@
   <aside class="side" id="side">
     <div class="side-tabs" role="tablist" aria-label="Right panel">
       <button type="button" role="tab" id="tab-needs" aria-selected="true" aria-controls="side-needs">Needs attention</button>
+      <button type="button" role="tab" id="tab-todo" aria-selected="false" aria-controls="side-todo">To Do</button>
       <button type="button" role="tab" id="tab-rewards" aria-selected="false" aria-controls="side-rewards">Staff rewards</button>
     </div>
     <div id="side-needs" role="tabpanel" aria-labelledby="tab-needs"></div>
+    <div id="side-todo" role="tabpanel" aria-labelledby="tab-todo" hidden></div>
     <div id="side-rewards" role="tabpanel" aria-labelledby="tab-rewards" hidden></div>
     <div id="side-card" aria-live="polite" hidden></div>
   </aside>
@@ -65,6 +67,7 @@
 <script src="projects.js"></script>
 <script src="checks.js"></script>
 <script src="backups.js"></script>
+<script src="todo.js"></script>
 <script src="arcade.js"></script>
 <script src="planner.js"></script>
 <script src="prompts.js"></script>

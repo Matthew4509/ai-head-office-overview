@@ -200,8 +200,25 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
   [brackets] are yours to fill in.
 - **Right panel:** **Needs attention** (threads with a question first, then projects: a live site down, Critical or
   High audit findings, git waiting for a save or push; click a row to open it; and, while the project planner is
-  shown, today's **check-ins**, each with Fine for now, Needs work and Park it) and **Staff rewards** (spend the purse: coffee, plants,
-  furniture, room keys; **Transaction history** folds open to list what was bought lately, when, and for how much).
+  shown, today's **check-ins**, each with Fine for now, Needs work and Park it), **To Do** (below) and **Staff rewards**
+  (spend the purse: coffee, plants, furniture, room keys; **Transaction history** folds open to list what was bought
+  lately, when, and for how much).
+- **To Do** (right panel; its number is what is open for today): what you mean to work on, put there by you, in three
+  parts: **Today**, **This week** and **This month**. Each row is a project, a size (**Quick** 15 min, **1 h**, **2 h**,
+  **4 h** or **8 h**) and an optional one-line note ("fix the header").
+  - **Adding:** drag a project's name from its tile (Projects tab) or from the Favourites tab onto a part (hold it over
+    the To Do tab and the tab opens), or **+ Add** in a part, or a tile's **More › Add to To Do…** (a person's
+    **Actions** menu has it too). A dragged project comes in at 1 h; change the size on the row.
+  - **Moving and finishing:** drag a row to another part or another place, or use its **⋯** menu (Move to…, a note,
+    its quick check, Remove). A tick folds it into **Done this week**; untick brings it back.
+  - **Nothing drops off by itself:** a row stays until you tick it or remove it. An unfinished Today row is still in
+    Today the next day, marked with the day it came in ("from Mon 26").
+  - **Your day:** the line at the top adds up Today's sizes against your day (**My day…**: 4 to 16 hours, 8 to start),
+    and says plainly when it goes over ("Today 9 h of 8 h: 1 h over"). Nothing is refused.
+  - **Quick checks:** a project can have a quick check **every week** or **every month** (in **+ Add**, or a row's ⋯).
+    When one is due it comes into Today by itself as a 15-minute row, **1 a day** (or 2: My day…), the longest overdue
+    first, so none is skipped. Ticking it sets the next one a week or a month on. My day… lists them all, with Off.
+  - Kept in the office's `data\todo.json`, written only when something changes; it never touches a project's files.
 - **A person's card:** a star beside their name and one on their project's heading (click to make them, or the whole
   project, a favourite; point at a star to read what that does), **EDIT** (their name and look; both belong to the
   seat, so the next thread at that desk is the same person) and under it **Actions** (Run, or Open and Stop while it runs, Copy prompt, Folder,
@@ -547,8 +564,9 @@ audit lists the record of every rule it shows that someone has judged.
 | `lib/audit*.js`, `lib/rules-more.js`, `lib/cross.js`, `lib/disclosure.js`, `lib/judged.js`, `lib/review.js` | The audit, its saved reports, Not a fault, Review with AI |
 | `lib/live*.js`, `lib/gitstate.js`, `lib/git-program.js` | Live checks, git marks and See what changed, the Git program's version |
 | `lib/tokens.js`, `lib/prompts.js`, `lib/sensors.js` | Codex token counts and the matcher both counts use, saved prompts, This PC |
+| `lib/todo.js` | The To Do: Today / This week / This month, sizes, carry-over, quick checks, the day's total (`data\todo.json`) |
 | `office/src/` | The office's reader (ES modules): transcripts, people and seats, token counts per project in the same read, setup and hooks, the shop, looks |
-| `office/public/` | The page: `index.html`, `app.css`, `look.js` and `office.js` (the drawing), `app.js` (people, cards, Needs attention), `projects.js`, `checks.js`, `arcade.js` (the arcade machine's games), `prompts.js`, `settings.js` |
+| `office/public/` | The page: `index.html`, `app.css`, `look.js` and `office.js` (the drawing), `app.js` (people, cards, Needs attention), `projects.js`, `checks.js`, `todo.js` (the To Do tab), `arcade.js` (the arcade machine's games), `prompts.js`, `settings.js` |
 | `office/hook.mjs` | Advanced setup's hook |
 | `demo/` | The demo: made-up projects, their little sites and live addresses, and the made-up office (`threads.js`) |
 | `index.html` | The launcher page |
