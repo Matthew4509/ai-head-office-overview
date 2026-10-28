@@ -659,3 +659,6 @@ details.more[open] > .more-menu { position: fixed; left: var(--more-left, auto);
 .todo-earlier .todo-done summary { margin: 2px 0; }
 .todo-show { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .todo-show select.field-text { margin: 0; padding: 1px 2px; font-size: 12px; }
+.todo-favs { border-style: dashed; }
+.todo-star { color: var(--needs); width: 13px; text-align: center; }
+.todo-fav { cursor: grab; }

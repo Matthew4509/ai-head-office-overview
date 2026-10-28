@@ -11,6 +11,7 @@
   const eng = app.engineData;
   const ITEM = 'application/x-aho-todo';
   const PROJECT = 'application/x-aho-project';
+  const SIZE = 'application/x-aho-size';
   let data = null;
   let at = 0;
   let loadedDay = '';
@@ -123,6 +124,27 @@
     ], [btn('Cancel', () => app.closeWindow(), 'btn'), btn('Save', save, 'btn primary')], false);
   }
 
+  // The Favourites part: every favourite project not on the To Do yet, each with the size it goes in at (kept in this
+  // browser), dragged onto a part or put there from its ⋯ menu. Once on the To Do it leaves Favourites; ticked or
+  // removed, it is back.
+  const favSizes = (() => { try { return JSON.parse(localStorage.getItem('aho-todo-fav-sizes') || '{}') || {}; } catch { return {}; } })();
+  const saveFavSizes = () => { try { localStorage.setItem('aho-todo-fav-sizes', JSON.stringify(favSizes)); } catch { /* fine */ } };
+  const sizeWords = (m) => (m < 60 ? 'Quick' : `${m / 60} h`);
+  const favSizeOf = (id) => ((data?.sizes || []).some((s) => s.min === favSizes[id]) ? favSizes[id] : 60);
+  function favRow(p, open) {
+    const size = sizeSelect(favSizeOf(p.id), `Size ${p.name} goes in at`, true);
+    size.onchange = () => { favSizes[p.id] = Number(size.value); saveFavSizes(); };
+    const put = (z) => btn(`Put in ${zoneName(z)}`, (e) => {
+      closeMenu(e);
+      call('/api/todo/add', { project: p.id, zone: z, size: Number(size.value) }, `${p.name} is on the To Do: ${zoneName(z)}, ${sizeWords(Number(size.value))}.`);
+    });
+    const menu = el('details', { class: 'more todo-menu', open: open?.has(`fav:${p.id}`) || null },
+      el('summary', { class: 'btn small', title: `Put ${p.name} on the To Do`, 'aria-label': `Put ${p.name} on the To Do` }, '⋯'),
+      el('div', { class: 'more-menu' }, put('today'), put('week'), put('month')));
+    return el('li', { class: 'todo-row todo-fav', draggable: 'true', 'data-todo-project': p.id, 'data-fav': `fav:${p.id}`, title: `Drag ${p.name} onto Today, This week or This month` },
+      el('span', { class: 'todo-star', 'aria-hidden': 'true', text: '★' }), el('span', { class: 'todo-text' }, el('b', { text: p.name })), size, menu);
+  }
+
   /** A row: done tick, the project (and note), its size, and ⋯ (move, note, quick check, remove). */
   function row(it, zone, open) {
     const tick = el('input', { type: 'checkbox', checked: it.done, 'aria-label': `Done: ${it.name}`,
@@ -154,7 +176,7 @@
     const t = data.total;
     const over = t.todayMin > t.dayMin;
     // An open ⋯ menu stays open when the tab is drawn again.
-    const open = new Set([...pane.querySelectorAll('details.todo-menu[open]')].map((d) => d.closest('[data-item]')?.dataset.item));
+    const open = new Set([...pane.querySelectorAll('details.todo-menu[open]')].map((d) => { const r = d.closest('[data-item], [data-fav]'); return r?.dataset.item || r?.dataset.fav; }));
     const head = el('div', { class: 'row todo-head' }, el('b', { class: over ? 'm-warn' : '', text: t.text }),
       btn('My day…', dayWindow, 'btn small', { title: 'The hours in your day, and your quick checks' }));
     const zones = data.zones.map((z) => el('section', { class: 'todo-zone', 'data-zone': z.zone, 'aria-label': z.name },
@@ -174,8 +196,14 @@
       el('summary', { text: `${e.name} (${e.items.length})` }), el('ul', { class: 'todo-list' }, ...e.items.map((it) => row(it, null))))
       : el('span', { class: 'note', text: e.show === 'hide' ? `Earlier done rows are hidden${e.hidden ? ` (${e.hidden} this week)` : ''}.` : `${e.name}: none.` });
     const done = el('div', { class: 'row todo-earlier' }, earlierList, el('label', { class: 'note todo-show' }, 'Show earlier ', showSel));
-    const hint = el('p', { class: 'note', text: 'Drag a project\'s name from the Projects or Favourites tab onto Today, This week or This month. Nothing drops off: a row stays until you tick it.' });
-    app.swap(pane, head, ...zones, doneToday, done, hint);
+    const onTodo = new Set(data.zones.flatMap((z) => z.items.map((it) => it.project)));
+    const favs = pickList().favs.filter((p) => !onTodo.has(p.id));
+    const favPart = el('section', { class: 'todo-zone todo-favs', 'aria-label': 'Favourites' },
+      el('div', { class: 'row todo-zone-head' }, el('h3', { text: `Favourites${favs.length ? ` (${favs.length})` : ''}` })),
+      favs.length ? el('ul', { class: 'todo-list' }, ...favs.map((p) => favRow(p, open)))
+        : el('p', { class: 'note todo-empty', text: pickList().favs.length ? 'Every favourite is on the To Do.' : 'No favourites yet: star a project (☆ beside its name) and it waits here.' }));
+    const hint = el('p', { class: 'note', text: 'Drag a favourite (or a project\'s name from the Projects or Favourites tab) onto Today, This week or This month. Nothing drops off: a row stays until you tick it.' });
+    app.swap(pane, head, ...zones, favPart, doneToday, done, hint);
   };
 
   // ---- dragging ----
@@ -183,7 +211,14 @@
   document.addEventListener('dragstart', (e) => {
     const p = e.target.closest?.('[data-todo-project]');
     const r = e.target.closest?.('.todo-row[data-item]');
-    if (p) { e.dataTransfer.setData(PROJECT, p.dataset.todoProject); e.dataTransfer.setData('text/plain', p.textContent.trim()); e.dataTransfer.effectAllowed = 'copy'; }
+    if (p) {
+      e.dataTransfer.setData(PROJECT, p.dataset.todoProject);
+      e.dataTransfer.setData('text/plain', (p.querySelector('b') || p).textContent.trim());
+      // A favourite in the To Do carries the size picked on it.
+      const sz = p.classList.contains('todo-fav') ? p.querySelector('select')?.value : '';
+      if (sz) e.dataTransfer.setData(SIZE, sz);
+      e.dataTransfer.effectAllowed = 'copy';
+    }
     else if (r) { e.dataTransfer.setData(ITEM, r.dataset.item); e.dataTransfer.effectAllowed = 'move'; r.classList.add('is-dragging'); }
   });
   document.addEventListener('dragend', () => { for (const n of document.querySelectorAll('.is-dragging, .todo-zone.is-over')) n.classList.remove('is-dragging', 'is-over'); });
@@ -193,7 +228,7 @@
   tab.addEventListener('dragover', (e) => { if (ours(e)) e.preventDefault(); });
   const pane = document.getElementById('side-todo');
   pane.addEventListener('dragover', (e) => {
-    const z = e.target.closest('.todo-zone');
+    const z = e.target.closest('.todo-zone[data-zone]');
     if (!z || !ours(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = e.dataTransfer.types.includes(ITEM) ? 'move' : 'copy';
@@ -201,7 +236,7 @@
     z.classList.add('is-over');
   });
   pane.addEventListener('drop', (e) => {
-    const z = e.target.closest('.todo-zone');
+    const z = e.target.closest('.todo-zone[data-zone]');
     if (!z || !ours(e)) return;
     e.preventDefault();
     z.classList.remove('is-over');
@@ -212,7 +247,8 @@
       const before = e.target.closest('.todo-row[data-item]')?.dataset.item;
       call('/api/todo/move', { item, zone, ...(before && before !== item ? { before } : {}) });
     } else if (project) {
-      call('/api/todo/add', { project, zone, size: 60 }, `${projectName(project)} is on the To Do: ${zoneName(zone)}, 1 h. Change its size on the row.`);
+      const size = Number(e.dataTransfer.getData(SIZE)) || 60;
+      call('/api/todo/add', { project, zone, size }, `${projectName(project)} is on the To Do: ${zoneName(zone)}, ${sizeWords(size)}.${size === 60 ? ' Change its size on the row.' : ''}`);
     }
   });
 })();

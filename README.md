@@ -209,6 +209,9 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
   - **Adding:** drag a project's name from its tile (Projects tab) or from the Favourites tab onto a part (hold it over
     the To Do tab and the tab opens), or **+ Add** in a part, or a tile's **More › Add to To Do…** (a person's
     **Actions** menu has it too). A dragged project comes in at 1 h; change the size on the row.
+  - **Favourites** (under the three parts): every favourite project that is not on the To Do yet, waiting there with
+    the size it goes in at (picked on it, kept in this browser). Drag one onto a part, or use its **⋯** (Put in
+    Today / This week / This month). On the To Do it leaves Favourites; ticked or removed, it is back.
   - **Moving and finishing:** drag a row to another part or another place, or use its **⋯** menu (Move to…, a note,
     its quick check, Remove). A tick moves it to **Done today**, which is always in view and counts in your day
     ("Today 5 h of 8 h · 2 h done"); untick brings it back. Rows done before today fold under **Done earlier this

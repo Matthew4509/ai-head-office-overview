@@ -384,6 +384,10 @@
     const tile = (p) => {
       const li = personRow(p);
       if (p.state === 'home') li.append(hideBox(p));
+      // A favourite's row can be dragged onto the To Do too (their project), not only the heading above it.
+      const id = app.data?.links?.[p.folder];
+      const b = li.querySelector('button.person');
+      if (id && b) { b.setAttribute('draggable', 'true'); b.dataset.todoProject = id; }
       return li;
     };
     const groups = folders.map((f) => {
