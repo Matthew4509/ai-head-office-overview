@@ -47,7 +47,7 @@ function privacyContext(here, scanned = here) {
   const listMissing = !fs.existsSync(listFile);
   const gaps = [];
   if (!listed.length) gaps.push(listMissing
-    ? 'your private-details list is missing (data/private-details.json in the main copy, ' + path.basename(main) + '/): add your details in the office under Audits › Private details'
+    ? 'your private-details list is missing (data/private-details.json in the main copy, ' + path.basename(main) + '/): add your details in the office under Settings › Private details'
     : 'your private-details list (data/private-details.json in ' + path.basename(main) + '/) has no details in it');
   if (!others.length) gaps.push('no other project folders were found to check names against (' + working.length + ' folder' + (working.length === 1 ? '' : 's') + ' looked in)');
   return { main, working, others, listed: listed.length, details: [...listed, ...autoDetails(working)], gaps };
