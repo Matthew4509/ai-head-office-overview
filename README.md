@@ -1,25 +1,50 @@
-# AI Head Office Overview (Windows)
+# AI Head Office Overview
 
-Your AI coding threads as staff in a little office, beside the projects they work on. Each thread is a person at their
-project's desk: working, thinking, standing with a question for you, or gone home. Next to them, each project has
-its own tile: run its local copy, open its folder, a terminal or the browser, and see three marks: a built-in
-**audit** for common security faults, its **git** backup state and its **live site**. One **Needs attention** list
-holds everything waiting for you: threads with a question, live sites down, serious audit findings, and work not yet
-saved or pushed in git.
+**A visual dashboard for Claude Code sessions and local development projects, on Windows.**
+
+See your AI coding threads as people working in a little office. Each person sits at their project's desk and shows
+whether they are working, thinking, waiting for your answer or gone home for the day. Beside them, every project has
+a tile: run its local copy, check its git and live site, audit it for common security faults, and back it up.
+
+![The office: every room unlocked and furnished, the staff at work, and Needs attention](screenshots/office.png)
+
+**[Install](#install-and-start)** · **[What you need](#what-you-need)** · **[Demo](#demo)** ·
+**[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
+
+## What you can do
+
+- **See your Claude Code sessions together.** Each thread is a person at their project's desk: working, thinking in
+  the meeting room, standing with a "?" when it needs you, gone home when it is done.
+- **Find what needs you.** One **Needs attention** list: threads waiting for an answer, live sites down, serious audit
+  findings, work not saved or pushed in git, and backups that are due.
+- **Plan your day.** A **To Do** with Today, This week and This month: drag a project in, give it a size (15 minutes
+  to 8 hours) and tick it off. Quick checks bring a project back every week or month, so none is forgotten.
+- **Run and preview local projects.** Start a project's own dev server and open it, its folder or a terminal from its
+  tile.
+- **Check each project.** Its git state (and every changed line before you commit), its live site's health, and a
+  built-in **audit** for common security faults and the personal details you would give away by publishing.
+- **Back up to a drive you choose.** Each project zipped to a USB drive, another drive or a network share, read back
+  and checked.
+- **Make the office yours.** As your staff work, the tokens they make can be spent on office improvements: rooms,
+  furniture, treats and a playable arcade machine.
+
+## How it works
+
+It runs only on your PC. It reads the transcripts Claude Code already keeps on your PC
+(`%USERPROFILE%\.claude\projects`) to show each thread; the project tools work without them, and the office is then
+simply empty. It is an independent project, not made by Anthropic.
 
 This is the head office: the office overview plus tools to manage your projects, scan and preview projects developed
 locally. If you prefer the office overview only, it's [AI Office Overview](https://github.com/Matthew4509/ai-office-overview).
 
-It runs only on your PC. It reads the AI app's transcripts already on your PC and never changes or sends them. The
-only requests that leave your PC: plain page requests to the live addresses you add (their checks, and the audit's
-look at the live site, with a DNS lookup of its mail settings), a look at this repository's release tags when you press
-Settings › About › Check for updates, and, only if you turn it on, a daily check with GitHub for the newest Git version. A live address
-in a project's own project.json is only a suggestion: nothing is asked of it until you add it. The version you have is under Settings › About.
+**Privacy:** it never changes or sends your transcripts. The only requests that leave your PC are plain page requests
+to the live addresses you add (their checks, and the audit's look at the live site, with a DNS lookup of its mail
+settings), a look at this repository's release tags when you press Settings › About › Check for updates, and, only if
+you turn it on, a daily check with GitHub for the newest Git version. A live address in a project's own project.json is
+only a suggestion: nothing is asked of it until you add it. The version you have is under Settings › About.
 
 Free for **noncommercial** use under the PolyForm Noncommercial License 1.0.0 (see [Licence](#licence)). For any
 commercial use, ask the owner first, through this repository on GitHub.
-
-![The office: every room unlocked and furnished, the staff at work, and Needs attention](screenshots/office.png)
 
 Using an AI helper to install, review or update it? **[AGENTS.md](AGENTS.md)** has the steps it should follow,
 including how to check an update's signature and see what it changes before taking it.
