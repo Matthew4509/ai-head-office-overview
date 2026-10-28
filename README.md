@@ -19,7 +19,7 @@ in a project's own project.json is only a suggestion: nothing is asked of it unt
 Free for **noncommercial** use under the PolyForm Noncommercial License 1.0.0 (see [Licence](#licence)). For any
 commercial use, ask the owner first, through this repository on GitHub.
 
-![The office with its staff and Needs attention](screenshots/office.png)
+![The office: every room unlocked and furnished, the staff at work, and Needs attention](screenshots/office.png)
 
 Using an AI helper to install, review or update it? **[AGENTS.md](AGENTS.md)** has the steps it should follow,
 including how to check an update's signature and see what it changes before taking it.
