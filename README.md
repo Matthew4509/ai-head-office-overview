@@ -210,7 +210,9 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
     the To Do tab and the tab opens), or **+ Add** in a part, or a tile's **More › Add to To Do…** (a person's
     **Actions** menu has it too). A dragged project comes in at 1 h; change the size on the row.
   - **Moving and finishing:** drag a row to another part or another place, or use its **⋯** menu (Move to…, a note,
-    its quick check, Remove). A tick folds it into **Done this week**; untick brings it back.
+    its quick check, Remove). A tick moves it to **Done today**, which is always in view and counts in your day
+    ("Today 5 h of 8 h · 2 h done"); untick brings it back. Rows done before today fold under **Done earlier this
+    week**; **Show earlier** picks **This week**, **This month** or **Hide**.
   - **Nothing drops off by itself:** a row stays until you tick it or remove it. An unfinished Today row is still in
     Today the next day, marked with the day it came in ("from Mon 26").
   - **Your day:** the line at the top adds up Today's sizes against your day (**My day…**: 4 to 16 hours, 8 to start),

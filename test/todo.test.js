@@ -59,18 +59,30 @@ check('move: between zones and before another row; into Today it takes today\'s 
   assert(!T.move(s, 'deadbeef00', 'today', null, WED).ok, 'an unknown row is refused');
 });
 
-check('done: a tick folds it into Done this week; untick brings it back; old done rows go after 35 days', () => {
+check('done today shows, and counts in the day; earlier done rows show for this week, this month, or are hidden', () => {
   const s = fresh();
   const a = T.add(s, { project: 'alpha-1a2b3c', zone: 'today', size: 60 }, MON).item;
+  T.add(s, { project: 'beta-4d5e6f', zone: 'today', size: 120 }, MON);
   T.done(s, a.id, true, TUE);
-  let v = T.view(s, WED, names);
-  assert.strictEqual(v.zones[0].items.length, 0);
-  assert.strictEqual(v.total.todayMin, 0, 'a done row does not count in Today');
-  assert.deepStrictEqual(v.doneWeek.map(i => i.name), ['Alpha']);
-  assert.strictEqual(T.view(s, '2026-11-03', names).doneWeek.length, 0, 'next week: no longer in Done this week');
+  let v = T.view(s, TUE, names);
+  assert.deepStrictEqual(v.zones[0].items.map(i => i.name), ['Beta'], 'a done row leaves its part');
+  assert.deepStrictEqual(v.doneToday.map(i => i.name), ['Alpha'], 'done today shows');
+  assert.strictEqual(v.total.text, 'Today 3 h of 8 h · 1 h done', 'the day counts what was done today and what is left');
+  v = T.view(s, WED, names);
+  assert.strictEqual(v.doneToday.length, 0);
+  assert.deepStrictEqual(v.doneEarlier.items.map(i => i.name), ['Alpha'], 'the next day: earlier this week');
+  assert.strictEqual(v.doneEarlier.name, 'Done earlier this week');
+  assert.strictEqual(T.view(s, '2026-11-03', names).doneEarlier.items.length, 0, 'next week: no longer listed');
+  T.setSettings(s, { doneShow: 'month' });
+  assert.deepStrictEqual(T.view(s, '2026-10-30', names).doneEarlier.items.map(i => i.name), ['Alpha'], 'this month');
+  assert.strictEqual(T.view(s, '2026-11-03', names).doneEarlier.items.length, 0, 'a new month: no longer listed');
+  T.setSettings(s, { doneShow: 'hide' });
+  v = T.view(s, WED, names);
+  assert(v.doneEarlier.items.length === 0 && v.doneEarlier.hidden === 1, 'hidden, and how many is said');
+  assert(!T.setSettings(s, { doneShow: 'year' }).ok);
   T.done(s, a.id, false, WED);
   v = T.view(s, WED, names);
-  assert.strictEqual(v.zones[0].items.length, 1);
+  assert.deepStrictEqual(v.zones[0].items.map(i => i.name).sort(), ['Alpha', 'Beta'], 'unticked: back in its part');
   T.done(s, a.id, true, WED);
   assert.strictEqual(T.tidy(s, '2026-11-30'), 0, '33 days on: kept');
   assert.strictEqual(T.tidy(s, '2026-12-05'), 1, '38 days on: gone');
@@ -156,7 +168,7 @@ check('normalize: rows and checks of the wrong shape are dropped, the rest kept'
   });
   assert.deepStrictEqual(s.items.map(i => i.id), ['abcdef0123']);
   assert.deepStrictEqual(Object.keys(s.checks), ['alpha-1a2b3c']);
-  assert.deepStrictEqual(s.settings, { dayHours: 8, checksPerDay: 1 });
+  assert.deepStrictEqual(s.settings, { dayHours: 8, checksPerDay: 1, doneShow: 'week' });
 });
 
 check('the store: a fresh read writes nothing; changes are saved; a damaged file is copied aside, not lost', () => {

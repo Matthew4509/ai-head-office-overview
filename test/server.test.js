@@ -865,7 +865,9 @@ async function main() {
     assert(chk && chk.project === alpha.id && chk.size === 15 && chk.check === 'week', JSON.stringify(v.zones[0]));
     assert((await api('/api/todo/done', { item: chk.id, done: true })).json.ok);
     v = (await api('/api/todo')).json;
-    assert(v.doneWeek.length === 1 && v.checks[0].due === false, 'ticked: in Done this week, the check due again a week on');
+    assert(v.doneToday.length === 1 && v.checks[0].due === false, 'ticked: in Done today, the check due again a week on');
+    assert((await api('/api/todo/settings', { doneShow: 'month' })).json.ok);
+    assert(!(await api('/api/todo/settings', { doneShow: 'year' })).json.ok);
     assert((await api('/api/todo/remove', { item: a.item.id })).json.ok);
     assert(!(await api('/api/todo/remove', { item: a.item.id })).json.ok, 'gone already');
     assert(JSON.parse(fs.readFileSync(path.join(DATA, 'todo.json'), 'utf8')).version === 1);

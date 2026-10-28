@@ -1,7 +1,7 @@
 // The To Do (the right panel's third tab, lib/todo.js): Today, This week and This month, each row a project, a size
 // and an optional note, put there by hand. Drag a project's name from a tile (Projects tab) or the Favourites tab onto
 // a part of it (over the To Do tab, it opens), or use + Add / a tile's More › Add to To Do…. Rows are dragged between
-// parts, or moved from their ⋯ menu (keyboard and touch). A tick folds a row into Done this week. Quick checks (a
+// parts, or moved from their ⋯ menu (keyboard and touch). A tick moves a row to Done today (always in view); rows done before today show for this week, this month, or not at all (Show earlier). Quick checks (a
 // project checked every week or month) come into Today by themselves, 1 or 2 a day. My day sets the day's hours.
 'use strict';
 
@@ -144,7 +144,7 @@
       el('b', { text: it.name }), it.gone ? el('span', { class: 'note', text: ' (not on the list)' }) : null,
       it.note ? ` · ${it.note}` : null,
       it.from ? el('span', { class: 'todo-from', text: ` from ${it.from}` }) : null,
-      it.done && it.doneAt ? el('span', { class: 'note', text: ` · ${new Date(`${it.doneAt}T12:00:00`).toLocaleDateString([], { weekday: 'short' })}` }) : null);
+      it.done && it.doneAt && it.doneAt !== data.today ? el('span', { class: 'note', text: ` · ${new Date(`${it.doneAt}T12:00:00`).toLocaleDateString([], { weekday: 'short' })}` }) : null);
     return el('li', { class: `todo-row${it.done ? ' is-done' : ''}`, draggable: it.done ? null : 'true', 'data-item': it.id }, tick, label, it.done ? el('span', { class: 'note', text: it.sizeText }) : size, menu);
   }
 
@@ -162,10 +162,20 @@
         btn('+ Add', () => addWindow(null, z.zone), 'btn small', { title: `Put a project in ${z.name}` })),
       z.items.length ? el('ul', { class: 'todo-list' }, ...z.items.map((it) => row(it, z.zone, open)))
         : el('p', { class: 'note todo-empty', text: z.zone === 'today' ? 'Nothing for today yet. Drag a project\'s name here, or + Add.' : 'Drag a project\'s name here, or + Add.' })));
-    const done = data.doneWeek.length ? el('details', { class: 'todo-done', open: pane.querySelector('details.todo-done')?.open || null },
-      el('summary', { text: `Done this week (${data.doneWeek.length})` }), el('ul', { class: 'todo-list' }, ...data.doneWeek.map((it) => row(it, null)))) : null;
+    // Done today: always in view, under the three parts. Done before today: this week, this month, or hidden (Show earlier).
+    const doneToday = data.doneToday.length ? el('section', { class: 'todo-zone todo-done-today', 'aria-label': 'Done today' },
+      el('div', { class: 'row todo-zone-head' }, el('h3', { text: `Done today (${data.doneToday.length})` })),
+      el('ul', { class: 'todo-list' }, ...data.doneToday.map((it) => row(it, null)))) : null;
+    const e = data.doneEarlier;
+    const showSel = el('select', { class: 'field-text short', 'aria-label': 'Show rows done before today' },
+      ...[['week', 'This week'], ['month', 'This month'], ['hide', 'Hide']].map(([v, t]) => el('option', { value: v, selected: e.show === v }, t)));
+    showSel.onchange = () => call('/api/todo/settings', { doneShow: showSel.value });
+    const earlierList = e.items.length ? el('details', { class: 'todo-done', open: pane.querySelector('details.todo-done')?.open || null },
+      el('summary', { text: `${e.name} (${e.items.length})` }), el('ul', { class: 'todo-list' }, ...e.items.map((it) => row(it, null))))
+      : el('span', { class: 'note', text: e.show === 'hide' ? `Earlier done rows are hidden${e.hidden ? ` (${e.hidden} this week)` : ''}.` : `${e.name}: none.` });
+    const done = el('div', { class: 'row todo-earlier' }, earlierList, el('label', { class: 'note todo-show' }, 'Show earlier ', showSel));
     const hint = el('p', { class: 'note', text: 'Drag a project\'s name from the Projects or Favourites tab onto Today, This week or This month. Nothing drops off: a row stays until you tick it.' });
-    app.swap(pane, head, ...zones, done, hint);
+    app.swap(pane, head, ...zones, doneToday, done, hint);
   };
 
   // ---- dragging ----

@@ -215,7 +215,7 @@
         'Needs attention: threads waiting for an answer, then projects: a live site down, Critical or High audit findings, git waiting for a save or push. Click a row to open it.'),
       h3('To Do'),
       li('The To Do (right panel) is what you mean to work on, in Today, This week and This month. Drag a project\'s name from its tile or the Favourites tab onto one, or use + Add, or a tile\'s More › Add to To Do…. Each row has a size (Quick 15 min, 1, 2, 4 or 8 h) and an optional note.',
-        'Nothing drops off by itself: a row stays until you tick it. An unfinished Today row is still there tomorrow, marked with the day it came in. Ticked rows fold into Done this week.',
+        'Nothing drops off by itself: a row stays until you tick it. An unfinished Today row is still there tomorrow, marked with the day it came in. Ticked rows go to Done today, always in view; Show earlier lists the ones before for this week, this month, or hides them.',
         'My day… sets the hours in your day (8 to start); the top line adds up Today against it. A quick check (every week or month) comes into Today by itself when due, 1 a day (or 2), the longest overdue first.'),
       h3('Audit, Git and Live'),
       li('Audit checks the code (and the running copy and live site, when there are) against about 130 rules: keys, injection, sign-in and payment gaps, uploads, exposed files, trackers, private details. It catches common faults, not everything. Not a fault… sets one place aside with your reason; Review with AI… builds a prompt to paste into the AI you use.',

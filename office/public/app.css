@@ -653,3 +653,9 @@ details.more[open] > .more-menu { position: fixed; left: var(--more-left, auto);
 .todo-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .todo-check-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); padding: 4px 0; }
 [data-todo-project][draggable="true"] { cursor: grab; }
+.todo-done-today { border-style: dashed; }
+.todo-earlier { justify-content: space-between; align-items: flex-start; gap: 6px 10px; margin: 0 0 8px; }
+.todo-earlier .todo-done { flex: 1 1 200px; min-width: 0; }
+.todo-earlier .todo-done summary { margin: 2px 0; }
+.todo-show { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.todo-show select.field-text { margin: 0; padding: 1px 2px; font-size: 12px; }
