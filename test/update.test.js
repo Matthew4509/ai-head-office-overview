@@ -144,10 +144,11 @@ function signedTag(work, version, pem = KEY.pem, force = false) {
   const W = extra => update.where({ app: clone, data: DATA, version: '0.1.98', key: KEY.pub, ...extra });
   const noRefs = () => assert.equal(g(clone, 'for-each-ref', 'refs/aho-update/'), '', 'no fetched refs left behind');
 
-  await check('a folder without git cannot update, and says why; a git setting that names a program stops git', async () => {
+  await check('a folder without git (a zip copy) checks from a scratch repository; a git setting that names a program stops git', async () => {
     const d = path.join(TMP, 'zip'); fs.mkdirSync(d);
     const r = await update.check(W({ app: d }));
-    assert(!r.ok && /cannot update itself/.test(r.fault) && r.wayOut, JSON.stringify(r));
+    assert(r.ok && r.zip && r.version === null && !r.newer, JSON.stringify(r));
+    assert(!fs.existsSync(path.join(d, '.git')), 'Check wrote a .git folder');
     const risky = path.join(TMP, 'risky');
     g(TMP, 'clone', '-q', origin, risky);
     g(risky, 'config', 'core.pager', 'evil.exe');
@@ -211,6 +212,85 @@ function signedTag(work, version, pem = KEY.pem, force = false) {
     const again = await update.goBack(W());
     assert(!again.ok && /no update to go back from/.test(again.fault), JSON.stringify(again));
   });
+  // ---------- a copy unpacked from the release zip (no .git folder) ----------
+  // 0.1.98, the first commit, signed too; a zip copy is that release's files, as git archive (and the bake) give them.
+  const c98 = g(work, 'rev-list', '--max-parents=0', 'HEAD');
+  const m98 = path.join(TMP, 'tag-0.1.98.txt');
+  fs.writeFileSync(m98, release.tagMessage(release.signTag(KEY.pem, '0.1.98', c98, g(work, 'rev-parse', c98 + '^{tree}'))));
+  g(work, 'tag', '-a', 'v0.1.98', '-F', m98, c98); g(work, 'push', '-q', origin, 'v0.1.98');
+  const TAR = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+  const zipCopy = name => {
+    const dir = path.join(TMP, 'zips', name), tarFile = path.join(TMP, 'zips', name + '.tar');
+    fs.mkdirSync(dir, { recursive: true });
+    g(work, 'archive', '--format=tar', '-o', tarFile, 'v0.1.98');
+    execFileSync(TAR, ['-x', '-f', tarFile, '-C', dir]);
+    fs.mkdirSync(path.join(dir, 'data'));
+    fs.writeFileSync(path.join(dir, 'data', 'settings.json'), JSON.stringify({ workingFolders: [], welcomed: true, mine: true }));
+    return { app: dir, data: path.join(dir, 'data') };
+  };
+  const hasGit = dir => fs.existsSync(path.join(dir, '.git'));
+
+  await check('a zip copy: Check finds the signed 0.1.99 and what it brings, and writes nothing in its folder', async () => {
+    const z = zipCopy('clean');
+    const r = await update.check(W(z));
+    assert(r.ok && r.zip && r.newer && r.signed && r.version === '0.1.99' && r.behind === 1 && r.commits[0].text === 'office 0.1.99' && !r.own && !r.changed.length, JSON.stringify(r));
+    assert(!hasGit(z.app), 'Check wrote a .git folder');
+    assert(update.status(W(z)).zip);
+  });
+  await check('a zip copy with a changed file: shown on Check; Update now refuses, keeps the file and leaves no .git', async () => {
+    const z = zipCopy('changed');
+    fs.appendFileSync(path.join(z.app, 'README.md'), '\nedited here\n');
+    const r = await update.check(W(z));
+    assert(r.ok && r.changed.includes('README.md'), JSON.stringify(r));
+    const t = await update.take('0.1.99', W(z));
+    assert(!t.ok && /differ from version 0\.1\.98/.test(t.fault) && /README\.md/.test(t.reason), JSON.stringify(t));
+    assert(!hasGit(z.app), 'a refused link left its .git folder');
+    assert.match(fs.readFileSync(path.join(z.app, 'README.md'), 'utf8'), /edited here/);
+  });
+  await check('a zip copy whose version is not a signed release: said plainly, nothing changed', async () => {
+    const z = zipCopy('unreleased');
+    const r = await update.check(W({ ...z, version: '0.1.97' }));
+    assert(!r.ok && r.notReleased && /0\.1\.97, is not a signed release/.test(r.reason) && /release zip/.test(r.wayOut), JSON.stringify(r));
+    const t = await update.take('0.1.99', W({ ...z, version: '0.1.97' }));
+    assert(!t.ok && t.notReleased, JSON.stringify(t));
+    assert(!hasGit(z.app), 'a refused link left its .git folder');
+  });
+  await check('Update now in a zip copy: linked at its own signed version, a missing file put back, moved to 0.1.99; Go back works', async () => {
+    const z = zipCopy('takes');
+    fs.rmSync(path.join(z.app, 'LICENSE'));
+    const r = await update.take('0.1.99', W(z));
+    assert(r.ok && r.version === '0.1.99' && r.linked, JSON.stringify(r));
+    assert.equal(g(z.app, 'rev-parse', 'HEAD'), g(work, 'rev-parse', 'v0.1.99^{commit}'));
+    assert.equal(g(z.app, 'symbolic-ref', 'HEAD'), 'refs/heads/main');
+    assert.equal(g(z.app, 'status', '--porcelain', '--untracked-files=no'), '', 'files differ from the signed commit');
+    assert(fs.existsSync(path.join(z.app, 'LICENSE')), 'the missing file was not put back');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(z.data, 'settings.json'), 'utf8')).mine, true);
+    assert.equal(update.lastResult(W(z)).fromCommit, c98);
+    assert.equal(g(z.app, 'for-each-ref', 'refs/aho-update/'), '', 'no fetched refs left behind');
+    // From now on an ordinary git copy: Check says it is the newest, and Go back returns to the 0.1.98 it was.
+    const c = await update.check(W({ ...z, version: '0.1.99' }));
+    assert(c.ok && !c.zip && !c.newer && c.version === '0.1.99', JSON.stringify(c));
+    const b = await update.goBack(W({ ...z, version: '0.1.99' }));
+    assert(b.ok && b.version === '0.1.98' && g(z.app, 'rev-parse', 'HEAD') === c98, JSON.stringify(b));
+  });
+  await check('no git on this PC: said plainly, with Install Git offered (Windows)', async () => {
+    const path0 = process.env.PATH, dirs = [zipCopy('nogit').app, clone];
+    process.env.PATH = path.join(TMP, 'no-programs-here');
+    process.env.AHO_NO_GIT_HOME = '1';
+    try {
+      for (const dir of dirs) {
+        const r = await update.check(W({ app: dir }));
+        assert(!r.ok && r.fault === 'Git is not installed.' && r.installGit === (process.platform === 'win32') && /Install Git/.test(r.wayOut), JSON.stringify(r));
+      }
+    } finally { process.env.PATH = path0; delete process.env.AHO_NO_GIT_HOME; }
+  });
+  await check('Install Git: winget in a window of its own (a test copy only says so)', () => {
+    const os2 = require('../lib/platform');
+    if (process.platform !== 'win32') return;
+    assert.match(os2.installGitCommand('C:\\x\\winget.exe'), /^winget install --id Git\.Git -e --source winget \(in a new window\)$/);
+    assert.match(os2.installGitCommand(null), /winget not found/);
+  });
+
   await check('a version that does not start is never taken', async () => {
     const at = g(clone, 'rev-parse', 'HEAD');
     // The tag points at a commit whose server.js stops at once.

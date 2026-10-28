@@ -27,7 +27,8 @@ https://github.com/Matthew4509/ai-office-overview. Explain the difference and le
    --source winget` (or point the user to https://nodejs.org). A new terminal is needed afterwards for the PATH.
 3. **Get it:** from the projects folder,
    `git clone https://github.com/Matthew4509/ai-head-office-overview.git` (then work inside
-   `ai-head-office-overview`). No git? `winget install --id Git.Git -e`, or download the repository's zip.
+   `ai-head-office-overview`). No git? `winget install --id Git.Git -e`, or unzip the release zip (it links itself to
+   GitHub on its first update; see "Update it").
 4. **Check it before running it** (see "Review it" below): at least `npm test` (about 6 minutes). Its data is made up
    and kept in temp folders; the setup test also uses a throwaway registry key (removed at the end) and briefly opens a
    minimised console window for its test copy (port 8881). Nothing of the user's is read or changed. A quicker look:
@@ -69,7 +70,14 @@ folder's own `origin`), and checks the signature against the key the office carr
    reset, stash or overwrite their changes without their word.
 4. A copy from before signed updates follows `main` in its own Settings › Update until it runs a version that has
    them; from that version on it takes signed tags only.
-5. The version is in `lib/config.js` (`VERSION`) and Settings › About. The user's data stays as it was; a new version
+5. **A copy unpacked from the release zip** (no `.git` folder, 0.1.13 or newer) updates the same way. Check looks
+   from a scratch repository in the temp folder and writes nothing in the office's folder. The first Update now runs
+   `git init` there, fetches the signed tag of the version it already is, checks its signature, sets `main` to that
+   commit, and compares the files: any that differ refuse the link (the new `.git` is removed again), missing ones are
+   put back from the signed release. Then it updates as above. No git on the PC: Update offers Install Git (winget, in
+   a window the user answers). A zip of a version that has no signed tag (GitHub's own Download ZIP of `main`) cannot
+   be linked: unzip the newest release zip and copy the `data` folder across.
+6. The version is in `lib/config.js` (`VERSION`) and Settings › About. The user's data stays as it was; a new version
    reads it as it is.
 
 ## Review it (what it does on this PC)
@@ -86,7 +94,9 @@ folder's own `origin`), and checks the signature against the key the office carr
 - **Runs:** a project's own start command from that project's `.claude/launch.json` or `project.json` (never text
   from the page; code: `lib/projects.js`, `lib/runner.js`), and only after the person has seen the whole command in a
   first-run window and said yes (asked again when the command changes; `trustCheck` in `lib/runner.js`); `git`
-  read-only commands; and PowerShell helpers in `lib/platform/windows/`.
+  read-only commands; and PowerShell helpers in `lib/platform/windows/`. Settings › Update runs git to fetch and take
+  a signed release (in a zip copy, `git init` first), and, only when the user presses Install Git,
+  `winget install --id Git.Git -e --source winget` in a window of its own (`installGit` in `lib/platform/windows.js`).
 - **Sends:** nothing about the user. The only requests that leave the PC are plain GETs to the live addresses the user
   adds (`lib/live.js`, `lib/audit.js`) and, only if ticked under About, one request a day to GitHub for the newest Git
   version (`lib/git-program.js`), and, when the user opens Settings › Update, a `git ls-remote` of this repository's

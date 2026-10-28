@@ -1,6 +1,6 @@
 {
   "name": "ai-head-office-overview",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "description": "An office that shows what your AI coding threads are doing, with your projects, their local copies, audits, git and live checks. Runs on this PC only.",
   "license": "PolyForm-Noncommercial-1.0.0",

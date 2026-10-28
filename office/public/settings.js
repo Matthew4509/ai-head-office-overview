@@ -254,13 +254,21 @@
       }
       said(el('p', { text: 'The office did not come back by itself. Double-click start.cmd (or the desktop shortcut) to start it.' }));
     }
-    const failed = (e) => said(el('p', { text: fault(e) }), el('div', { class: 'row' }, btn('Check again', check)));
+    // No Git on this PC: Install Git opens Windows' own installer in a window of its own; Check again once it is done.
+    const installGit = () => btn('Install Git', async (e) => {
+      e.currentTarget.disabled = true;
+      try {
+        const r = await app.engine('/api/update/install-git', {});
+        said(el('p', { text: r.dryRun ? `Test copy, nothing installed: ${r.dryRun}.` : 'A window opened to install Git. Answer it there (Windows may ask for your yes). When it says it is installed, press Check again.' }), el('div', { class: 'row' }, btn('Check again', check, true)));
+      } catch (x) { said(el('p', { text: fault(x) }), el('div', { class: 'row' }, btn('Check again', check))); }
+    }, true, { title: 'Opens a window that installs Git with winget, Windows\' own installer. It asks before it changes anything.' });
+    const failed = (e) => said(el('p', { text: fault(e) }), el('div', { class: 'row' }, e?.error?.installGit ? installGit() : null, btn('Check again', check)));
     async function take(button, version) {
       button.disabled = true;
       said(el('p', { text: `Taking ${version}: fetching it, checking its signature and starting it once as a test copy (up to a minute)…` }));
       try {
         const r = await app.engine('/api/update/take', { version });
-        said(el('p', { text: `Updated to ${r.version} (${r.from} to ${r.to}).` }));
+        said(el('p', { text: `Updated to ${r.version} (${r.from} to ${r.to})${r.linked ? '. This copy is now linked to GitHub, so later updates come the same way' : ''}.` }));
         await app.engine('/api/update/restart', {}).catch(() => null);
         backAgain();
       } catch (e) { failed(e); }
@@ -273,12 +281,13 @@
       const when = `Checked ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
       if (!r.version) return said(el('p', {}, el('b', { text: '● There is no signed release on GitHub yet.' })), el('p', { class: 'note', text: `Update takes only a version signed by the office's maker, and ${r.from} has none so far. ${when}` }), el('div', { class: 'row' }, again));
       if (!r.newer) return said(el('p', {}, el('b', { text: '● You have the newest version.' })), el('p', { class: 'note', text: `The newest signed release on ${r.from} is ${r.version}. ${when}` }), el('div', { class: 'row' }, again));
+      const zipNote = r.zip ? el('p', { class: 'note', text: `This copy came from a zip. Update now first links it to GitHub, after checking its files are ${r.mine} as released, then takes ${r.version}. Every update after that comes the same way.` }) : null;
       const list = el('ul', { class: 'update-list' }, r.commits.map((c) => el('li', {}, el('span', { class: 'note', text: `${c.date} ` }), c.text)));
       const blocked = r.changed.length ? `Files here were changed (${r.changed.slice(0, 3).join(', ')}${r.changed.length > 3 ? ', …' : ''}), so it will not update until they are kept or undone.`
         : r.own ? 'This copy has saved changes of its own that the new version does not, so it cannot simply move forward. Bring it up to date by hand (see AGENTS.md, "Update it").' : '';
       const go = btn('Update now', (e) => take(e.currentTarget, r.version), true, { title: 'Takes the signed version from GitHub, starts it once as a test copy, then moves this copy to it and restarts the office. Your data folder (settings, audits, prompts, the office) is not touched.' });
       said(el('p', {}, el('b', { text: `▲ Version ${r.version} is out, signed by the office's maker: ${plural(r.behind, 'change', 'changes')} since yours.` })),
-        list, blocked ? el('p', { text: blocked }) : null,
+        list, blocked ? el('p', { text: blocked }) : null, zipNote,
         el('p', { class: 'note', text: `From ${r.from}, tag v${r.version} (commit ${r.commit}). This copy is at ${r.at}. ${when}` }),
         el('div', { class: 'row' }, blocked ? null : go, again),
         el('p', { class: 'note', text: 'Update now checks the signature again, starts the new version once as a test copy (a version that does not start is never taken), then takes it and restarts the office (the page reloads itself). Your data folder is never touched, and nothing here is overwritten: an update that would is refused.' }));
@@ -295,7 +304,7 @@
         try { await app.engine('/api/update/back', {}); await app.engine('/api/update/restart', {}).catch(() => null); backAgain(); } catch (x) { failed(x); }
       }) : null);
     check();
-    return [row(`This copy: AI Head Office Overview ${stats.version}`, 'Updates come from the office\'s own GitHub address, and only as a version signed by its maker. Opening this tab asks GitHub once; nothing about you or your projects is sent.'), lastRow, box].filter(Boolean);
+    return [row(`This copy: AI Head Office Overview ${stats.version}`, 'Updates come from the office\'s own GitHub address, and only as a version signed by its maker. Opening this tab asks GitHub once; nothing about you or your projects is sent.' + (st?.zip ? ' This copy came from a zip: its first update links it to GitHub, and it updates the same way from then on.' : '')), lastRow, box].filter(Boolean);
   }
 
   // ---- About ----

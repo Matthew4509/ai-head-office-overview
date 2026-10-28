@@ -38,10 +38,9 @@ including how to check an update's signature and see what it changes before taki
 1. Get it **inside the folder that holds your projects** (for example `C:\Users\you\projects`): on its first start
    the office lists the folders next to it. Anywhere else works too; you then add your projects folder under
    **Settings › Folders**.
-   - **Best: clone it with git**, so it can update itself later in one click. In that folder, run
+   - **Download the release zip** and unzip it there. It updates itself like any other copy (see **Update** below).
+   - **Or clone it with git**: in that folder, run
      `git clone https://github.com/Matthew4509/ai-head-office-overview.git`
-   - **Or download the zip** (the green **Code** button › **Download ZIP**, or a release zip) and unzip it there. A zip
-     copy works the same, but cannot update itself: see **Update** below.
 2. Double-click **`install.cmd`**. It checks Node.js (and offers to install it), asks whether you want a desktop
    shortcut and to start the office when you sign in to Windows (Enter = yes), sets up the start link, then starts the
    office. It opens in its own window. A small console window titled "AI Head Office Overview" starts minimised: that
@@ -58,8 +57,12 @@ local copy it started. From a command line: `node server.js --stop`, and `node s
 running).
 
 **Update:** Settings › **Update** checks GitHub, shows what the newer version changes, and takes it in one click (only
-a version signed by the office's maker; **Go back** undoes it). That needs a copy cloned with git. A zip copy: **Quit** the
-office, unzip the new zip to a new folder, copy the old folder's **`data`** folder into it (your settings, prompts and
+a version signed by the office's maker; **Go back** undoes it). Updates need Git, the free program that fetches them:
+if it is missing, Update offers **Install Git** (Windows' own installer, in a window that asks before it changes
+anything). A copy from the release zip (0.1.13 or newer) is linked to GitHub by its first update, after checking its
+files are the released ones, and updates the same way from then on. Your `data` folder is never touched. A zip copy
+older than 0.1.13, or a **Download ZIP** of GitHub's newest code (not a release), cannot: **Quit** the office, unzip the
+newest release zip to a new folder, copy the old folder's **`data`** folder into it (your settings, prompts and
 records), double-click the new folder's `install.cmd`, then delete the old folder.
 
 **Uninstall:** Settings › About › **Uninstall**, or double-click **`uninstall.cmd`**. Either one stops the office and
