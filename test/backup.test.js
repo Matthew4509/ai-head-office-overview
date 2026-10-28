@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const assert = require('assert');
+const zlib = require('zlib');
 const { spawnSync } = require('child_process');
 const Backup = require('../lib/backup');
 const { writeZip, checkZip, listZip } = require('../lib/zip');
@@ -176,6 +177,87 @@ check('a big file that cannot be read to its end is left out and written over, w
     const r = await checkZip(z, made.entries);
     assert.ok(r.ok, r.fault);
   }
+});
+
+check('the check compares the name in each entry\'s own header with the zip\'s list (Windows tar unpacks by that name)', async () => {
+  const d = path.join(tmp, 'theta'); const f = mk(d, 'report.txt', 'hello\n');
+  const z = path.join(tmp, 'theta.zip');
+  const made = await writeZip(z, [{ name: 'Theta/', dir: true, mtimeMs: Date.now() }, { name: 'Theta/report.txt', abs: f, size: 6, mtimeMs: Date.now() }]);
+  for (const e of await listZip(z)) {
+    const bad = fs.readFileSync(z); bad[e.offset + 30 + e.name.length - 2] ^= 0x01; // a letter near the end of its name
+    fs.writeFileSync(path.join(tmp, 'theta-bad.zip'), bad);
+    const r = await checkZip(path.join(tmp, 'theta-bad.zip'), made.entries);
+    assert.strictEqual(r.ok, false, e.name);
+    assert.match(r.fault, /its own header in the zip disagrees with the zip's list/, e.name);
+  }
+});
+
+// A zip that says its one file is `claims` bytes but unpacks to `real` zeros (not one the office wrote).
+function craftedZip(file, claims, real) {
+  const parts = [], d = zlib.createDeflateRaw(); d.on('data', b => parts.push(b));
+  const zeros = Buffer.alloc(1 << 20);
+  return new Promise(ok => { d.on('end', ok); for (let n = 0; n < real; n += zeros.length) d.write(zeros); d.end(); }).then(() => {
+    const body = Buffer.concat(parts), nm = Buffer.from('bomb.bin');
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(8, 8);
+    lh.writeUInt32LE(body.length, 18); lh.writeUInt32LE(claims, 22); lh.writeUInt16LE(nm.length, 26);
+    const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(8, 10);
+    ch.writeUInt32LE(body.length, 20); ch.writeUInt32LE(claims, 24); ch.writeUInt16LE(nm.length, 28);
+    const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(1, 8); end.writeUInt16LE(1, 10);
+    end.writeUInt32LE(46 + nm.length, 12); end.writeUInt32LE(30 + nm.length + body.length, 16);
+    fs.writeFileSync(file, Buffer.concat([lh, nm, body, ch, nm, end]));
+  });
+}
+
+check('a zip whose file unpacks to far more than it lists is stopped at the listed size, not unpacked into memory', async () => {
+  const z = path.join(tmp, 'bomb.zip');
+  await craftedZip(z, 1024, 256 << 20);
+  const before = process.memoryUsage().rss;
+  const r = await checkZip(z);
+  const grew = process.memoryUsage().rss - before;
+  assert.strictEqual(r.ok, false);
+  assert.match(r.fault, /bomb\.bin unpacks to more than the 1024 bytes the zip lists/);
+  assert.ok(grew < 128 << 20, 'memory grew ' + Math.round(grew / 1048576) + ' MB');
+});
+
+check('zip64 sizes in an entry\'s own header (files of 4 GB and over) are compared with the list too', async () => {
+  // Listed at 4 GB, so it gets a zip64 header; the file itself is small, so the test stays quick.
+  const d = path.join(tmp, 'iota'); const f = mk(d, 'z64.bin', 'zip64 header\n'.repeat(200));
+  const z = path.join(tmp, 'iota.zip');
+  const made = await writeZip(z, [{ name: 'z64.bin', abs: f, size: 0xFFFF0000, mtimeMs: Date.now() }]);
+  assert.ok((await checkZip(z, made.entries)).ok, 'the zip as written passes');
+  if (hasTar) {
+    const out = path.join(tmp, 'iota-out'); fs.mkdirSync(out);
+    assert.strictEqual(spawnSync(TAR, ['-x', '-f', z, '-C', out]).status, 0);
+    assert.ok(fs.readFileSync(path.join(out, 'z64.bin')).equals(fs.readFileSync(f)), 'Windows tar unpacks it whole');
+  }
+  const e = (await listZip(z))[0];
+  for (const at of [4, 12]) { // its size, then its compressed size, in the zip64 extra
+    const bad = fs.readFileSync(z); bad[e.offset + 30 + e.name.length + at] ^= 0x01;
+    fs.writeFileSync(path.join(tmp, 'iota-bad.zip'), bad);
+    const r = await checkZip(path.join(tmp, 'iota-bad.zip'), made.entries);
+    assert.strictEqual(r.ok, false, 'byte ' + at);
+    assert.match(r.fault, /its own header in the zip disagrees with the zip's list/);
+  }
+});
+
+check('a fault writing a big file\'s header to the zip does not leave the project file open', async () => {
+  const d = path.join(tmp, 'kappa');
+  const pad = mk(d, 'pad.zip', require('crypto').randomBytes((1 << 20) - 50)); // stored; leaves just under 1 MB gathered
+  const big = mk(d, 'big.bin', require('crypto').randomBytes(5 << 20));
+  const z = path.join(tmp, 'kappa.zip');
+  const open = fs.promises.open, rs = fs.createReadStream;
+  let src = null;
+  fs.createReadStream = (p, o) => { const s = rs(p, o); if (p === big) src = s; return s; };
+  fs.promises.open = async (f, ...a) => {
+    const fh = await open(f, ...a);
+    if (f === z) fh.write = () => Promise.reject(Object.assign(new Error('the drive went away'), { code: 'EIO' }));
+    return fh;
+  };
+  try {
+    await assert.rejects(writeZip(z, [pad, big].map(f => ({ name: path.basename(f), abs: f, size: fs.statSync(f).size, mtimeMs: Date.now() }))), { code: 'EIO' });
+  } finally { fs.promises.open = open; fs.createReadStream = rs; }
+  assert.ok(src, 'the big file was opened');
+  assert.ok(src.destroyed, 'and closed again');
 });
 
 if (process.platform === 'win32') check('a file that cannot be read is listed, and the backup still passes', async () => {
