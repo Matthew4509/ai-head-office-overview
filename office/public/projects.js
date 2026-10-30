@@ -233,7 +233,7 @@
   const stopItem = (p, b) => (p.running ? b('stop', 'Stop', `Stop ${p.name}'s local copy (port ${p.running.port})`) : null);
   const browserItem = (p, b) => (!p.running && p.commands.some((c) => c.port) ? b('browser', 'Browser', 'Open its local address in the browser') : null);
   /** The tile's More menu (Stop or Browser, Free port when shown, Copy prompt, Folder, Terminal, Back up now, Hide,
-   * Remove from list), at the end of the marks line. */
+   * Publish guard… (git only), Hide, Remove from list), at the end of the marks line. */
   function moreMenu(p, open) {
     const b = (what, label, title) => tileBtn(p, what, label, title);
     const more = el('details', { class: 'more', open: !!open, 'data-id': p.id,
@@ -247,6 +247,7 @@
         b('folder', 'Folder', `Open ${p.name}'s folder`), b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
         todoItem(p, 'btn small'),
         ...(app.backupMenuItems?.(p) || []),
+        ...(app.gateMenuItems?.(p) || []),
         p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
         b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`)));
     return more;
@@ -266,6 +267,7 @@
       b('terminal', 'Terminal', `A terminal in ${p.name}'s folder`),
       todoItem(p, 'btn'),
       ...(app.backupMenuItems?.(p, 'btn') || []),
+      ...(app.gateMenuItems?.(p, 'btn') || []),
       p.hiddenView ? b('unhide', 'Show again', `Show ${p.name} with the others`) : b('hide', 'Hide', `Keep ${p.name} on the list but out of view`),
       b('remove', 'Remove from list', `Take ${p.name} off the list; its files are not touched`),
     ];

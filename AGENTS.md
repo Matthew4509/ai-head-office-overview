@@ -84,13 +84,17 @@ folder's own `origin`), and checks the signature against the key the office carr
 - **Listens** on 127.0.0.1 only (port 8880; 8881 tests, 8882 demo, 8883 test copy). Every API request needs the per-run
   key the page was served with; the one exception, `/api/office/hook`, takes only a JSON event. Code: `lib/routes/index.js`.
 - **Reads:** `~/.claude/projects` (transcripts), `~/.codex/sessions` (token counts), the project folders in its
-  working folders, and the Claude desktop app's thread records (the Open button). It never writes to any of them.
+  working folders, and the Claude desktop app's thread records (the Open button). It never writes to any of them,
+  with one exception the user turns on per project: the publish guard (below).
 - **Writes:** its own `data` folder; when the user runs a backup, a zip, a .txt and `backups-index.json` in the
   backup folder they chose (`lib/backup.js`; it never changes a project's files, and deletes old zips only when the
   user turned on Keep last N); the AI app's `~/.claude/settings.json` only when the user turns advanced
   setup on or off, and uninstall takes its own hooks out again (a copy is saved first each time; code:
   `office/src/setup.mjs`, `lib/setup.js`); the start link is set again on every start (start.cmd), and the shortcuts
-  only through setup (`lib/setup.js`).
+  only through setup (`lib/setup.js`); and, only when the user turns on a project's publish guard (More › Publish
+  guard…), that project's `.git/hooks/pre-push` (a script marked `ai-head-office-publish-guard` that runs
+  `tools/gate.js`, the audit, before every push and stops the push while it says "fix first"). Turn off removes it;
+  a pre-push hook the office did not write is never changed or removed (code: `lib/gate.js`).
 - **Runs:** a project's own start command from that project's `.claude/launch.json` or `project.json` (never text
   from the page; code: `lib/projects.js`, `lib/runner.js`), and only after the person has seen the whole command in a
   first-run window and said yes (asked again when the command changes; `trustCheck` in `lib/runner.js`); `git`

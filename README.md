@@ -23,6 +23,7 @@ a tile: run its local copy, check its git and live site, audit it for common sec
   tile.
 - **Check each project.** Its git state (and every changed line before you commit), its live site's health, and a
   built-in **audit** for common security faults and the personal details you would give away by publishing.
+- **Guard your pushes** if you want: a per-project publish guard stops a `git push` while the audit says "fix first".
 - **Back up to a drive you choose.** Each project zipped to a USB drive, another drive or a network share, read back
   and checked.
 - **Make the office yours.** As your staff work, the tokens they make can be spent on office improvements: rooms,
@@ -192,7 +193,8 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
   **No git…** for a project not in git (its Git mark moves in here, to keep the tile tidy; it opens how to start one),
   **Copy prompt**
   (its name and full folder, to paste into the AI you use; the office never starts an AI itself), **Folder**,
-  **Terminal**, **Hide** (stays on the list, out of view until **Show hidden** is ticked) and **Remove from list** (its
+  **Terminal**, **Publish guard…** for a git repository (see Audit, Git and Live below), **Hide** (stays on the list,
+  out of view until **Show hidden** is ticked) and **Remove from list** (its
   folder and files are never touched; Settings › Folders brings it back).
 - **Project planner** tab, hidden to start with: tick **Show the Project planner tab** under Settings › Office (kept in
   this browser; hidden again, its scores and categories are kept). So no project is forgotten and the important ones
@@ -252,7 +254,7 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
 - **A person's card:** a star beside their name and one on their project's heading (click to make them, or the whole
   project, a favourite; point at a star to read what that does), **EDIT** (their name and look; both belong to the
   seat, so the next thread at that desk is the same person) and under it **Actions** (Run, or Open and Stop while it runs, Copy prompt, Folder,
-  Terminal, Browser, Hide, Remove from list), what they are doing now, **Earnings** (helpers and tokens today, since
+  Terminal, Browser, Publish guard…, Hide, Remove from list), what they are doing now, **Earnings** (helpers and tokens today, since
   the office opened and in all; click to fold it open), their last messages and steps, **Open** in the AI desktop app
   when it has a record of the thread, and their project's marks.
 
@@ -266,7 +268,18 @@ Each mark opens its window:
   (one line each, safe to paste into an AI), **Not a fault…** (sets one place aside with your reason; it comes back if
   that line changes; **Bring back** undoes it), **Review with AI…** (a prompt to paste into the AI you use, and the
   faults it reports) and **Import report-back…** (its Findings and False flags tables).
-- **Git** (read only: the office never commits, pushes or changes a folder): ● backed up, ▲ unsaved, not pushed or only
+- **Publish guard** (a project's **More › Publish guard…**, also in its Audit window, for a git repository): checks
+  the project with this audit before every `git push`, from any tool (Claude Code, GitHub Desktop, a terminal), and
+  **stops the push while the audit says "fix first"** (a Critical or High finding). Waiting to fix is better than
+  publishing a fault. It is the audit without the localhost and live-site parts (a push does not wait on the
+  network), and a finding you set aside as **Not a fault** no longer stops a push. **Ready to publish?** runs the same
+  check now. Turning it on writes one file, the project's `.git/hooks/pre-push` (git never uploads it); **Turn off**
+  removes it, and a pre-push hook of the project's own is never changed: the window gives the line to add to it
+  instead (the same when hooks live elsewhere, as with Husky's `core.hooksPath`). A stopped push names each fault and
+  its fix. To push anyway, knowing what it holds: `git push --no-verify`. If the office the guard was turned on from
+  is moved or removed, pushes stop and say how to take the guard off.
+- **Git** (read only: the office never commits, pushes or changes a folder; the publish guard's hook is the one file
+  it writes, and only when you turn it on): ● backed up, ▲ unsaved, not pushed or only
   on this PC, ○ no git; the exact commands to copy for a terminal, and **See what changed**: every changed line since
   the last save, to read before you commit.
 - **Live**: the address the project is hosted at, checked when the office starts and every 5, 10 or 15 minutes with one
@@ -371,7 +384,8 @@ the Prompts tab.
 
 ## Names and descriptions: `projects.json`
 
-The office **never writes into a project's folder**. Names, descriptions, live addresses, extra start commands and
+The office **never writes into a project's folder** (the one exception is the publish guard's `.git/hooks/pre-push`,
+written only when you turn the guard on for that project). Names, descriptions, live addresses, extra start commands and
 audit settings live in the office's own `projects.json`, keyed by folder name. Copy **`projects.example.json`** to
 `projects.json` (next to `server.js`) and edit that:
 
@@ -558,6 +572,9 @@ audit lists the record of every rule it shows that someone has judged.
   prompts, your private-details list (`private-details.json`; the window only ever gets its labels back) and the
   office's own records in `data\office` (seats, names, looks, the ledger that keeps a deleted thread's person, the
   shop). The `data` folder carries its own `.gitignore`, so it is never offered for a commit. Delete it to start fresh.
+- **Your projects' files are never changed**, with one exception you choose: turning on a project's publish guard
+  writes its `.git/hooks/pre-push` (git never uploads it), and Turn off removes it. A pre-push hook of the project's
+  own is never touched.
 - The start link (`ai-head-office://start`) passes nothing from the web page to the office; at most it starts it.
   `uninstall.cmd` (or Settings › About › Uninstall) takes it away.
 
@@ -601,6 +618,10 @@ audit lists the record of every rule it shows that someone has judged.
   zip, each verdict, what a skill does (scripts, hooks, services, keys), and the agent files in a project audit. Each
   rule's should-fire and must-stay-quiet pair is in the museum's bucket A (`test/museum/cases-6-agent-files.js`).
 - `node tools/skill-check.js [folder | zip]`: the same check from a terminal; with no folder, every installed skill.
+- `node test/gate.test.js`: the publish guard (`lib/gate.js`, `tools/gate.js`): on and off per project, a project's
+  own pre-push hook and `core.hooksPath` left alone (the line to add given), and real pushes to a bare repository
+  through the hook: let through when ready, stopped (remote unchanged, the fault named) with a key, stopped and
+  explained when the office it points at is gone; and the line to add by hand, run from a project's own hook.
 - `node test/scanfix.test.js`: what a site really carries: a test script left in the web root, a key behind
   thousands of pictures, a UTF-16 `.env`, a key in a long minified line, a file too big to read (named in a note),
   a `launch.json` with a BOM.
@@ -628,6 +649,7 @@ audit lists the record of every rule it shows that someone has judged.
 | `lib/update.js`, `lib/release.js`, `tools/sign-release.js` | Settings › About › Update (signed tags, the test start, Go back), the release key and signatures, signing a release |
 | `lib/audit*.js`, `lib/rules-more.js`, `lib/cross.js`, `lib/disclosure.js`, `lib/judged.js`, `lib/review.js` | The audit, its saved reports, Not a fault, Review with AI |
 | `lib/agents.js`, `lib/routes/skills.js`, `office/public/skills.js`, `tools/skill-check.js` | AI agent files: their checks in the audit, and Settings › Check a skill (also from a terminal) |
+| `lib/gate.js`, `tools/gate.js`, `office/public/gate.js` | The publish guard: the pre-push hook it writes, what the hook runs, and the project's More › Publish guard… window |
 | `lib/live*.js`, `lib/gitstate.js`, `lib/git-program.js` | Live checks, git marks and See what changed, the Git program's version |
 | `lib/tokens.js`, `lib/prompts.js`, `lib/sensors.js` | Codex token counts and the matcher both counts use, saved prompts, This PC |
 | `lib/todo.js` | The To Do: Today / This week / This month, sizes, carry-over, quick checks, the day's total (`data\todo.json`) |

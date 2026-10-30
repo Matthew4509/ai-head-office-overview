@@ -119,8 +119,10 @@
       el('p', { class: 'note', text: 'A simple built-in check: it catches common faults, not everything.' }), line],
     [btn('Run again', () => runAudit(p.id)),
       a.findings.length ? btn('Copy faults', () => copy(faultsText(p, a), 'Faults copied. Paste them into the AI you use.', line)) : null,
-      btn('Review with AI…', () => review(p, a)), btn('Import report-back…', () => importBack(p, a)), closeBtn()]);
+      btn('Review with AI…', () => review(p, a)), btn('Import report-back…', () => importBack(p, a)),
+      app.gateHasGit?.(proj(p.id) || p) ? btn('Publish guard…', () => app.gateWindow(p.id)) : null, closeBtn()]);
   }
+  app.showAudit = showAudit;
 
   function judge(p, a, f) {
     const why = el('textarea', { rows: '4', class: 'field-text', 'aria-label': 'Why it is not a fault' });
