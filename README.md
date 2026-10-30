@@ -311,6 +311,8 @@ as it is made.
   once and never shown again; a finding shows only its label. They are kept as plain text in the office's data folder
   (`data/private-details.json`): never sent and never published, but readable by anyone who can open that folder or a
   copy of it. **Delete all** removes the file.
+- **Check a skill**: checks a Claude Code skill, plugin or agent folder before you install it (see
+  [The built-in audit](#the-built-in-audit)).
 - **About**: the version, **Update**, the Git program's own security state, Quit and Uninstall (it removes the
   shortcuts, the start link and advanced setup's hooks, and leaves the folder for you to delete).
 - **Update** (in About): **Check for updates** asks GitHub for a newer version (nothing is asked until you press it),
@@ -439,6 +441,25 @@ audit lists the record of every rule it shows that someone has judged.
   needs; backups or logs written into the web folder with no deny rule for them; a Content-Security-Policy that
   blocks the site's own form or script; long-cached scripts and styles linked with no version; a test file that
   checks nothing.
+- **AI agent files (`lib/agents.js`):** the files Claude Code, Codex, Cursor and the like read as instructions or run
+  on their own: `CLAUDE.md`, `AGENTS.md`, every `SKILL.md` and the scripts beside it, commands, `.claude/settings.json`
+  (hooks and permissions) and `.mcp.json`. A fault here is an attack on you, the person using the agent: an
+  instruction hidden where the agent reads it and you do not (an HTML comment, an element styled out of sight,
+  invisible Unicode characters, direction-flipping characters), text telling the agent to ignore its other
+  instructions, keep something from you or send keys away, a hook or script that downloads a program and runs it or
+  runs encoded code, a script that reads your SSH keys or saved passwords, collects every environment variable,
+  posts to a drop box (a chat webhook, a paste site, a tunnel, a bare IP address) or sends your key to a service the
+  skill never names, one that sets itself up to run again later, permission checks switched off, any command allowed
+  without asking, an MCP server fetched at whatever version is newest, and every project MCP server switched on.
+  A worktree copy inside `.claude` is the project again, so it is not read twice. The same install line is a warning
+  in a guide (it names where the program comes from) and Critical in a hook or script, which runs it on its own.
+- **Settings › Check a skill** runs the same check on a skill, plugin or agent folder **before** you install it:
+  paste its `SKILL.md`, or choose its folder or its `.zip` / `.skill` file. It answers **Do not install**, **Read these
+  first** or **No known attack found**, and lists what the skill does: the scripts and hooks it runs, the services it
+  talks to and the keys it reads. A skill that runs code is never called safe, only "no known attack found": no scan
+  can prove code is safe. Nothing in it is run, and nothing is sent anywhere. From a terminal,
+  `node tools/skill-check.js <folder or zip>` does the same; with no folder it checks every skill you already have
+  (`~/.claude/skills`, `~/.claude/plugins` and `.claude/skills` in the folder you run it from).
 - The same fault in several release copies of a file is reported once, with the other copies listed.
 - **Localhost (only while the copy runs, only localhost addresses):** security headers, session cookie flags, folder
   listing, and whether files like `/.env`, `/.git`, editor FTP settings, `/error_log` or `/backup.zip` can be
@@ -574,7 +595,15 @@ audit lists the record of every rule it shows that someone has judged.
   every file it would ship and stops on any hit. Both take your private-details list and working folders from the main
   copy (also when run from a git worktree). With no list or no other project names to check against, the bake stops
   (`--incomplete` goes on and says so) and `disclose.js` warns and ends with exit code 2, never "Nothing found".
-- `node tools/benchmark.js`: the audit's benchmark over `test/museum/`, one small made-up project per kind of real fault.
+- `node tools/benchmark.js`: the audit's benchmark over `test/museum/`, one small made-up project per kind of real fault,
+  per bucket (R one-file rule, X across files, L live site, A AI agent files).
+- `node test/agents.test.js`: the AI agent files check (`lib/agents.js`): Check a skill on pasted text, a folder and a
+  zip, each verdict, what a skill does (scripts, hooks, services, keys), and the agent files in a project audit. Each
+  rule's should-fire and must-stay-quiet pair is in the museum's bucket A (`test/museum/cases-6-agent-files.js`).
+- `node tools/skill-check.js [folder | zip]`: the same check from a terminal; with no folder, every installed skill.
+- `node test/scanfix.test.js`: what a site really carries: a test script left in the web root, a key behind
+  thousands of pictures, a UTF-16 `.env`, a key in a long minified line, a file too big to read (named in a note),
+  a `launch.json` with a BOM.
 - **Releases are signed.** The first `node tools/bake.js` makes the release key (Ed25519): its private half goes
   outside the repository (`AHO_RELEASE_KEY`, or the private folder in your home folder; keep a copy), its public half
   into `lib/release.js`. Each bake signs the zip (`.zip.sig`) and, when everything is committed, writes the signed tag
@@ -598,6 +627,7 @@ audit lists the record of every rule it shows that someone has judged.
 | `lib/setup.js`, `tools/setup.js` | Setup and uninstall (start link, desktop shortcut, Start with Windows) |
 | `lib/update.js`, `lib/release.js`, `tools/sign-release.js` | Settings › About › Update (signed tags, the test start, Go back), the release key and signatures, signing a release |
 | `lib/audit*.js`, `lib/rules-more.js`, `lib/cross.js`, `lib/disclosure.js`, `lib/judged.js`, `lib/review.js` | The audit, its saved reports, Not a fault, Review with AI |
+| `lib/agents.js`, `lib/routes/skills.js`, `office/public/skills.js`, `tools/skill-check.js` | AI agent files: their checks in the audit, and Settings › Check a skill (also from a terminal) |
 | `lib/live*.js`, `lib/gitstate.js`, `lib/git-program.js` | Live checks, git marks and See what changed, the Git program's version |
 | `lib/tokens.js`, `lib/prompts.js`, `lib/sensors.js` | Codex token counts and the matcher both counts use, saved prompts, This PC |
 | `lib/todo.js` | The To Do: Today / This week / This month, sizes, carry-over, quick checks, the day's total (`data\todo.json`) |

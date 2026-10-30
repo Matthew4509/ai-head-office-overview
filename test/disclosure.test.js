@@ -169,6 +169,15 @@ async function main() {
   const acc = [{ id: 'x1', rule: 'DISC-001', file: 'email.txt', fp: fingerprint('Write to ' + EMAIL + ' today'), verdict: 'false', why: 'test', by: 'test' }];
   const A2 = await runAudit(path.join(tmp, 'plain'), null, { disclosure: ctx, judged: acc });
   check('a set-aside disclosure finding moves to setAside', () => assert(A2.setAside.some(f => f.where.startsWith('email.txt')) && !A2.findings.some(f => f.where.startsWith('email.txt'))));
+  // Judged from the audit window (with what the finding held), it comes back when another detail joins the file.
+  w('holds/notes.txt', 'Write to ' + EMAIL + ' today\n');
+  const H1 = await runAudit(path.join(tmp, 'holds'), null, { disclosure: ctx });
+  const hf = H1.findings.find(f => f.rule === 'DISC-001' && f.where.startsWith('notes.txt'));
+  const hj = hf ? [{ id: 'h1', rule: 'DISC-001', file: 'notes.txt', fp: hf.fp, holds: hf.holds, verdict: 'false', why: 'test', by: 'test' }] : [];
+  const H2 = await runAudit(path.join(tmp, 'holds'), null, { disclosure: ctx, judged: hj });
+  w('holds/notes.txt', 'Write to ' + EMAIL + ' today\nor ring ' + PHONE + '\n');
+  const H3 = await runAudit(path.join(tmp, 'holds'), null, { disclosure: ctx, judged: hj });
+  check('a set-aside private-detail finding comes back when another detail joins the file', () => assert(hf && hf.holds && H2.setAside.some(f => f.where.startsWith('notes.txt')) && H3.findings.some(f => f.rule === 'DISC-001' && f.where.startsWith('notes.txt'))));
   check('no planted value in the saved audit', () => noValues(A1));
 
   // ---- 7. The list the person fills in ----
@@ -388,6 +397,22 @@ async function main() {
   const ownGuide = f => f.rule === 'DISC-003' && /^(_releases\/ai-head-office-overview-[\d.]+\.zip > ai-head-office-overview\/ ?)?((AGENTS|CLAUDE)\.md|\(2 files, e\.g\. (AGENTS|CLAUDE)\.md\))$/.test(f.where);
   const selfFound = self.findings.filter(f => !pastFixture(f) && !ownGuide(f));
   check('the office\'s own folder scans clean', () => assert.strictEqual(selfFound.length, 0, selfFound.map(f => f.rule + '@' + f.where + ' ' + f.title).join('\n  ')));
+
+  // The scratch git folder of an office that was ended by force (no exit event) is swept by the next one, and the next
+  // one's own is gone when it ends. One of a process still running is left alone.
+  const { spawn } = require('child_process');
+  const deadKid = spawnSync(process.execPath, ['-e', '0']), aliveKid = spawn(process.execPath, ['-e', 'setTimeout(()=>{},30000)'], { stdio: 'ignore' });
+  const deadOne = path.join(os.tmpdir(), 'aho-disclosure-' + deadKid.pid + '-test01'), liveOne = path.join(os.tmpdir(), 'aho-disclosure-' + aliveKid.pid + '-test02');
+  for (const d of [deadOne, liveOne]) fs.mkdirSync(d, { recursive: true });
+  const plain = fs.mkdtempSync(path.join(tmp, 'no-git-'));
+  fs.writeFileSync(path.join(plain, 'a.txt'), 'hello');
+  const kid = spawnSync(process.execPath, ['-e', "require('./lib/disclosure').disclosurePass(process.argv[1], {}).then(() => console.log(require('fs').readdirSync(require('os').tmpdir()).filter(n => n.startsWith('aho-disclosure-' + process.pid + '-')).length))", plain], { cwd: HERE, encoding: 'utf8', timeout: 60000 });
+  check('a scratch git folder left by an office that was ended is swept; one still in use is not; its own goes at exit', () => {
+    assert.strictEqual(kid.stdout.trim(), '1', kid.stdout + kid.stderr);
+    assert(!fs.existsSync(deadOne) && fs.existsSync(liveOne), 'dead swept, live kept');
+    assert.strictEqual(fs.readdirSync(os.tmpdir()).filter(n => n.startsWith('aho-disclosure-' + kid.pid + '-')).length, 0, 'its own removed at exit');
+  });
+  aliveKid.kill(); fs.rmSync(liveOne, { recursive: true, force: true });
 
   // ---- the bake and tools/disclose.js: context from the MAIN copy, every working folder, never a blind "0 hits" ----
   // A copy of this app in a made-up projects folder, as a git repository with a second working copy (a worktree) inside

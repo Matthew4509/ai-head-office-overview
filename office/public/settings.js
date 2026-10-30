@@ -1,7 +1,7 @@
 // Settings: one window for everything that is not the office itself. Folders (working folders, projects added one by
 // one, the projects folder, projects taken off the list), Backups (drawn by backups.js), Setup (the start link,
 // desktop shortcut and Start with Windows; advanced setup, the AI app's hooks), Office (theme, gone-home time, live
-// checks, Thoughts chat, the planner), Private details, Help, and About (version, Update: a newer version from GitHub,
+// checks, Thoughts chat, the planner), Private details, Check a skill (drawn by skills.js), Help, and About (version, Update: a newer version from GitHub,
 // taken in one click; the Git program, Quit, Uninstall). Opened by Settings at the top. The welcome on the first start
 // is here too. Each tab shows its controls and one line; the longer explanations fold away under "More ▸" (more()).
 // A choice is saved as soon as it is made (no Save buttons), except lists typed out in full (private details).
@@ -11,7 +11,7 @@
   const app = window.aiOffice;
   const { el } = app;
   const sheet = document.getElementById('setup');
-  const SECTIONS = [['folders', 'Folders'], ['backups', 'Backups'], ['setup', 'Setup'], ['office', 'Office'], ['private', 'Private details'], ['help', 'Help'], ['about', 'About']];
+  const SECTIONS = [['folders', 'Folders'], ['backups', 'Backups'], ['setup', 'Setup'], ['office', 'Office'], ['private', 'Private details'], ['skill', 'Check a skill'], ['help', 'Help'], ['about', 'About']];
   let section = 'folders';
   const said = el('p', { class: 'note check-said', role: 'status', 'aria-live': 'polite' });
   const say = (t) => { said.textContent = t; };
@@ -235,7 +235,7 @@
         'Nothing drops off by itself: a row stays until you tick it. An unfinished Today row is still there tomorrow, marked with the day it came in. Ticked rows go to Done today, always in view; Show earlier lists the ones before for this week, this month, or hides them.',
         'My day… sets the hours in your day (8 to start); the top line adds up Today against it. A quick check (every week or month) comes into Today by itself when due, 1 a day (or 2), the longest overdue first.'),
       h3('Audit, Git and Live'),
-      li('Audit checks the code (and the running copy and live site, when there are) against about 130 rules: keys, injection, sign-in and payment gaps, uploads, exposed files, trackers, private details. It catches common faults, not everything. Not a fault… sets one place aside with your reason; Review with AI… builds a prompt to paste into the AI you use.',
+      li('Audit checks the code (and the running copy and live site, when there are) against about 130 rules: keys, injection, sign-in and payment gaps, uploads, exposed files, trackers, private details. It catches common faults, not everything. Not a fault… sets one place aside with your reason; Review with AI… builds a prompt to paste into the AI you use. The audit also reads the AI agent files (CLAUDE.md, AGENTS.md, skills, hooks, MCP servers); Settings › Check a skill checks a skill or plugin before you install it.',
         'Git: ● backed up, ▲ unsaved or not pushed or only on this PC, ○ no git. The window gives the exact commands to copy, and See what changed shows every changed line. The office only reads git: it never commits, pushes or changes a folder.',
         'Live: the address a project is hosted at, checked when the office starts and every 5, 10 or 15 minutes with one plain request: ● up, ▲ unsure, ✕ down.'),
       h3('Backups'),
@@ -374,7 +374,7 @@
     ];
   }
 
-  const DRAW = { folders: drawFolders, backups: () => app.drawBackupSettings(say, () => show('backups')), setup: drawSetup, office: drawOffice, private: drawPrivate, help: drawHelp, about: drawAbout };
+  const DRAW = { folders: drawFolders, backups: () => app.drawBackupSettings(say, () => show('backups')), setup: drawSetup, office: drawOffice, private: drawPrivate, skill: () => app.drawSkillCheck(say), help: drawHelp, about: drawAbout };
 
   // ---- The first start: Start with Windows and a desktop shortcut, offered ticked, asked once ----
   let welcomed = false;

@@ -80,6 +80,27 @@ test('a file is read a piece at a time: a half-written last line waits for the r
   }
 });
 
+test('a line over 16 MB with no newline is passed over: the read moves past it and the next reply still counts', () => {
+  const h = tempHome();
+  try {
+    const file = path.join(h.dir, 't.jsonl');
+    const two = lines('t').reply(1, 'Done?', 9).text();
+    const fd = fs.openSync(file, 'w');
+    const mb = Buffer.alloc(1 << 20, 0x61);
+    for (let i = 0; i < 20; i++) fs.writeSync(fd, mb);
+    fs.writeSync(fd, '\n' + two);
+    fs.closeSync(fd);
+    const t = emptyThread('t');
+    const t0 = Date.now();
+    const off = readFrom(file, t, 0);
+    assert.equal(off, fs.statSync(file).size);
+    assert.equal(t.out, 9);
+    assert.ok(Date.now() - t0 < 5000, (Date.now() - t0) + ' ms');
+  } finally {
+    h.done();
+  }
+});
+
 test('a snag for the quips: a step that ended in an error, or the AI saying it found a bug; a declined step is not one', () => {
   const t = emptyThread('a');
   const result = (at, is_error, text) => ({ type: 'user', timestamp: at, message: { content: [{ type: 'tool_result', is_error, content: text }] } });

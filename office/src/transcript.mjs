@@ -318,6 +318,9 @@ export function readFrom(file, t, offset = 0, also = null) {
     const CHUNK = 4 * 1024 * 1024;
     let pos = Math.min(offset, alsoFrom);
     let carry = Buffer.alloc(0);
+    // A line with no newline for 16 MB (a damaged or hostile file) is passed over to its end: kept, it grew with the
+    // file, was copied again every 4 MB, and the offset stayed at its start so every later read went over it again.
+    let skipping = false;
     while (pos < size) {
       const buf = Buffer.alloc(Math.min(CHUNK, size - pos));
       const n = fs.readSync(fd, buf, 0, buf.length, pos);
@@ -329,8 +332,9 @@ export function readFrom(file, t, offset = 0, also = null) {
       for (let i = 0; i < data.length; i++) {
         if (data[i] !== 10) continue;
         const at = base + start;
-        const line = data.toString('utf8', start, i).trim();
+        const line = skipping ? '' : data.toString('utf8', start, i).trim();
         start = i + 1;
+        skipping = false;
         if (!line) continue;
         const mine = at >= offset, theirs = at >= alsoFrom;
         if (!mine && !theirs) continue;
@@ -341,6 +345,7 @@ export function readFrom(file, t, offset = 0, also = null) {
         } catch { /* a damaged line is skipped */ }
       }
       carry = Buffer.from(data.subarray(start));
+      if (carry.length > 16 * 1024 * 1024) { carry = Buffer.alloc(0); skipping = true; }
     }
     return pos - carry.length;
   } finally {

@@ -273,6 +273,23 @@ async function main() {
   check('non-localhost address is never fetched', () => assert(X.findings.some(f => f.rule === 'LIVE-000')));
   leaky.close(); tidy.close();
 
+  // A place set aside as not a fault does not hide the same rule further down the same file.
+  const twice = path.join(tmp, 'twice');
+  fs.mkdirSync(twice, { recursive: true });
+  fs.writeFileSync(path.join(twice, 'a.php'), '<?php\necho $_GET["a"];\n// more\necho $_GET["b"];\n');
+  const W1 = await runAudit(twice, null);
+  const first = W1.findings.find(f => f.where === 'a.php:2');
+  const W2 = first ? await runAudit(twice, null, { judged: [{ id: 'j1', rule: first.rule, file: 'a.php', fp: first.fp, verdict: 'false', why: 'made-up', by: 'test' }] }) : null;
+  check('a set-aside place does not hide a later one of the same rule in the file', () => assert(first && W2.findings.some(f => f.rule === first.rule && f.where === 'a.php:4') && W2.setAside.some(f => f.where === 'a.php:2'), JSON.stringify(W2 && W2.findings.map(f => f.rule + '@' + f.where))));
+
+  // Odd but harmless lines: an unclosed template string with many ${...}, and one very long a.b.c... assignment.
+  const odd = path.join(tmp, 'odd-lines');
+  fs.mkdirSync(odd, { recursive: true });
+  fs.writeFileSync(path.join(odd, 'app.js'), 'el.innerHTML = `' + '${a}'.repeat(300) + '\nmsg = ' + 'a.'.repeat(100000) + 'b\nel.innerHTML = msg;\n');
+  const t0 = Date.now();
+  await runAudit(odd, null);
+  check('an audit of odd long lines finishes quickly', () => assert(Date.now() - t0 < 10000, (Date.now() - t0) + ' ms'));
+
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(failures ? failures + ' FAILED' : 'all passed');
   process.exit(failures ? 1 : 0);
