@@ -53,7 +53,10 @@
     app.openWindow(`Checking ${p.name}…`, [el('p', { class: 'note', text: 'The same check a push gets: the project\'s files, its AI agent files and what publishing would give away (no live site).' })], []);
     try {
       const d = await app.engine('/api/gate/check', { id });
-      app.showAudit(p, d.audit, d.ready ? 'Ready to publish: no Critical or High finding.' : 'Not ready to publish: fix the Critical and High findings first. With the publish guard on, a push is stopped until then.');
+      const a = d.audit, finds = (a.counts && (a.counts.Critical || a.counts.High)) > 0, cut = Array.isArray(a.cut) && a.cut.length > 0;
+      app.showAudit(p, a, d.ready
+        ? (a.partly ? 'Partly checked: no Critical or High finding in what was read, but not everything was read. A push would go on.' : 'Ready to publish: no Critical or High finding.')
+        : 'Not ready to publish: ' + (finds ? 'fix the Critical and High findings first' : 'a part of the check did not finish') + (finds && cut ? ', and a part of the check did not finish' : '') + '. With the publish guard on, a push is stopped until then.');
     } catch (e) { app.openWindow('The check did not finish', [el('p', { text: app.faultText(e) })], [btn('Close', app.closeWindow, true)]); }
   }
 

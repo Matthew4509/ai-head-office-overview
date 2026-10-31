@@ -39,7 +39,12 @@
     if (!a) return { mark: '○', text: 'No audit', cls: 'm-none' };
     const c = a.counts || {};
     if (c.Critical || c.High) return { mark: '▲', text: [c.Critical && `${c.Critical} Critical`, c.High && `${c.High} High`].filter(Boolean).join(', '), cls: 'm-bad' };
-    if (c.Medium) return { mark: '■', text: `${c.Medium} Medium`, cls: 'm-warn' };
+    // cut: a part stopped or crashed; partly: not everything was read. A saved audit from before that has neither, and shows as it did.
+    const cut = Array.isArray(a.cut) && a.cut.length > 0;
+    if (c.Medium) return { mark: '■', text: `${c.Medium} Medium${cut ? ', check did not finish' : a.partly ? ', partly checked' : ''}`, cls: 'm-warn' };
+    if (cut) return { mark: '◐', text: 'Check did not finish', cls: 'm-warn' };
+    if (a.partly && a.filesScanned === 0) return { mark: '◐', text: 'No code was read', cls: 'm-warn' };
+    if (a.partly) return { mark: '◐', text: 'Passed, partly checked', cls: 'm-warn' };
     return { mark: '✓', text: 'Passed', cls: 'm-ok' };
   }
   function gitLabel(g) {
@@ -98,7 +103,8 @@
 
   function showAudit(p, a, lead = '') {
     const c = a.counts || {};
-    const head = c.Critical || c.High ? 'Fix the Critical and High faults before this goes live.' : c.Medium ? 'No Critical or High faults. Medium ones are warnings.' : (c.Low || c.Info) ? 'Passed: only low-priority findings.' : 'Passed every rule that ran.';
+    const notRead = Array.isArray(a.notRead) ? a.notRead : [];
+    const head = c.Critical || c.High ? 'Fix the Critical and High faults before this goes live.' : Array.isArray(a.cut) && a.cut.length ? 'A part of the check did not finish, so nothing is known about what it did not read. This is not a pass: scan again.' : a.partly && a.filesScanned === 0 ? 'No file of a kind the check reads was found, so this is not a pass.' : a.partly ? 'No Critical or High faults in what was read, but not everything was read: ' + notRead.join('; ') + '.' : c.Medium ? 'No Critical or High faults. Medium ones are warnings.' : (c.Low || c.Info) ? 'Passed: only low-priority findings.' : 'Passed every rule that ran.';
     const line = said();
     const item = (f) => el('li', { class: 'finding' }, el('span', { class: `sev ${(SEV[f.sev] || SEV.Medium).cls}`, text: (SEV[f.sev] || SEV.Medium).mark }),
       el('div', { class: 'what' }, el('b', { text: `${f.title}` }), f.knownAs ? el('span', { class: 'note', text: ` · already known as ${f.knownAs}` }) : null,
@@ -109,7 +115,7 @@
     open(`Audit: ${p.name}`, [
       lead ? el('p', { text: lead }) : null,
       el('p', { class: 'note', text: `${head} ${a.rules} rules over ${a.filesScanned} files in ${a.seconds} s, ${when(a.ranAt)}.${a.url ? (a.liveReached ? ` Checked ${a.url} too.` : ` ${a.url} did not answer, so it was not checked.`) : ''}` }),
-      major.length ? el('ol', { class: 'findings' }, major.slice(0, 60).map(item)) : el('p', { class: 'm-ok', text: '✓ Nothing above Low.' }),
+      major.length ? el('ol', { class: 'findings' }, major.slice(0, 60).map(item)) : el('p', { class: a.partly ? 'm-warn' : 'm-ok', text: a.partly ? '◐ Nothing above Low in what was read.' : '✓ Nothing above Low.' }),
       major.length > 60 ? el('p', { class: 'note', text: `…and ${major.length - 60} more. Copy faults to see them all.` }) : null,
       low.length ? el('details', {}, el('summary', { text: `${plural(low.length, 'low-priority finding', 'low-priority findings')} (Low and Info)` }), el('ol', { class: 'findings' }, low.slice(0, 60).map(item))) : null,
       a.notes?.length ? el('details', {}, el('summary', { text: `${plural(a.notes.length, 'note', 'notes')} (checked, not counted)` }), el('ul', {}, a.notes.slice(0, 30).map((n) => el('li', { text: n })))) : null,
