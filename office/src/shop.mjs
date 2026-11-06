@@ -2,8 +2,8 @@
 // for the output tokens a day of AI coding work writes. The purse is every output token written since the
 // office opened, less what was spent. What is bought is kept in data/office.json, oldest first.
 
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJson, writeJson, isKept } from './files.mjs';
 
 export const SHOP = [
   { id: 'coffee', name: 'Coffee round', the: 'the coffee round', price: 200_000, keeps: false, most: 0, room: 'treats' },
@@ -55,12 +55,9 @@ function fileOf(office) { return path.join(office.dataDir, 'office.json'); }
 
 /** Purchases as kept, oldest first; unknown items dropped. */
 export function boughtOf(office) {
-  let raw = {};
-  try { raw = JSON.parse(fs.readFileSync(fileOf(office), 'utf8')); } catch (e) {
-    raw = {};
-    // There but unreadable: copied aside first, so the next purchase cannot wipe what was bought before.
-    if (e.code !== 'ENOENT') try { fs.copyFileSync(fileOf(office), fileOf(office).replace(/\.json$/, '') + '.damaged-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json'); } catch {}
-  }
+  // There but unreadable: copied aside first (or, when that fails, kept: see files.mjs), so a purchase cannot wipe
+  // what was bought before.
+  const raw = readJson(fileOf(office), {}) || {};
   const list = Array.isArray(raw.bought) ? raw.bought : [];
   return list.filter((b) => b && SHOP.some((i) => i.id === b.item)).map((b) => ({ item: b.item, price: Math.max(0, Math.round(Number(b.price) || 0)), at: String(b.at || '').slice(0, 40) }));
 }
@@ -149,10 +146,9 @@ export function buy(office, item, now = new Date()) {
   const earned = office.snapshot().earned;
   const left = purseOf(earned, bought).left;
   if (left < i.price) return no(`Not enough tokens yet for ${i.the}.`, `It costs ${n(i.price)} and the office has ${n(left)} to spend.`, 'Every token Claude writes from now on adds to it: come back after some work.');
+  // The purchases file could not be read and could not be kept safe: nothing is bought until it can be (AHO-16).
+  if (isKept(fileOf(office))) return no('The shop is closed for now.', 'The record of what was bought before could not be read, and a safe copy of it could not be made, so nothing is written over it.', 'Check the disk has room and nothing holds the office data files, then restart the office.');
   bought.push({ item: i.id, price: i.price, at: now.toISOString() });
-  fs.mkdirSync(office.dataDir, { recursive: true });
-  const tmp = `${fileOf(office)}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify({ bought }, null, 1));
-  fs.renameSync(tmp, fileOf(office));
+  writeJson(fileOf(office), { bought });
   return { ok: true, item: i.id, shop: shopOf(office, earned) };
 }

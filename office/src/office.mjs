@@ -10,6 +10,7 @@ import { newTally, tallyLine, monthOf } from './tokens.mjs';
 import { folderOf, stateOf, assignSeats, defaultName, projectOf, normPath } from './people.mjs';
 import { cleanLook } from './look.mjs';
 import { AppLinks } from './applinks.mjs';
+import { readJson, writeJson } from './files.mjs';
 
 /** How long a finished thread on the Needs attention list stays there. */
 const WAITING_DAYS = 7;
@@ -20,22 +21,9 @@ const CACHE_VERSION = 6;
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 export const safeKey = (k) => !UNSAFE_KEYS.has(String(k));
 
-/** A file of the office's own: not there = `fallback`; there but unreadable (cut short, edited by hand) = copied aside
- * first (<name>.damaged-<time>.json), so the next save cannot wipe what was in it (the ledger holds what was earned). */
-function readJson(file, fallback) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {
-    if (e.code !== 'ENOENT') try { fs.copyFileSync(file, `${file.replace(/\.json$/i, '')}.damaged-${new Date().toISOString().replace(/[:.]/g, '-')}.json`); } catch { /* nothing to keep */ }
-    return fallback;
-  }
-}
-
-/** Writes beside the file, then swaps it in, so a crash never leaves half a file. */
-function writeJson(file, data) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 1));
-  fs.renameSync(tmp, file);
-}
+// The office's own files: read and written by files.mjs (a damaged one is copied aside, or kept, never wiped unseen).
+// A file of the AI app's (a thread's custom-title.json) is only ever read: nothing is written in its folder.
+const readOnlyJson = (file, fallback) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; } };
 
 export class Office {
   /**
@@ -170,7 +158,7 @@ export class Office {
     rec.size = st.size;
     rec.mtime = st.mtimeMs;
     if (!parent && !rec.t.title) {
-      const ct = readJson(path.join(path.dirname(file), id, 'custom-title.json'), null);
+      const ct = readOnlyJson(path.join(path.dirname(file), id, 'custom-title.json'), null);
       if (ct?.customTitle) rec.t.title = String(ct.customTitle);
     }
     this.files[file] = rec;

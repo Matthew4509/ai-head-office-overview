@@ -41,9 +41,12 @@ const slashes = (p) => String(p).replace(/\\/g, '/').toLowerCase();
 /** Ours: this mark, or a hook that runs THIS office's hook.mjs (with a port and a --…-hook mark). Another app's hook
  * (its own hook.mjs, its own mark, such as AI Office Overview's) is never counted, changed or removed. */
 const OLDER = /^node "([^"]+)" \d+ --[a-z-]+-hook$/;
+// With the mark: only the whole command this office writes (any office folder, any port), not another hook that
+// happens to mention the mark (AHO-18).
+const OURS_ANY_FOLDER = new RegExp(`^node "[^"]+/hook\\.mjs" \\d+ --${MARK}$`, 'i');
 const isOurs = (h, own = OWN_HOOK) => {
   if (typeof h?.command !== 'string') return false;
-  if (h.command.includes(`--${MARK}`)) return true;
+  if (OURS_ANY_FOLDER.test(h.command.trim())) return true;
   const m = OLDER.exec(h.command);
   return !!m && slashes(m[1]) === slashes(own);
 };
@@ -135,10 +138,12 @@ export function onHook(office, b) {
 }
 
 /** The office's own settings: { root, quietMinutes, theme }. */
+// Every part is checked before any is kept: a request refused for one part changes nothing (AHO-19).
 export function settings(office, b) {
+  const next = { ...office.settings };
   if (b.theme !== undefined) {
     if (!THEMES.includes(b.theme)) return { error: { fault: 'That theme is not one the office has.', reason: `It knows ${THEMES.join(', ')}.`, wayOut: 'Pick Auto, Dark, Light or Match Windows in Settings › Office.' } };
-    office.settings.theme = b.theme;
+    next.theme = b.theme;
   }
   if (b.root !== undefined) {
     const root = String(b.root || '').trim();
@@ -146,15 +151,20 @@ export function settings(office, b) {
       let ok = false;
       try { ok = fs.statSync(root).isDirectory(); } catch { ok = false; }
       if (!ok) return { error: { fault: 'That projects folder was not found.', reason: `${root} is not a folder on this PC.`, wayOut: 'Paste the full path of the folder your project folders sit in.' } };
-      office.settings.root = root;
-    } else delete office.settings.root;
+      next.root = root;
+    } else delete next.root;
   }
   if (b.quietMinutes !== undefined) {
     const m = Math.round(Number(b.quietMinutes));
     if (!(m >= 5 && m <= 1440)) return { error: { fault: 'That gone-home time cannot be used.', reason: 'It must be between 5 minutes and 24 hours (1440 minutes).', wayOut: 'Type a number of minutes from 5 to 1440.' } };
-    office.settings.quietMinutes = m;
+    next.quietMinutes = m;
   }
-  office.saveSettings();
+  const before = office.settings;
+  office.settings = next;
+  try { office.saveSettings(); } catch (e) {
+    office.settings = before;
+    return { error: { fault: 'The office settings could not be saved.', reason: String(e?.message || e), wayOut: 'Check the office\'s data folder can be written to, then try again.' } };
+  }
   office.dirty = true;
   return { ok: true, status: status(office) };
 }

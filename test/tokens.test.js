@@ -49,6 +49,21 @@ check('a character split between two pieces is not broken', () => {
 });
 check('a missing file is no lines, not an error', () => assert.deepStrictEqual(lines(path.join(tmp, 'none.jsonl')), []));
 
+// AHO-10 (1 Nov): a Codex session's running total, across a month end: each month gets only what was used in it.
+check('a Codex session that crosses into a new month counts there only what was used there', () => {
+  const { scanCodex, makeMatcher } = require('../lib/tokens');
+  const proj = path.join(tmp, 'proj');
+  fs.mkdirSync(proj, { recursive: true });
+  const f = path.join(tmp, 'codex.jsonl');
+  const ev = (ts, total) => JSON.stringify({ timestamp: ts, payload: { type: 'token_count', info: { total_token_usage: { total_tokens: total } } } });
+  // midday UTC, so the month is the same in every time zone
+  fs.writeFileSync(f, [JSON.stringify({ timestamp: '2026-10-15T12:00:00Z', payload: { cwd: proj } }), ev('2026-10-15T12:00:00Z', 100), ev('2026-10-16T12:00:00Z', 100), ev('2026-11-15T12:00:00Z', 150)].join('\n') + '\n');
+  const per = scanCodex(f, makeMatcher([{ id: 'p', dir: proj }]));
+  assert.strictEqual(per.p, 150, 'the session total');
+  const m = per.__months__ || {};
+  assert.deepStrictEqual(Object.entries(m).filter(([k]) => k.startsWith('p|')).map(([k, v]) => [k.split('|')[1], v]).sort(), [['2026-10', 100], ['2026-11', 50]]);
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(failures ? failures + ' failed' : 'all passed');
 process.exit(failures ? 1 : 0);

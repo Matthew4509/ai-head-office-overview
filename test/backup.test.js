@@ -274,6 +274,16 @@ if (process.platform === 'win32') check('a file that cannot be read is listed, a
   } finally { spawnSync('icacls', [locked, '/remove:d', user]); }
 });
 
+check('1 Nov AHO-11: a file dated after 2107 (the last day a zip can hold) is zipped with that last day, not a crash', async () => {
+  const p = project('Omicron');
+  const w = await Backup.walk(p.dir);
+  const one = w.items.find(i => i.name.endsWith('README.md'));
+  one.mtimeMs = Date.UTC(2200, 0, 1);
+  const z = path.join(tmp, 'omicron.zip');
+  const made = await writeZip(z, w.items);
+  assert.ok((await checkZip(z, made.entries)).ok);
+});
+
 // ---- the engine, with a made-up drive list: the temp folder's drive has serial TEST0001 ----
 const letter = tmp[0].toUpperCase();
 let vols = [{ letter, serial: 'TEST0001', label: 'Test stick', type: 2, bus: 'USB', size: 64e9, free: 32e9 }];
@@ -400,6 +410,92 @@ check('engine: every backup is kept by default; keep-last-N deletes only its own
   assert.strictEqual(left.filter(n => /^Kappa-.*\.zip$/.test(n)).length, 2);
   assert.ok(left.includes('mine.zip'));
   assert.strictEqual(left.filter(n => n.endsWith('.txt')).length, 2);
+});
+
+// Backup faults found on 1 Nov: AHO-01, -02, -05 and -06.
+check('1 Nov AHO-01: a file made after the plan is in the zip (Start reads the folder again)', async () => {
+  const b = engine();
+  const p = project('Lambda');
+  const usb = path.join(tmp, 'usb-l');
+  assert.ok((await b.addDrive(usb, { projects: [p] })).ok);
+  await b.plan([p]);
+  mk(p.dir, 'made-after-plan.txt', 'new');
+  await b.start([p]); const j = await waitJob(b);
+  assert.strictEqual(j.items[0].state, 'done', JSON.stringify(j.items[0]));
+  const dir = path.join(usb, Backup.FOLDER_NAME, 'Lambda');
+  const zip = fs.readdirSync(dir).find(n => n.endsWith('.zip'));
+  assert.ok((await listZip(path.join(dir, zip))).some(e => e.name === 'Lambda/made-after-plan.txt'));
+});
+
+check('1 Nov AHO-02: two Starts at once: the second is refused, one zip is written', async () => {
+  const b = engine();
+  const p = project('Mu');
+  const usb = path.join(tmp, 'usb-m');
+  assert.ok((await b.addDrive(usb, { projects: [p] })).ok);
+  const [r1, r2] = await Promise.all([b.start([p]), b.start([p])]);
+  assert.strictEqual([r1, r2].filter(r => r.ok).length, 1, JSON.stringify([r1, r2]));
+  assert.match((r1.ok ? r2 : r1).fault, /already running/);
+  await waitJob(b);
+  assert.strictEqual(fs.readdirSync(path.join(usb, Backup.FOLDER_NAME, 'Mu')).filter(n => n.endsWith('.zip')).length, 1);
+});
+
+check('1 Nov AHO-05: a zip deleted from the drive no longer counts as the last backup', async () => {
+  let t = Date.now();
+  const b = engine({ now: () => t });
+  const p = project('Nu');
+  const usb = path.join(tmp, 'usb-n');
+  assert.ok((await b.addDrive(usb, { projects: [p] })).ok);
+  b.setListed([p.dir], true);
+  await b.start([p]); await waitJob(b);
+  assert.ok(b.rowOf(p).last);
+  const dir = path.join(usb, Backup.FOLDER_NAME, 'Nu');
+  for (const n of fs.readdirSync(dir)) if (n.endsWith('.zip')) fs.rmSync(path.join(dir, n));
+  t += 61000;
+  await b.checkPresent();
+  const row = b.rowOf(p);
+  assert.strictEqual(row.last, null, 'not shown as backed up');
+  assert.strictEqual(row.missing, 1);
+  assert.strictEqual(row.attention, 'missing');
+});
+
+check('1 Nov AHO-06: keep-last never deletes the last complete backup for one that left files out', async () => {
+  const b = engine();
+  const p = project('Xi');
+  const usb = path.join(tmp, 'usb-x');
+  assert.ok((await b.addDrive(usb, { projects: [p] })).ok);
+  assert.ok(b.setKeep(1).ok);
+  await b.start([p]); await waitJob(b);
+  const dir = path.join(usb, Backup.FOLDER_NAME, 'Xi');
+  const first = fs.readdirSync(dir).find(n => n.endsWith('.zip'));
+  // The next run cannot read one file (made unreadable): its zip is not complete.
+  const locked = mk(p.dir, 'locked.txt', 'x');
+  const user = process.env.USERNAME;
+  spawnSync('icacls', [locked, '/deny', user + ':(R)']);
+  try {
+    await new Promise(r => setTimeout(r, 1100));
+    await b.start([p]); const j = await waitJob(b);
+    assert.strictEqual(j.items[0].state, 'done');
+  } finally { spawnSync('icacls', [locked, '/remove:d', user]); }
+  const zips = fs.readdirSync(dir).filter(n => n.endsWith('.zip'));
+  assert.ok(zips.includes(first), 'the complete one is kept: ' + zips.join(', '));
+  assert.strictEqual(zips.length, 2);
+  // A complete one after it: now the older complete one may go.
+  await new Promise(r => setTimeout(r, 1100));
+  await b.start([p]); await waitJob(b);
+  assert.ok(!fs.readdirSync(dir).includes(first), 'the old complete one goes once a newer complete one is there');
+});
+
+check('1 Nov AHO-03: a junction that leads into a project is refused as a backup folder', async () => {
+  const b = engine();
+  const p = project('Pi');
+  const link = path.join(tmp, 'looks-like-a-drive');
+  fs.symlinkSync(p.dir, link, 'junction');
+  try {
+    const r = await b.addDrive(link, { projects: [p] });
+    assert.strictEqual(r.ok, false, JSON.stringify(r));
+    assert.match(r.fault, /inside Pi/);
+    assert(!fs.existsSync(path.join(p.dir, Backup.FOLDER_NAME)), 'nothing made in the project');
+  } finally { fs.rmSync(link, { force: true, recursive: false }); }
 });
 
 check('engine: a drive used before tells a new office what it holds; forgetting a drive leaves its files', async () => {

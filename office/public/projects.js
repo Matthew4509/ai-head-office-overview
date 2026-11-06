@@ -138,6 +138,7 @@
         t.local ? el('p', { class: 'm-bad', text: `▲ This program is inside ${t.name}'s own folder, so it runs instead of the usual one of that name. Run it only if you know why the project has it.` }) : null,
         fact('Arguments', t.args.length ? t.args.map(quote).join(' ') : '(none)'),
         t.script ? fact(`Script "${t.script.name}" (package.json)`, t.script.text) : null,
+        ...(t.hooks || []).map((s) => fact(`Also runs "${s.name}" (package.json, ${s.name.startsWith('pre') ? 'before' : 'after'} it)`, s.text)),
         fact('Folder', t.cwd), ...(t.others || []).map((o) => fact('Or, if its port is taken, in', o)),
         // Settings from the start file's "env": part of what runs, so each one is shown.
         ...(t.env || []).map(([k, v]) => fact('Setting (env)', `${k}=${v}`)),

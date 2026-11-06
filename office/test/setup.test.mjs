@@ -176,3 +176,25 @@ test('the theme is kept in the office settings: dark, light or system, and nothi
     h.done();
   }
 });
+
+test('1 Nov AHO-19: a settings request refused for one part changes nothing, in memory or on disk', () => {
+  const h = tempHome();
+  try {
+    const office = new Office({ dataDir: h.data, transcriptsDir: h.transcripts });
+    assert.equal(settings(office, { theme: 'light' }).ok, true);
+    const bad = settings(office, { theme: 'dark', quietMinutes: 1 });
+    assert.ok(bad.error);
+    assert.equal(office.settings.theme, 'light', 'the good half did not slip into memory');
+    office.saveSettings(); // a later save of anything else
+    assert.equal(JSON.parse(fs.readFileSync(path.join(h.data, 'settings.json'), 'utf8')).theme, 'light');
+  } finally {
+    h.done();
+  }
+});
+
+test('1 Nov AHO-18: only the office\'s own hook command counts as ours, not any hook that mentions its mark', () => {
+  const other = { type: 'command', command: 'echo documentation --ai-head-office-hook' };
+  const ours = { type: 'command', command: hookCommand('C:/somewhere else/office/hook.mjs', 8880) };
+  const data = { hooks: { Stop: [{ hooks: [other, ours] }] } };
+  assert.deepEqual(withoutOurs(data), { hooks: { Stop: [{ hooks: [other] }] } });
+});

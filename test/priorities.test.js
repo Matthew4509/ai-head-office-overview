@@ -247,5 +247,13 @@ check('the score window: marks 0-10, a deadline, Needs work, two categories at m
   assert.strictEqual(P.setEntry({ stage: 'handover', stageSince: '2026-10-01' }, { stage: 'handover' }, cats, TODAY).entry.stageSince, '2026-10-01', 'the same stage again keeps its start day');
 });
 
+// AHO-14 (1 Nov): working days across a clock change, run where the clocks change (Sydney: back on 5 Apr, on 4 Oct).
+check('working days count Monday after the clocks go back or forward (Sydney time)', () => {
+  const code = "const P = require(" + JSON.stringify(path.join(__dirname, '..', 'lib', 'priorities.js')) + ");" +
+    "console.log(JSON.stringify([P.dayNumber('2026-04-03', '2026-04-06', true), P.dayNumber('2026-04-05', '2026-04-06', true), P.dayNumber('2026-10-02', '2026-10-05', true), P.dayNumber('2026-04-03', '2026-04-06'), P.dayNumber('2026-10-03', '2026-10-05')]));";
+  const r = require('child_process').spawnSync(process.execPath, ['-e', code], { env: { ...process.env, TZ: 'Australia/Sydney' }, encoding: 'utf8' });
+  assert.deepStrictEqual(JSON.parse(r.stdout), [2, 1, 2, 4, 3], r.stderr);
+});
+
 console.log(failures ? failures + ' failed' : 'all passed');
 process.exit(failures ? 1 : 0);

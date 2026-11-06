@@ -191,5 +191,73 @@ check('the store: a fresh read writes nothing; changes are saved; a damaged file
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+// FULL-AHO-01: a refused change must change nothing, in memory or on disk, even when part of it was fine.
+check('a refused settings change changes nothing: not memory, not the next save', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-todo-atomic-'));
+  try {
+    const day = '2026-11-02';
+    const st = T.create({ dataDir: dir, today: () => day });
+    assert.strictEqual(st.view(names).settings.dayHours, 8, 'starts at an 8-hour day');
+    const r = st.setSettings({ dayHours: 4, checksPerDay: 99 });
+    assert.strictEqual(r.ok, false, 'the combined change is refused');
+    assert.strictEqual(st.view(names).settings.dayHours, 8, 'the good half did not slip into memory');
+    assert(st.add({ project: 'alpha-1a2b3c', name: 'Alpha', size: 60, zone: 'today' }).ok);
+    const disk = JSON.parse(fs.readFileSync(path.join(dir, 'todo.json'), 'utf8'));
+    assert.strictEqual(disk.settings.dayHours, 8, 'nor into the file at the next save');
+    assert.strictEqual(T.create({ dataDir: dir, today: () => day }).view(names).settings.dayHours, 8, 'nor after a restart');
+    // the same for a row: a bad size with a good note changes neither
+    const id = disk.items[0].id;
+    assert.strictEqual(st.set(id, { note: 'kept?', size: 7 }).ok, false);
+    assert.strictEqual(st.view(names).zones[0].items[0].note, '');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+check('a save that fails leaves memory as the file is', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-todo-savefail-'));
+  try {
+    const st = T.create({ dataDir: dir, today: () => '2026-11-02' });
+    assert(st.add({ project: 'alpha-1a2b3c', size: 60, zone: 'today' }).ok);
+    // A folder where the file goes: the save's swap-in cannot replace it, so the save fails.
+    fs.rmSync(path.join(dir, 'todo.json'));
+    fs.mkdirSync(path.join(dir, 'todo.json'));
+    let threw = false;
+    try { st.add({ project: 'beta-4d5e6f', size: 60, zone: 'today' }); } catch { threw = true; }
+    assert(threw, 'the failed save is not hidden');
+    assert.strictEqual(st.view(names).zones[0].items.length, 1, 'the row that was not saved is not shown as kept');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+// FULL-AHO-02: an impossible date (2026-02-31) is not a date.
+check('impossible dates are not dates; a damaged quick check is kept, due today, and the file copied aside', () => {
+  const s = T.normalize({ items: [{ id: 'aaaaaaaa', project: 'alpha-1a2b3c', name: 'A', size: 60, zone: 'today', added: '2026-02-31', today: '2026-02-30', doneAt: '2026-13-01' }],
+    checks: { 'beta-4d5e6f': { every: 'month', next: '2026-02-31', name: 'Beta' }, 'gamma-777777': { every: 'week', next: '2026-02-28', name: 'Gamma' } } });
+  assert.notStrictEqual(s.items[0].added, '2026-02-31');
+  assert.strictEqual(s.items[0].today, null);
+  assert.strictEqual(s.items[0].doneAt, null);
+  assert.strictEqual(s.checks['gamma-777777'].next, '2026-02-28', 'a real date stays');
+  assert(s.checks['beta-4d5e6f'], 'the damaged check is not lost');
+  assert.strictEqual(s.checks['beta-4d5e6f'].next, '2026-02-28', 'a day past the month end becomes its last day');
+  assert.strictEqual(s.repaired, 1);
+  for (const [bad, want] of [['2026-02-29', '2026-02-28'], ['2026-04-31', '2026-04-30'], ['2026-12-32', '2026-12-31'], ['2026-06-00', '2026-06-01'], ['2026-00-10', MON], ['2026-13-01', MON], ['0000-01-01', MON], ['2026-1-01', MON]]) {
+    const n = T.normalize({ checks: { x: { every: 'week', next: bad } } }, MON);
+    assert.strictEqual(n.repaired, 1, bad);
+    assert.strictEqual(n.checks.x.next, want, bad);
+  }
+  assert.strictEqual(T.normalize({ checks: { x: { every: 'week', next: '2028-02-29' } } }).checks.x.next, '2028-02-29', 'a leap day is real');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-todo-dates-'));
+  try {
+    const raw = JSON.stringify({ version: 1, items: [], checks: { 'beta-4d5e6f': { every: 'month', next: '2026-02-31', name: 'Beta' } } });
+    fs.writeFileSync(path.join(dir, 'todo.json'), raw);
+    const st = T.create({ dataDir: dir, today: () => '2026-03-05' });
+    const v = st.view(names);
+    assert.strictEqual(v.damaged, 1, 'the page is told');
+    assert(v.checks.some(c => c.project === 'beta-4d5e6f' && c.due), 'the check is due, not skipped');
+    const aside = fs.readdirSync(dir).filter(f => /^todo\.damaged-.*\.json$/.test(f));
+    assert.strictEqual(aside.length, 1, 'the file as it was is kept');
+    assert.strictEqual(fs.readFileSync(path.join(dir, aside[0]), 'utf8'), raw);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 console.log(failures ? failures + ' FAILED' : 'all passed');
 process.exit(failures ? 1 : 0);

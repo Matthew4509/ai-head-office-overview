@@ -243,6 +243,43 @@ const globalHooks = (() => { try { return git(tmp, 'config', '--global', '--get'
     });
   }
 
+  // 1 Nov audit AHO-08: a pre-push of the person's own that only mentions the mark is not the office's.
+  {
+    const m = repo('mentions');
+    const mine = '#!/bin/sh\n# see ' + gate.MARK + ' in the office docs\necho custom >&2\n';
+    fs.writeFileSync(hook(m), mine);
+    check('1 Nov AHO-08: a hook that only mentions the mark is not on, and Turn off leaves it', () => {
+      assert.strictEqual(gate.guardState(m).state, 'other');
+      assert.strictEqual(gate.turnOff(m).ok, false);
+      assert.strictEqual(fs.readFileSync(hook(m), 'utf8'), mine);
+    });
+    const o = repo('ours');
+    gate.turnOn(o);
+    check('the office\'s own hook is still on, and Turn off removes it', () => {
+      assert.strictEqual(gate.guardState(o).state, 'on');
+      assert(gate.turnOff(o).ok);
+      assert(!fs.existsSync(hook(o)));
+    });
+  }
+  // 1 Nov audit AHO-07: the line to add by hand keeps a folder named with $( ), backticks and quotes as it is, in sh.
+  {
+    const execPath = spawnSync('git', ['--exec-path'], { encoding: 'utf8' }).stdout.trim();
+    const shExe = [path.join(execPath, '..', '..', '..', 'bin', 'sh.exe'), path.join(execPath, '..', '..', '..', 'usr', 'bin', 'sh.exe')].find(f => fs.existsSync(f));
+    if (shExe) {
+      const odd = path.join(tmp, "odd $(echo HACKED) `echo x` it's");
+      fs.mkdirSync(odd, { recursive: true });
+      spawnSync('git', ['init', '-q', odd]);
+      const line = gate.guardState(odd).line || (() => { git(odd, 'config', 'core.hooksPath', '.husky'); return gate.guardState(odd).line; })();
+      const out = spawnSync(shExe, ['-c', 'printf "%s\\n" ' + line], { encoding: 'utf8' });
+      check('1 Nov AHO-07: the hand-added line keeps $( ), backticks and quotes in a folder name as they are', () => {
+        assert(line, 'a line is given');
+        const parts = out.stdout.trim().split(/\r?\n/);
+        assert.strictEqual(parts[2], odd.replace(/\\/g, '/'), out.stdout + out.stderr);
+        assert(!/HACKED$/.test(parts[2]) || parts[2].includes('$(echo HACKED)'));
+      });
+    } else console.log('skip AHO-07 (no sh.exe found beside git)');
+  }
+
   fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10 });
   console.log(failures ? failures + ' FAILED' : 'all passed');
   process.exit(failures ? 1 : 0);

@@ -203,7 +203,8 @@
       favs.length ? el('ul', { class: 'todo-list' }, ...favs.map((p) => favRow(p, open)))
         : el('p', { class: 'note todo-empty', text: pickList().favs.length ? 'Every favourite is on the To Do.' : 'No favourites yet: star a project (☆ beside its name) and it waits here.' }));
     const hint = el('p', { class: 'note', text: 'Drag a favourite (or a project\'s name from the Projects or Favourites tab) onto Today, This week or This month. Nothing drops off: a row stays until you tick it.' });
-    app.swap(pane, head, ...zones, favPart, doneToday, done, hint);
+    const damaged = data.damaged ? el('p', { class: 'note m-warn', role: 'status', text: `◐ ${data.damaged} row${data.damaged === 1 ? '' : 's'} or quick check${data.damaged === 1 ? '' : 's'} in the To Do file had a damaged shape or date: a check's date was mended (it comes up now), anything else left out. The file as it was is kept beside it in the data folder (todo.damaged-<time>.json).` }) : null;
+    app.swap(pane, damaged, head, ...zones, favPart, doneToday, done, hint);
   };
 
   // ---- dragging ----

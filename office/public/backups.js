@@ -53,6 +53,7 @@
     if (b.fault) return { mark: '✕', text: 'Backup failed', cls: 'm-bad' };
     if (b.last && b.changed) return { mark: '▲', text: `Changed since ${ago(b.last.at)}`, cls: 'm-warn' };
     if (b.last) return { mark: '●', text: `Backed up ${ago(b.last.at)}`, cls: 'm-ok' };
+    if (b.missing) return { mark: '✕', text: 'Backup zip gone', cls: 'm-bad' };
     if (b.listed) return { mark: '○', text: 'Never backed up', cls: 'm-none' };
     return null;
   }
@@ -224,7 +225,7 @@
       b.changed ? el('p', { class: 'm-warn', text: `▲ ${h.name} changed after its last backup (${ago(b.last.at)}).` }) : null,
       h.history.length ? el('ul', { class: 'open-list' }, h.history.map((x) => el('li', { class: 'open-row bk-row' },
         el('span', { class: 'open-what' }, el('b', { text: when(x.at) }), el('span', { class: 'note', text: `${x.driveName} · ${x.file}` })),
-        el('span', { class: x.checked ? 'm-ok' : 'm-warn', text: `${x.checked ? '✓ checked' : 'not checked'} · ${size(x.bytes)} · ${plural(x.files, 'file', 'files')}` }))))
+        el('span', { class: x.missing ? 'm-bad' : x.checked ? 'm-ok' : 'm-warn', text: `${x.missing ? '✕ zip no longer on the drive' : x.checked ? '✓ checked' : 'not checked'} · ${size(x.bytes)} · ${plural(x.files, 'file', 'files')}` }))))
         : el('p', { class: 'note', text: 'No backup yet.' }),
       el('label', { class: 'tick-row' }, el('input', { type: 'checkbox', checked: b.listed, onchange: async (e) => { await setListed([id], e.target.checked); } }),
         el('span', { text: `On the backup list (Run backups now takes ${h.name})` })),
@@ -295,8 +296,9 @@
       const a = p.backup?.attention;
       if (!a || p.hiddenView) continue;
       if (typeof folder === 'function' ? !folder(folderOf[p.id], p) : folder !== null && folder !== undefined && folderOf[p.id] !== folder) continue;
-      const sub = a === 'failed' ? `${p.backup.fault.fault} ${p.backup.fault.wayOut || ''}` : a === 'never' ? 'On the backup list, never backed up.' : `Changed since its last backup, ${ago(p.backup.last.at)}.`;
-      mine.push({ kind: 'backup', cls: a === 'failed' ? 'm-bad' : 'm-warn', title: `${a === 'failed' ? '✕' : '▲'} Backup · ${p.name}`, sub, open: () => history(p.id), rank: 3 });
+      const sub = a === 'failed' ? `${p.backup.fault.fault} ${p.backup.fault.wayOut || ''}` : a === 'never' ? 'On the backup list, never backed up.'
+        : a === 'missing' ? `Its backup zip${p.backup.missing === 1 ? ' is' : 's are'} no longer on the drive (deleted or moved), so there is no backup. Run backups now.` : `Changed since its last backup, ${ago(p.backup.last.at)}.`;
+      mine.push({ kind: 'backup', cls: a === 'failed' || a === 'missing' ? 'm-bad' : 'm-warn', title: `${a === 'failed' || a === 'missing' ? '✕' : '▲'} Backup · ${p.name}`, sub, open: () => history(p.id), rank: 3 });
     }
     return [...items, ...mine.sort((x, y) => x.title.localeCompare(y.title))];
   };
