@@ -276,6 +276,7 @@
         try { const r = await app.engine('/api/backup/full', { on: e.target.checked }); say(r.full ? 'Full backup is on: the rebuildable folders go in too, so backups are bigger and slower.' : 'Full backup is off: the rebuildable folders are left out again.'); again(); } catch (err) { say(faultText(err)); e.target.checked = !e.target.checked; }
       } }), el('span', {}, el('b', { text: 'Full backup' }), el('span', { class: 'note', text: ': take those too (bigger and slower, nothing to rebuild)' }))),
       note('To restore: right-click a zip › Extract All.'),
+      note('A zip is not encrypted: it holds everything in the project folder, keys and git history included, so keep the drive private. "Read back and checked" means the zip is whole, not private.'),
       more('What is left out, and where it goes',
         v.full ? null : note(`Left out unless Full backup is ticked: ${v.leaveOut}.`),
         note('A file that is locked or in use is listed in the .txt beside the zip; the rest still go in.'),

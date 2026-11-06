@@ -14,8 +14,8 @@ const dir = path.resolve(process.argv.slice(2).find(a => !a.startsWith('--')) ||
   try {
     gate = require('../lib/gate');
     process.stderr.write('Publish guard: checking ' + path.basename(dir) + ' with the AI Head Office Overview audit before the push…\n');
-    const { p, a, ready } = await gate.gateAudit(dir);
-    process.stderr.write(gate.report(p, a) + '\n');
+    const { p, a, ready, reviewOpen } = await gate.gateAudit(dir);
+    process.stderr.write(gate.report(p, a, reviewOpen) + '\n');
     process.exit(ready ? 0 : 1);
   } catch (e) {
     process.stderr.write('Publish guard: the check could not run (' + ((e && e.message) || e) + '), so the push was stopped.\n'

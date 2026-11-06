@@ -26,3 +26,5 @@ desktop.ini
 # AI tool settings (the preview's launch.json): they name the tool the office was built with, so they stay on this PC.
 .claude/
 mockups/
+# Local audit evidence (third-party audit probes and logs): they hold this PC's paths, so they stay on this PC.
+audit-20*/

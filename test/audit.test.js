@@ -208,6 +208,24 @@ async function honestVerdict() {
   w('ignored/live/huge.js', '// ' + rep('x', 900 * 1024) + '\n');
   const ig2 = await runAudit(igd, null);
   check('the same file where git would publish it is', () => assert(ig2.partly && ig2.notRead.includes('Code files over 800 KB: 1'), JSON.stringify(ig2.notRead)));
+  // F02: git ignoring a file lowers a leak (it stays on this PC) but not code that runs (injection, authorization)
+  w('igrt/.gitignore', 'local/\n');
+  w('igrt/index.html', '<!doctype html><title>Shop</title>\n');
+  w('igrt/local/api.js', 'const express = require("express");\nconst app = express();\napp.get("/u", (req, res) => { db.query("SELECT * FROM users WHERE id = " + req.query.id); res.end(); });\napp.post("/r", (req, res) => { account.role = req.body.role; res.end(); });\nconst K = "sk_live_' + 'q7Zr3Lm9Xc2Vb5Nk8Pw4Yt1H' + '";\n');
+  const igr = path.join(tmp, 'igrt');
+  gitIn(igr, 'init', '-q'); gitIn(igr, 'config', 'user.email', 't@example.org'); gitIn(igr, 'config', 'user.name', 'T'); gitIn(igr, 'config', 'commit.gpgsign', 'false');
+  gitIn(igr, 'add', '-A'); gitIn(igr, 'commit', '-qm', 'one');
+  const igRt = await runAudit(igr, null);
+  const inLocal = igRt.findings.filter(f => /local\/api\.js/.test(f.where));
+  check('F02: an ignored file still reports the fault in code that runs at its full severity', () => {
+    const run = inLocal.filter(f => f.area === 'injection' || f.area === 'authorization' || f.area === 'auth');
+    assert(run.length, JSON.stringify(inLocal.map(f => [f.rule, f.area, f.sev])));
+    assert(run.every(f => !f.ignored && !/git ignores/.test(f.title)), JSON.stringify(run.map(f => [f.rule, f.sev, f.ignored])));
+  });
+  check('F02: an ignored file still softens a leak (a key stays on this PC)', () => {
+    const leak = inLocal.filter(f => f.area === 'secrets');
+    assert(leak.length && leak.every(f => f.ignored && f.sev === 'Medium'), JSON.stringify(inLocal.map(f => [f.rule, f.area, f.sev])));
+  });
   // Left out on purpose: old copies, a folder a person asked to skip, pictures, fonts and minified code.
   w('kept/port-v1.5/index.html', '<p>old</p>'); w('kept/port-v1.6/index.html', '<p>new</p>');
   w('kept/port-v1.6/logo.png', 'x'); w('kept/port-v1.6/f.woff2', 'x'); w('kept/port-v1.6/app.min.js', 'x');
@@ -254,7 +272,10 @@ async function keysInWhatIsPublished() {
   check('a private key in a file with no extension is found', () => assert(K.findings.some(x => x.rule === 'SEC-001' && x.where === 'deploy/id_rsa:1'), K.findings.map(x => x.rule + '@' + x.where).join(', ')));
   check('so the verdict is fix-first, not passed', () => assert.strictEqual(K.verdict, 'fix-first'));
   const K0 = await runAudit(d, null, {});
-  check('with no disclosure context the code rules alone read as before', () => assert(!K0.findings.some(f => PLACES.some(p => f.where.startsWith(p))), K0.findings.map(x => x.where).join(', ')));
+  check('without disclosure context SQL is still scanned as code; other publication-only formats stay excluded', () => {
+    assert(K0.findings.some(f => f.rule === 'SEC-003' && f.where === 'db.sql:1'));
+    assert(!K0.findings.some(f => PLACES.filter(p => p !== 'db.sql').some(p => f.where.startsWith(p))), K0.findings.map(x => x.where).join(', '));
+  });
 
   // Read once: a file the code rules read is not reported again; a copy in a build folder is the same fault.
   const same = 'const k = "' + key() + '";\n';

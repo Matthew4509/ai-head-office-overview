@@ -12,6 +12,7 @@ const part = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const supabaseToken = role => [part({ alg: 'HS256', typ: 'JWT' }), part({ iss: 'supabase', ref: 'madeupproject', role, iat: 1700000000 }), 'madeUpSignatureNotARealOne_0123456789'].join('.');
 const SK_TEST = () => j('sk_', 'test_', 'Q3x9Lm2Vb7Tn4Rk8Wd5Hj6Zp');
 const PK_TEST = () => j('pk_', 'test_', 'Q3x9Lm2Vb7Tn4Rk8Wd5Hj6Zp');
+const FORM_KEY = () => j('6L', 'q7Xv2Lm9Rt4Kp8Ws3Hn6Jd1Gb5Cz0Fy', 'Q3x9Lm');
 const R = (id, rule, title, at, bad, good) => ({ id, bucket: 'R', phase: 'H1', faults: 1, examples: ['ai-built'], rule: '^' + rule + '$', title, at, bad, good });
 const X = (id, rule, title, at, bad, good) => ({ id, bucket: 'X', phase: 'H1', faults: 1, examples: ['ai-built'], rule: '^' + rule + '$', title, at, bad, good });
 const Q = (id, rule, title, files) => ({ id, quiet: true, phase: 'H1', examples: ['ai-built'], rule, title, files });
@@ -1519,5 +1520,25 @@ module.exports = { getProducts, deleteProduct };
   await prisma.message.create({ data: await req.json() });
   return Response.json({ ok: true });
 }
+` }),
+  X('ai-secret-as-fallback', 'SEC-018', 'A form secret reads a setting, with the real key written in as the fallback; the good copy has no fallback and stops when the setting is missing', 'lib/captcha.php', { 'lib/captcha.php': `<?php
+$s = getenv('CAPTCHA_SECRET');
+define('CAPTCHA_SECRET_KEY', $s !== false ? $s : '${FORM_KEY()}');
+` }, { 'lib/captcha.php': `<?php
+$s = getenv('CAPTCHA_SECRET');
+if ($s === false) { throw new RuntimeException('The form check has no key. Set CAPTCHA_SECRET on the server.'); }
+define('CAPTCHA_SECRET_KEY', $s);
+` }),
+  X('ai-secret-under-its-name', 'SEC-018', 'A secret is written in under a name the password rules do not read; the good copy reads a setting', 'server/captcha.js', { 'server/captcha.js': `const recaptchaSecret = '${FORM_KEY()}';
+module.exports = { recaptchaSecret };
+` }, { 'server/captcha.js': `const recaptchaSecret = process.env.RECAPTCHA_SECRET;
+module.exports = { recaptchaSecret };
+` }),
+  Q('ai-quiet-secret-look-alikes', '^SEC-018$', 'A site key, a setting name, a path, an empty fallback and a label picked by a ternary are not secrets', {
+    'server/settings.js': `const RECAPTCHA_SITE_KEY = '${FORM_KEY()}';
+const SECRET_HEADER = 'x-signature-sha256-v2-abcdef';
+const secretFile = process.env.SECRET_FILE || '/run/secrets/app1';
+const key = process.env.API_SECRET || '';
+const label = isSecret ? 'hiddenvalue1' : 'shownvalue2';
 ` }),
 ];

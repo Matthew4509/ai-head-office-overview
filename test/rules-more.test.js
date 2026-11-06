@@ -123,6 +123,12 @@ const PAIRS = [
   // Key-shaped text below is joined at run time: no line of this file looks like a real key.
   ['KEY-001', 'views/Admin.jsx', `const db = createClient(url, serviceRoleKey);\nexport const Admin = () => <p>{db.name}</p>;\n`, `const db = createClient(url, anonKey);\nexport const Admin = () => <p>{db.name}</p>;\n`],
   ['KEY-002', 'public/app.js', `const k = "${token('service_role')}";\n`, `const k = "${token('anon')}";\n`],
+  // F11: an example key on the same line must not hide a real one; only the matched key is judged
+  ['KEY-002', 'public/f11.js', `const k = "sb_secret_Ab3dE6gH9jK2mN5pQ8"; // e.g. sb_secret_example\n`, `const k = "sb_secret_example_0123456789";\n`],
+  ['KEY-002', 'public/f11b.js', `const a = "sb_secret_your_key_here_0123", k = "sb_secret_Ab3dE6gH9jK2mN5pQ8";\n`, `const a = "sb_secret_your_key_here_0123", b = "sb_secret_xxxxxxxxxxxxxxxxxx";\n`],
+  ['SEC-017', 'auth.js', `const t = jwt.sign(x, 'hard-written');\n`, `const t = jwt.sign(x, process.env.JWT_SECRET);\n`],
+  ['SEC-018', 'verify.php', `<?php\ndefine('RECAPTCHA_SECRET', getenv('RECAPTCHA_SECRET') ?: 'q7Xv2Lm9Rt4Kp8Ws3Hn6');\n`, `<?php\ndefine('RECAPTCHA_SECRET', getenv('RECAPTCHA_SECRET') ?: '');\n`],
+  ['SEC-019', 'config.php', `<?php\nreturn ['recaptcha_secret' => 'q7Xv2Lm9Rt4Kp8Ws3Hn6'];\n`, `<?php\nreturn ['recaptcha_secret' => getenv('RECAPTCHA_SECRET')];\n`],
   ['KEY-003', 'hooks/useStats.js', `const admin = require('firebase-admin');\nadmin.initializeApp({ credential: admin.credential.cert(key) });\n`, `import { initializeApp } from 'firebase/app';\ninitializeApp(webConfig);\n`],
   ['KEY-004', 'pages/index.js', `const key = require('../keys/acme-firebase-adminsdk-x1y2.json');\nexport default function Home() { return key.project_id; }\n`, `import site from '../site.json';\nexport default function Home() { return site.name; }\n`],
   ['KEY-005', 'static/key.json', `{"type": "service_account", "private_key": "${'made-up-not-a-key-'.repeat(4)}"}\n`, `{"type": "authorized_user", "note": "made up"}\n`],

@@ -54,9 +54,12 @@
     try {
       const d = await app.engine('/api/gate/check', { id });
       const a = d.audit, finds = (a.counts && (a.counts.Critical || a.counts.High)) > 0, cut = Array.isArray(a.cut) && a.cut.length > 0;
-      app.showAudit(p, a, d.ready
+      // Open Critical or High faults from Review with AI are unverified, so they do not stop a push: they are said here.
+      const open = Array.isArray(d.reviewOpen) ? d.reviewOpen.length : 0;
+      const ask = open ? ` Also ${open} open Critical or High fault${open === 1 ? '' : 's'} from Review with AI, not yet marked fixed or "not a fault": check ${open === 1 ? 'it' : 'them'} before you publish (Review with AI…).` : '';
+      app.showAudit(p, a, (d.ready
         ? (a.partly ? 'Partly checked: no Critical or High finding in what was read, but not everything was read. A push would go on.' : 'Ready to publish: no Critical or High finding.')
-        : 'Not ready to publish: ' + (finds ? 'fix the Critical and High findings first' : 'a part of the check did not finish') + (finds && cut ? ', and a part of the check did not finish' : '') + '. With the publish guard on, a push is stopped until then.');
+        : 'Not ready to publish: ' + (finds ? 'fix the Critical and High findings first' : 'a part of the check did not finish') + (finds && cut ? ', and a part of the check did not finish' : '') + '. With the publish guard on, a push is stopped until then.') + ask);
     } catch (e) { app.openWindow('The check did not finish', [el('p', { text: app.faultText(e) })], [btn('Close', app.closeWindow, true)]); }
   }
 

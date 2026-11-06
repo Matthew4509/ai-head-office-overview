@@ -150,6 +150,29 @@ const globalHooks = (() => { try { return git(tmp, 'config', '--global', '--get'
     check('it can be judged: the finding has a fingerprint', () => assert(j1 && j1.fp));
 
     // A project's own project.json cannot leave anything out of what a push is held to.
+    // F01 (N01, N02): the review fault list is read. An open High from Review with AI is a warning that asks; it does
+    // not block (imported faults are unverified), and a fixed or "not a fault" one is silent.
+    const rv = require('../lib/review'), cfgMod = require('../lib/config'), { keyOf: rvKey } = require('../lib/projects');
+    const f1 = repo('f1');
+    const rvRow = { where: 'index.html:1', evidence: 'role taken from the form', sev: 'High', category: 'auth', title: 'A visitor can make themselves admin', fix: 'Read the role from the session', ref: '' };
+    const quiet = await gate.gateAudit(f1);
+    check('F01: no review fault, quiet scan: ready, nothing to ask', () => assert(quiet.ready === true && !quiet.ask && !(quiet.reviewOpen || []).length, JSON.stringify(quiet.reviewOpen)));
+    rv.importFindings(cfgMod.DATA, rvKey(f1), [rvRow], 'test', 'test');
+    const asked = await gate.gateAudit(f1);
+    check('F01: an open High from Review with AI: still ready to push, but it asks', () => {
+      assert.strictEqual(asked.ready, true);
+      assert.strictEqual(asked.ask, true);
+      assert.strictEqual(asked.reviewOpen.length, 1);
+      const text = gate.report(asked.p, asked.a, asked.reviewOpen);
+      assert(/Review with AI/.test(text) && /admin/.test(text) && /open/i.test(text), text);
+    });
+    const faultId = rv.readFaults(cfgMod.DATA, rvKey(f1))[0].id;
+    rv.setStatus(cfgMod.DATA, rvKey(f1), faultId, 'false', 'test', 'checked by hand: not reachable');
+    const settled = await gate.gateAudit(f1);
+    check('F01: once set to "not a fault" it no longer asks', () => assert(!settled.ask && !settled.reviewOpen.length, JSON.stringify(settled.reviewOpen)));
+    rv.importFindings(cfgMod.DATA, rvKey(f1), [{ ...rvRow, where: 'index.html:2', evidence: 'a medium one', sev: 'Medium' }], 'test', 'test');
+    const med = await gate.gateAudit(f1);
+    check('F01: an open Medium from review does not ask (only Critical and High do)', () => assert(!med.ask, JSON.stringify(med.reviewOpen)));
     const liveKey = 'const k = "' + 'sk_' + 'live_' + 'Q3x9Lm2Vb7Tn4Rk8Wd5Hj6Zp' + '";\n';
     const h6 = repo('h6', { 'index.js': 'let a = 1;\n', 'src/pay.js': liveKey, 'project.json': JSON.stringify({ auditSkip: ['src'] }) });
     const realList = stateMod.refreshProjects;

@@ -108,6 +108,24 @@ check('the list is kept per project, in the data folder, not in the project', ()
   assert(fs.readdirSync(path.join(data, 'faults')).length === 1 && !fs.existsSync(path.join(proj, 'faults')));
 });
 
+// F13: a project whose code matches no group is still listed, not an empty "0 listed" prompt
+check('F13: a project with only server.js lists server.js under "Other code"', () => {
+  const lone = path.join(tmp, 'lone');
+  fs.mkdirSync(lone);
+  fs.writeFileSync(path.join(lone, 'server.js'), 'require("http").createServer().listen(3000);\n');
+  const pr = review.buildPrompt({ name: 'Lone', folder: 'lone', dir: lone, auditSkip: [] }, { findings: [] }, [], scan.redact);
+  assert(/Other code[^\n]*server\.js/.test(pr), pr);
+  const g = review.fileGroups(lone);
+  assert.strictEqual(g.total, 1);
+  assert.strictEqual(g.groups.reduce((n, x) => n + x.files.length, 0), 1);
+});
+check('F13: a file already in a group is not listed twice under "Other code"', () => {
+  const g = review.fileGroups(proj);
+  const other = g.groups.find(x => x.name === 'Other code');
+  const named = g.groups.filter(x => x !== other).flatMap(x => x.files);
+  assert(!other || !other.files.some(f => named.includes(f)), JSON.stringify(other));
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(failures ? failures + ' FAILED' : 'all passed');
 process.exit(failures ? 1 : 0);
