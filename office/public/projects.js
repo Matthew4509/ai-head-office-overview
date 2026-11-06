@@ -352,7 +352,7 @@
       : [el('p', { class: 'note', text: 'Nothing is open now. Run a project from its Actions menu (on a person\'s card) or from the Projects tab.' })];
     const keepFocus = sheet.contains(document.activeElement) ? document.activeElement.textContent : null;
     app.openWindow(`Projects open (${list.length})`, body, [
-      el('span', { class: 'note foot-note', text: 'This is projects hosted on your localhost, and does not impact any active thread in development.' }),
+      el('span', { class: 'note foot-note', text: 'These are copies of your projects running on this PC (localhost). Stopping one does not touch a thread at work.' }),
       list.length > 1 ? el('button', { type: 'button', class: 'btn', onclick: stopAll, title: 'Stop every local copy the office started' }, 'Stop all') : null,
       el('button', { type: 'button', class: 'btn primary', onclick: () => { openShown = false; app.closeWindow(); } }, 'Close')]);
     sheet.firstElementChild.dataset.kind = 'running';

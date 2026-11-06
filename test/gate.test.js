@@ -166,6 +166,12 @@ const globalHooks = (() => { try { return git(tmp, 'config', '--global', '--get'
       const text = gate.report(asked.p, asked.a, asked.reviewOpen);
       assert(/Review with AI/.test(text) && /admin/.test(text) && /open/i.test(text), text);
     });
+    // A fault imported from a report-back table has no title (Id | Severity | Category | Where | Evidence | Fix): the
+    // push says its evidence, not an empty line (found walking the office, 7 Nov).
+    check('an imported fault with no title is named by its evidence', () => {
+      const text = gate.report(asked.p, asked.a, [{ sev: 'High', where: 'serve.js:3', evidence: 'the notes list has no sign-in check', category: 'access' }]);
+      assert(/serve\.js:3: the notes list has no sign-in check/.test(text), text);
+    });
     const faultId = rv.readFaults(cfgMod.DATA, rvKey(f1))[0].id;
     rv.setStatus(cfgMod.DATA, rvKey(f1), faultId, 'false', 'test', 'checked by hand: not reachable');
     const settled = await gate.gateAudit(f1);
