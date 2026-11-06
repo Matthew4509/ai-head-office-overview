@@ -9,7 +9,32 @@ a tile: run its local copy, check its git and live site, audit it for common sec
 ![The office: every room unlocked and furnished, the staff at work, and Needs attention](screenshots/office.png)
 
 **[Install](#install-and-start)** · **[What you need](#what-you-need)** · **[Demo](#demo)** ·
-**[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
+**[What's new](#whats-new-in-0117)** · **[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
+
+## What's new in 0.1.17
+
+- **A stronger audit.** SQL files are scanned; new rules for request data written into
+  roles or user records, a decoded token taken as the user, row-level security switched off and `WITH CHECK (true)`
+  policies; Supabase service keys in git history; secrets written in as a fallback. A rule that can only guess from a
+  pattern says **a pattern guess: check this by hand**.
+- **Honest wording.** A clean audit says "No known faults in the checks that ran", and that a pass is not proof the
+  app is safe. An audit older than the project's last change says **changed since: scan again**. Live says one answered
+  request does not show that logins, data or alerts work. Backups say a zip is not encrypted.
+- **Publish guard:** an open Critical or High fault from Review with AI is named before a push (it does not stop the
+  push: it is unverified). A pre-push hook of your own that only mentions the guard is never removed, and the line to
+  add by hand keeps `$`, backticks and quotes in a folder name as they are.
+- **Run asks again** when any part of an npm script changes, or its pre or post script (`prestart`, `postdev`), and
+  shows them. Two projects moved to a clean port at once get two ports.
+- **Backups:** a file made after the plan goes in; a second Start while one starts is refused; a zip deleted from the
+  drive no longer counts as a backup (✕ Backup zip gone, in Needs attention too); Keep last N never deletes the newest
+  complete backup for newer ones that left files out; a folder that is really a junction into a project is refused.
+- **Your data is never wiped unseen.** A data file that cannot be read is copied aside first; if even that copy cannot
+  be made, the file is not written over at all (settings, prompts, To Do, the office ledger, the shop) and the window
+  says why. A change refused for one part (To Do settings, office settings) changes nothing.
+- **To Do:** an impossible date (31 February) is not a date; a damaged quick check is mended and comes up now.
+- **Smaller:** an edit deep in a project's folders counts as a change; working days count Monday after a clock change; a
+  Codex session that crosses into a new month counts there only what was used there; Check a skill finds "read the
+  key, then send it to an address" said the other way round.
 
 ## What you can do
 
@@ -184,7 +209,7 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
 - **Projects** tab: a tile per project, its staff as faces on the left. Its name has a star after it (click to make it a
   favourite project) and, on the same line, **Run** (starts the project's own dev server and opens it) or, while it
   runs, **Open** (opens it in the browser) beside the port. The first time a start command runs, or after it changes, Run asks first: a window shows the program,
-  its arguments, the folder and the file it comes from, because it runs with your Windows permissions (check it for a
+  its arguments, the whole package.json script with the pre and post scripts that run with it, the folder and the file it comes from, because it runs with your Windows permissions (check it for a
   project you downloaded). Its output goes to a log in the office's data folder, cut back past 5 MB. When another program holds its port, Run becomes **Use another port**: it starts the project on the
   next clean port (one no other project uses) instead of stopping that program, and keeps that port for next time while
   the old one stays taken, so moves stay rare; the start port is always tried first. Under them: its **Audit / Git /
@@ -264,10 +289,12 @@ alone: delete the office's folder afterwards to remove it completely (its `data`
 
 Each mark opens its window:
 
-- **Audit**: the last audit's findings by severity (◆ Critical, ▲ High, ■ Medium, ○ Low), **Run again**, **Copy faults**
+- **Audit**: the last audit's findings by severity (◆ Critical, ▲ High, ■ Medium, ○ Low; a pattern guess says so), **Run again**, **Copy faults**
   (one line each, safe to paste into an AI), **Not a fault…** (sets one place aside with your reason; it comes back if
   that line changes; **Bring back** undoes it), **Review with AI…** (a prompt to paste into the AI you use, and the
-  faults it reports) and **Import report-back…** (its Findings and False flags tables).
+  faults it reports) and **Import report-back…** (its Findings and False flags tables). A clean audit says "No known
+  faults in the checks that ran": a pass is not proof the app is safe. An audit older than the project's last change
+  says **changed since: scan again**.
 - **Publish guard** (a project's **More › Publish guard…**, also in its Audit window, for a git repository): checks
   the project with this audit before every `git push`, from any tool (Claude Code, GitHub Desktop, a terminal), and
   **stops the push while the audit says "fix first"** (a Critical or High finding). Waiting to fix is better than
@@ -276,14 +303,16 @@ Each mark opens its window:
   check now. Turning it on writes one file, the project's `.git/hooks/pre-push` (git never uploads it); **Turn off**
   removes it, and a pre-push hook of the project's own is never changed: the window gives the line to add to it
   instead (the same when hooks live elsewhere, as with Husky's `core.hooksPath`). A stopped push names each fault and
-  its fix. To push anyway, knowing what it holds: `git push --no-verify`. If the office the guard was turned on from
+  its fix, and names any open Critical or High fault from Review with AI (unverified, so it does not stop the push). To
+  push anyway, knowing what it holds: `git push --no-verify`. If the office the guard was turned on from
   is moved or removed, pushes stop and say how to take the guard off.
 - **Git** (read only: the office never commits, pushes or changes a folder; the publish guard's hook is the one file
   it writes, and only when you turn it on): ● backed up, ▲ unsaved, not pushed or only
   on this PC, ○ no git; the exact commands to copy for a terminal, and **See what changed**: every changed line since
   the last save, to read before you commit.
 - **Live**: the address the project is hosted at, checked when the office starts and every 5, 10 or 15 minutes with one
-  plain request: ● up, ▲ unsure, ✕ down.
+  plain request: ● up, ▲ unsure, ✕ down. Up means that one request was answered: it does not show that logins or data
+  work, or that alerts reach you.
 - **Backups**: tick **Backup** on a tile to put the project on the backup list. **Run backups now** (Projects tab, top
   line) lists every project on it with its size, the time it should take and the drive's free space, refuses before
   starting when it will not fit, then zips each one to your backup drive, one at a time, while the office keeps
@@ -291,7 +320,10 @@ Each mark opens its window:
   is a `.zip.partial`. Links and junctions are not followed: the run says how many, and the .txt beside the zip names
   them. On a FAT32 drive (how most USB sticks come) no file can reach 4 GB, so a project whose zip would is left out
   of the run and told why. The mark beside a tile's Backup tick (its words in its tooltip; click it for the backups):
-  ● backed up, ▲ changed since, ○ never, ✕ the last try failed (also in Needs attention). **Back up now…** is in a
+  ● backed up, ▲ changed since, ○ never, ✕ the last try failed or the zip is gone from the drive (also in Needs
+  attention). A zip is not encrypted: it holds everything in the project folder, keys and git history included, so keep
+  the drive private. With **Keep last N** on, the newest complete backup is never deleted for newer ones that left
+  files out. **Back up now…** is in a
   tile's More menu too.
 
 ![An audit](screenshots/audit.png)
