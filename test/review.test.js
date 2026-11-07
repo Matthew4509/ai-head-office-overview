@@ -152,6 +152,12 @@ check('0.1.18: a bare "#" line is not joined to a "Findings" line below it', () 
   assert.strictEqual(ok.rows.length, 1);
 });
 
+check('0.1.18: only open Critical or High review faults count (the tile and the guard use this)', () => {
+  const f = [{ status: 'open', sev: 'High' }, { status: 'open', sev: 'Critical' }, { status: 'open', sev: 'Medium' }, { status: 'fixed', sev: 'High' }, { status: 'false', sev: 'Critical' }];
+  assert.strictEqual(review.openSerious(f).length, 2);
+  assert.deepStrictEqual(review.openSerious(null), []);
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(failures ? failures + ' FAILED' : 'all passed');
 process.exit(failures ? 1 : 0);

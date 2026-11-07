@@ -37,12 +37,19 @@
   // ---- labels: a shape and a word for each state (never colour alone) ----
   // `updated` (ms) is when the project's files last changed: an audit older than that no longer covers what is there
   // now. It never turns a fault into a pass, only a pass into a doubt.
-  function auditLabel(a, updated) {
-    const l = auditLabelBase(a);
+  function auditLabel(a, updated, reviewOpen) {
+    const l = withReview(auditLabelBase(a), a, reviewOpen);
     if (!a) return l;
     const stale = Number(updated) > Date.parse(a.ranAt) + 60000;
     if (!stale) return l;
     return l.cls === 'm-ok' ? { ...l, mark: '◐', cls: 'm-warn', stale, text: `${l.text} · changed since: scan again` } : { ...l, stale, text: `${l.text} · changed since` };
+  }
+  // Open Critical/High faults from a review are not in the scanner's counts, but a tile must not read as a pass with them open.
+  function withReview(l, a, n) {
+    n = Number(n) || 0;
+    if (!n || l.cls === 'm-bad') return l;
+    const say = `${n} open from a review`;
+    return { mark: '▲', cls: 'm-warn', text: l.cls === 'm-ok' || !a ? say : `${l.text}, ${say}`, review: n };
   }
   function auditLabelBase(a) {
     if (!a) return { mark: '○', text: 'No audit', cls: 'm-none' };
@@ -76,11 +83,11 @@
   /** The three marks on a project tile (and a person's card): each opens its window. `after` (the tile's Backup and More) end the line. */
   app.checkMarks = (p, ...after) => {
     const mark = (l, label, what, title) => el('button', { type: 'button', class: `mark ${l.cls}`, title, 'aria-label': `${label}: ${l.text}`, onclick: () => what(p.id) }, el('span', { 'aria-hidden': 'true' }, l.mark), ` ${l.text}`);
-    const a = auditLabel(p.audit, p.updated), g = gitLabel(p.git), l = liveLabel(p);
+    const a = auditLabel(p.audit, p.updated, p.reviewOpen), g = gitLabel(p.git), l = liveLabel(p);
     // On a tile, "No git" sits in its More menu instead (projects.js moreMenu); a person's card, with no More, keeps it here.
     const gitInMore = p.git?.state === 'none' && after.some((x) => x?.classList?.contains('more'));
     return el('div', { class: 'row marks' },
-      mark(a, 'Audit', auditWindow, p.audit ? `Last audit ${when(p.audit.ranAt)}${a.stale ? '; files changed since, so it may not cover what is there now' : ''}` : 'No audit yet: open to run one'),
+      mark(a, 'Audit', auditWindow, a.review ? `${a.review} Critical or High ${a.review === 1 ? 'fault' : 'faults'} from a review ${a.review === 1 ? 'is' : 'are'} still open (open to see them)` : p.audit ? `Last audit ${when(p.audit.ranAt)}${a.stale ? '; files changed since, so it may not cover what is there now' : ''}` : 'No audit yet: open to run one'),
       gitInMore ? null : mark(g, 'Git', gitWindow, g.say),
       mark(l, 'Live site', liveWindow, p.liveUrl ? `${hostOf(p.liveUrl)}: ${p.live ? `${p.live.reason}\n${LIVE_MEANS}` : 'not checked yet'}` : 'Add the address this project is hosted at'), ...after);
   };
@@ -117,6 +124,11 @@
     const head = c.Critical || c.High ? 'Fix the Critical and High faults before this goes live.' : Array.isArray(a.cut) && a.cut.length ? 'A part of the check did not finish, so nothing is known about what it did not read. This is not a pass: scan again.' : a.partly && a.filesScanned === 0 ? 'No file of a kind the check reads was found, so this is not a pass.' : a.partly ? 'No Critical or High faults in what was read, but not everything was read: ' + notRead.join('; ') + '.' : c.Medium ? 'No Critical or High faults. Medium ones are warnings.' : (c.Low || c.Info) ? 'Passed: only low-priority findings.' : 'No known faults in the checks that ran.';
     const stale = auditLabel(a, p.updated).stale;
     const line = said();
+    const reviewNote = el('p', { class: 'm-warn' });
+    app.engine(`/api/faults?id=${encodeURIComponent(p.id)}`).then((d) => {
+      const n = (d.faults || []).filter((f) => f.status === 'open' && (f.sev === 'Critical' || f.sev === 'High')).length;
+      if (n) reviewNote.textContent = `▲ ${plural(n, 'Critical or High fault', 'Critical or High faults')} from a review ${n === 1 ? 'is' : 'are'} still open. The scanner's result above does not include ${n === 1 ? 'it' : 'them'}: this is not a pass. Open Review with AI to settle ${n === 1 ? 'it' : 'them'}.`;
+    }).catch(() => {});
     const item = (f) => el('li', { class: 'finding' }, el('span', { class: `sev ${(SEV[f.sev] || SEV.Medium).cls}`, text: (SEV[f.sev] || SEV.Medium).mark }),
       el('div', { class: 'what' }, el('b', { text: `${f.title}` }), f.knownAs ? el('span', { class: 'note', text: ` · already known as ${f.knownAs}` }) : null,
         f.confidence === 'review-required' ? el('span', { class: 'note', text: ' · a pattern guess: check this by hand' }) : null,
@@ -126,6 +138,7 @@
     const setAside = a.setAside || a.accepted || [];
     open(`Audit: ${p.name}`, [
       lead ? el('p', { text: lead }) : null,
+      reviewNote,
       stale ? el('p', { class: 'm-warn', text: '◐ The project\'s files changed after this audit, so it may not cover what is there now. Run again.' }) : null,
       el('p', { class: 'note', text: `${head} ${a.rules} rules over ${a.filesScanned} files in ${a.seconds} s, ${when(a.ranAt)}.${a.url ? (a.liveReached ? ` Checked ${a.url} too.` : ` ${a.url} did not answer, so it was not checked.`) : ''}` }),
       major.length ? el('ol', { class: 'findings' }, major.slice(0, 60).map(item)) : el('p', { class: a.partly ? 'm-warn' : 'm-ok', text: a.partly ? '◐ Nothing above Low in what was read.' : '✓ Nothing above Low.' }),
@@ -135,7 +148,8 @@
       setAside.length ? el('details', {}, el('summary', { text: `${setAside.length} set aside as not a fault (an edited line comes back)` }),
         el('ul', {}, setAside.map((f) => el('li', {}, `${f.rule} · ${f.where} — ${f.judged ? `${f.judged.why} (${f.judged.by || 'unnamed'})` : 'set aside in projects.json'} `,
           f.judged?.id ? btn('Bring back', () => unjudge(p, f.judged.id), false, { class: 'btn link' }) : null)))) : null,
-      el('p', { class: 'note', text: 'A simple built-in check: it catches common faults, not everything, and a pass is not proof the app is safe.' }), line],
+      el('p', { class: 'note', text: 'A simple built-in check: it catches common faults, not everything, and a pass is not proof the app is safe.' }),
+      app.gateHasGit?.(proj(p.id) || p) ? el('p', { class: 'note', text: 'The publish guard also checks the git history of this project (for example the email address on its saves), so it can stop a push that this check passes.' }) : null, line],
     [btn('Run again', () => runAudit(p.id)),
       a.findings.length ? btn('Copy faults', () => copy(faultsText(p, a), 'Faults copied. Paste them into the AI you use.', line)) : null,
       btn('Review with AI…', () => review(p, a)), btn('Import report-back…', () => importBack(p, a)),
@@ -192,7 +206,8 @@
         const d = await app.engine('/api/audit/import', { id: p.id, text: text.value, by: by.value, source: '' });
         const good = d.results.filter((x) => x.ok).length;
         const fr = d.findings || { added: 0, again: 0, refused: [] };
-        showAudit(p, d.audit || a, `Imported: ${good} of ${d.results.length} false flags judged; ${fr.added} new on the fault list${fr.again ? `, ${fr.again} already there` : ''}${fr.refused.length ? `; ${fr.refused.length} not imported` : ''}.`);
+        const why = fr.refused.slice(0, 3).map((r) => `${oneLine(r.id || 'a row')}: ${oneLine(r.error)}`).join('; ');
+        showAudit(p, d.audit || a, `Imported: ${d.results.length ? `${good} of ${d.results.length} false flags judged; ` : ''}${fr.added} new on the fault list${fr.again ? `, ${fr.again} already there` : ''}${fr.refused.length ? `; ${fr.refused.length} not imported (${why}${fr.refused.length > 3 ? '; …' : ''})` : ''}.`);
         app.loadProjects();
       } catch (e) { err.textContent = faultText(e); }
     }, true), btn('Back to the audit', () => (a ? showAudit(p, a) : close()))]);
