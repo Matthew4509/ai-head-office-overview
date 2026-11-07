@@ -125,8 +125,10 @@
     const stale = auditLabel(a, p.updated).stale;
     const line = said();
     const reviewNote = el('p', { class: 'm-warn' });
+    const none = el('p', { class: a.partly ? 'm-warn' : 'm-ok', text: a.partly ? '◐ Nothing above Low in what was read.' : '✓ Nothing above Low.' });
     app.engine(`/api/faults?id=${encodeURIComponent(p.id)}`).then((d) => {
       const n = (d.faults || []).filter((f) => f.status === 'open' && (f.sev === 'Critical' || f.sev === 'High')).length;
+      if (n) { none.className = 'm-warn'; none.textContent = '◐ The scanner found nothing above Low. That is not the whole picture.'; }
       if (n) reviewNote.textContent = `▲ ${plural(n, 'Critical or High fault', 'Critical or High faults')} from a review ${n === 1 ? 'is' : 'are'} still open. The scanner's result above does not include ${n === 1 ? 'it' : 'them'}: this is not a pass. Open Review with AI to settle ${n === 1 ? 'it' : 'them'}.`;
     }).catch(() => {});
     const item = (f) => el('li', { class: 'finding' }, el('span', { class: `sev ${(SEV[f.sev] || SEV.Medium).cls}`, text: (SEV[f.sev] || SEV.Medium).mark }),
@@ -141,7 +143,7 @@
       reviewNote,
       stale ? el('p', { class: 'm-warn', text: '◐ The project\'s files changed after this audit, so it may not cover what is there now. Run again.' }) : null,
       el('p', { class: 'note', text: `${head} ${a.rules} rules over ${a.filesScanned} files in ${a.seconds} s, ${when(a.ranAt)}.${a.url ? (a.liveReached ? ` Checked ${a.url} too.` : ` ${a.url} did not answer, so it was not checked.`) : ''}` }),
-      major.length ? el('ol', { class: 'findings' }, major.slice(0, 60).map(item)) : el('p', { class: a.partly ? 'm-warn' : 'm-ok', text: a.partly ? '◐ Nothing above Low in what was read.' : '✓ Nothing above Low.' }),
+      major.length ? el('ol', { class: 'findings' }, major.slice(0, 60).map(item)) : none,
       major.length > 60 ? el('p', { class: 'note', text: `…and ${major.length - 60} more. Copy faults to see them all.` }) : null,
       low.length ? el('details', {}, el('summary', { text: `${plural(low.length, 'low-priority finding', 'low-priority findings')} (Low and Info)` }), el('ol', { class: 'findings' }, low.slice(0, 60).map(item))) : null,
       a.notes?.length ? el('details', {}, el('summary', { text: `${plural(a.notes.length, 'note', 'notes')} (checked, not counted)` }), el('ul', {}, a.notes.slice(0, 30).map((n) => el('li', { text: n })))) : null,
