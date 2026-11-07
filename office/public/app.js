@@ -137,6 +137,67 @@
     return 'The office did not answer. Check that the AI Head Office Overview window is still open (or start it again), then try again.';
   };
 
+  /** The office's own confirm window, for anything that cannot be undone. The browser's confirm() answers "no" at once
+   * (and says nothing) when a browser blocks dialogs, so a button using it would silently do nothing. One window, above
+   * any other (Settings stays open under it): app.confirm({ title, text, yes, no, more }) answers true for the yes
+   * button and false for Cancel, Escape or a click beside it. Cancel has the focus (the safe answer is the default); the
+   * focus goes back to the button that asked. */
+  const ask = document.getElementById('ask');
+  let askDone = null;
+  app.confirm = (o) => new Promise((resolve) => {
+    if (askDone) askDone(false);
+    const back = document.activeElement && document.activeElement !== document.body ? document.activeElement : lastOutside;
+    const finish = (yes) => {
+      if (askDone !== finish) return;
+      askDone = null;
+      ask.hidden = true;
+      ask.replaceChildren();
+      resolve(yes);
+      giveBack(back);
+    };
+    askDone = finish;
+    const no = el('button', { type: 'button', class: 'btn primary', onclick: () => finish(false) }, o.no || 'Cancel');
+    const yes = el('button', { type: 'button', class: 'btn', onclick: () => finish(true) }, o.yes || 'OK');
+    ask.replaceChildren(el('div', { class: 'sheet-box confirm-box', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'ask-title', 'aria-describedby': 'ask-text' },
+      el('h2', { id: 'ask-title', text: o.title || 'Are you sure?' }), el('p', { id: 'ask-text', text: o.text || '' }), ...(o.more || []),
+      el('div', { class: 'row sheet-foot' }, no, yes)));
+    ask.hidden = false;
+    ask.onclick = (e) => { if (e.target === ask) finish(false); };
+    no.focus();
+  });
+  ask.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); askDone?.(false); return; }
+    if (e.key !== 'Tab') return;
+    const items = [...ask.querySelectorAll('button')];
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (!ask.contains(document.activeElement) || (e.shiftKey && document.activeElement === first)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
+  /** Tabs (role="tab"): the chosen one is the only one in the Tab order, the others are reached with the arrow keys
+   * (Left, Right, Home, End), which also choose the tab they land on. */
+  function roving(list) {
+    const all = [...list.querySelectorAll('[role="tab"]')];
+    const on = all.find((t) => t.getAttribute('aria-selected') === 'true' && !t.hidden) || all.find((t) => !t.hidden);
+    for (const t of all) t.tabIndex = t === on ? 0 : -1;
+  }
+  app.roving = roving;
+  for (const list of document.querySelectorAll('[role="tablist"]')) {
+    roving(list);
+    new MutationObserver(() => roving(list)).observe(list, { attributes: true, attributeFilter: ['aria-selected', 'hidden'], subtree: true, childList: true });
+  }
+  document.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t?.getAttribute?.('role') !== 'tab' || e.altKey || e.ctrlKey || e.metaKey) return;
+    const tabs = [...(t.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]') || [])].filter((x) => !x.hidden && !x.disabled);
+    const to = window.pageLogic.nextTab(e.key, tabs.indexOf(t), tabs.length);
+    if (to < 0 || !tabs[to]) return;
+    e.preventDefault();
+    tabs[to].focus();
+    tabs[to].click();
+  });
+
   // Every request carries the key this page was served with; the office's own API lives under /api/office/.
   const KEY = document.querySelector('meta[name="aho-key"]')?.content || '';
   async function api(url, body) {
@@ -650,14 +711,25 @@
     document.getElementById('loading-bar').value = l.total ? l.done / l.total : 0;
   }
 
+  // An answer that comes after a newer ask was sent is not drawn (a slow old one must not put back what a newer one changed);
+  // the timer does not ask again while an ask is still waiting, so a slow office is not piled up with them.
+  const asks = window.pageLogic.sequence();
+  let asking = 0;
   async function refresh() {
+    const mine = asks.begin();
+    let d;
+    asking++;
+    try { d = await api('/api/state'); } catch (e) { if (asks.isLatest(mine)) showFault(e); return; } finally { asking--; }
+    if (!asks.isLatest(mine)) return;
+    app.data = d;
+    // Drawing is apart from asking: a fault in the drawing is not "the office is not answering".
     try {
-      app.data = await api('/api/state');
-      drawLoading(app.data.loading);
-      showFault(app.data.scanError ? { error: { fault: 'Some transcripts could not be read.', reason: app.data.scanError, wayOut: 'The office keeps trying every few seconds.' } } : null);
+      drawLoading(d.loading);
+      showFault(d.scanError ? { error: { fault: 'Some transcripts could not be read.', reason: d.scanError, wayOut: 'The office keeps trying every few seconds.' } } : null);
       draw();
     } catch (e) {
-      showFault(e);
+      console.error('[draw]', e);
+      showFault({ error: { fault: 'The page could not draw what the office sent.', reason: String((e && e.message) || e), wayOut: 'Reload the page (F5). If it keeps happening, restart the office.' } });
     }
   }
   app.refresh = refresh;
@@ -703,6 +775,7 @@
   setView(['list', 'favs', 'prompts', 'planner'].includes(saved) ? saved : 'office');
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (askDone) { askDone(false); return; } // the confirm window is above the rest: Escape answers it first
     for (const id of ['setup', 'edit', 'check']) {
       const sheet = document.getElementById(id);
       // Escape on the Welcome is an answer too ("Not now"), so it is not asked again at every start.
@@ -724,6 +797,24 @@
     const b = e.target.closest?.('button, a[href], summary, [tabindex]');
     if (b && !b.closest('.sheet')) lastOutside = b;
   }, true);
+  /** Puts the focus back on `was` (the button that opened a window). A tile drawn again meanwhile has a new button in the
+   * old one's place, found by what it does and for whom; one greyed for a moment (Starting…) is waited for, up to two
+   * seconds; a button of a More or Actions menu that closed when it was pressed is not on screen, so the menu's own button
+   * (More, Actions) gets the focus. It never takes the focus into the page from under another window that is open. */
+  function giveBack(was, tries = 10) {
+    if (!was) return;
+    const sel = was.dataset?.act ? `[data-act="${CSS.escape(was.dataset.act)}"][data-id="${CSS.escape(was.dataset.id || '')}"]` : '';
+    const menu = was.closest?.('details.more');
+    const menuSel = !menu ? '' : menu.classList.contains('card-actions') ? 'details.card-actions > summary' : menu.dataset.id ? `details.more[data-id="${CSS.escape(menu.dataset.id)}"] > summary` : '';
+    // A closed menu's items still have a box (content-visibility), so checkVisibility is asked too.
+    const seen = (n) => !!n && n.isConnected && n.offsetParent !== null && (!n.checkVisibility || n.checkVisibility());
+    const to = [was, sel && document.querySelector(sel), menuSel && document.querySelector(menuSel)].find(seen);
+    if (to && !to.disabled) {
+      const open = [...document.querySelectorAll('.sheet:not([hidden]) .sheet-box')];
+      if (!open.length || open.some((s) => s.contains(to))) to.focus();
+    } else if (tries > 0 && (to || sel || was.isConnected)) setTimeout(() => giveBack(was, tries - 1), 200);
+  }
+  app.giveBack = giveBack;
   // Into a window that just opened: a box marked autofocus, else its first text field, else its main button, else the
   // window itself (read out by its title). Nothing moves when the focus is already inside it.
   function focusInto(sheet) {
@@ -753,16 +844,7 @@
       if (!open && wasOpen) {
         const was = back;
         back = null;
-        // A tile drawn again meanwhile has a new button in the old one's place, found by what it does and for whom; one
-        // greyed for a moment (Starting…) is waited for, up to two seconds.
-        const sel = was?.dataset?.act ? `[data-act="${CSS.escape(was.dataset.act)}"][data-id="${CSS.escape(was.dataset.id || '')}"]` : '';
-        const giveBack = (tries) => {
-          if (document.querySelector('.sheet:not([hidden]) .sheet-box')) return;
-          const to = was?.isConnected ? was : sel ? document.querySelector(sel) : null;
-          if (to?.isConnected && !to.disabled) to.focus();
-          else if (tries > 0 && (to || sel)) setTimeout(() => giveBack(tries - 1), 200);
-        };
-        giveBack(10);
+        giveBack(was);
       }
       wasOpen = open;
     }).observe(sheet, { attributes: true, attributeFilter: ['hidden'], childList: true });
@@ -778,5 +860,5 @@
   }
 
   refresh();
-  setInterval(refresh, 3000);
+  setInterval(() => { if (!asking) refresh(); }, 3000);
 })();

@@ -255,7 +255,7 @@
       el('div', { class: 'row set-acts' },
         d.here ? btn('Open', async () => { try { const r = await app.engine('/api/backup/drive/open', { drive: d.id }); if (r.dryRun) say(`Test copy, not opened: ${r.dryRun}`); } catch (e) { say(faultText(e)); } }) : null,
         btn('Forget', async () => {
-          if (!confirm(`Forget ${d.name}? The office stops using it. Its backups stay on the drive, and adding it again brings them back.`)) return;
+          if (!(await app.confirm({ title: `Forget ${d.name}?`, yes: 'Forget it', text: `The office stops using it. Its backups stay on the drive, and adding it again brings them back.` }))) return;
           try { await app.engine('/api/backup/drive/forget', { drive: d.id }); say(`${d.name} is forgotten. Its backups were not touched.`); await app.loadProjects(); again(); } catch (e) { say(faultText(e)); }
         })));
     return [

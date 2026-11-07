@@ -146,7 +146,7 @@
     return `${plural(Math.round(s / 86400), 'day', 'days')} ago`;
   }
   async function replan() {
-    if (!confirm('Pick today\'s last-hour pair again, by the longest wait as it is now? Today\'s check-in answers start again. (The focus three always follow the scores.)')) return;
+    if (!(await app.confirm({ title: 'Plan again?', yes: 'Plan again', text: 'Pick today\'s last-hour pair again, by the longest wait as it is now? Today\'s check-in answers start again. (The focus three always follow the scores.)' }))) return;
     try { await send('/api/priorities/replan', {}, 'Today is planned again.'); app.showFault(null); } catch (e) { app.showFault(e); }
   }
 
@@ -335,7 +335,7 @@
       c.id === 'unsorted' ? el('span', { class: 'note', text: 'Always here' }) : el('span', { class: 'row' },
         el('button', { type: 'button', class: 'btn small', onclick: () => categoryWindow(c) }, 'Edit…'),
         el('button', { type: 'button', class: 'btn small', onclick: async () => {
-          if (!confirm(`Delete the category ${c.name}? ${c.count ? `Its ${plural(c.count, 'project goes', 'projects go')} back to Not sorted (or lose it as their second one). ` : ''}No project or file is deleted.`)) return;
+          if (!(await app.confirm({ title: `Delete the category ${c.name}?`, yes: 'Delete category', text: `${c.count ? `Its ${plural(c.count, 'project goes', 'projects go')} back to Not sorted (or lose it as their second one). ` : ''}No project or file is deleted.` }))) return;
           try { await send('/api/priorities/category/remove', { id: c.id }, `${c.name} is deleted.`); categoriesWindow(); } catch (e) { said.textContent = faultText(e); }
         } }, 'Delete')));
     app.openWindow('Project categories', [

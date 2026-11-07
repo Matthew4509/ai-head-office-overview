@@ -30,13 +30,18 @@
   setInterval(() => { if (Date.now() - at > 60000 || dayNow() !== loadedDay) load(); }, 15000);
   app.todoOpen = () => data?.open || 0;
 
-  async function call(url, body, said) {
+  /** One request to the To Do. True when it went through. A fault goes in `line` (a window's own status line) when given, and
+   * the window stays open, so what was typed is not lost; else it is shown in the page's fault box. */
+  async function call(url, body, said, line) {
+    let ok = false;
     try {
       const r = await app.engine(url, body);
       if (said) app.say(typeof said === 'function' ? said(r) : said);
       app.showFault(null);
-    } catch (e) { app.showFault(e); }
+      ok = true;
+    } catch (e) { if (line) line.textContent = app.faultText(e); else app.showFault(e); }
     await load();
+    return ok;
   }
   const zoneName = (z) => ({ today: 'Today', week: 'This week', month: 'This month' }[z] || z);
   const btn = (label, onclick, cls = 'btn small', extra = {}) => el('button', { type: 'button', class: cls, onclick, ...extra }, label);
@@ -76,14 +81,17 @@
     const note = el('input', { type: 'text', class: 'field-text', maxlength: '120', placeholder: 'What to do (optional), e.g. fix the header', 'aria-label': 'Note', autocomplete: 'off' });
     const every = everySelect(checkOf(chosen));
     pick.onchange = () => { every.value = checkOf(pick.value); };
+    const err = el('p', { class: 'note check-said', role: 'alert' });
     const go = async () => {
       if (!pick.value) return;
       const name = projectName(pick.value);
-      app.closeWindow();
       const was = checkOf(pick.value);
-      await call('/api/todo/add', { project: pick.value, zone: where.value, size: Number(size.value), note: note.value, ...(every.value !== 'off' ? { every: every.value } : {}) },
-        `${name} is on the To Do: ${zoneName(where.value)}.`);
-      if (every.value === 'off' && was !== 'off') await call('/api/todo/check', { project: pick.value, every: 'off' });
+      const project = pick.value;
+      const ok = await call('/api/todo/add', { project, zone: where.value, size: Number(size.value), note: note.value, ...(every.value !== 'off' ? { every: every.value } : {}) },
+        `${name} is on the To Do: ${zoneName(where.value)}.`, err);
+      if (!ok) return;
+      app.closeWindow();
+      if (every.value === 'off' && was !== 'off') await call('/api/todo/check', { project, every: 'off' });
       app.showTab?.('todo');
     };
     note.onkeydown = (e) => { if (e.key === 'Enter') go(); };
@@ -91,6 +99,7 @@
       field('Project', pick), el('div', { class: 'row todo-fields' }, field('Where', where), field('Size', size)), field('Note', note),
       field('Quick check', every),
       el('p', { class: 'note', text: 'A quick check comes into Today by itself when it is due (15 min), so a project is never forgotten. It stays until you tick it.' }),
+      err,
     ], [btn('Cancel', () => app.closeWindow(), 'btn'), btn('Add', go, 'btn primary')], false);
     (project ? where : pick).focus();
   }
@@ -98,9 +107,10 @@
 
   function noteWindow(it) {
     const note = el('input', { type: 'text', class: 'field-text', maxlength: '120', value: it.note, 'aria-label': 'Note', autocomplete: 'off' });
-    const save = () => { app.closeWindow(); call('/api/todo/set', { item: it.id, note: note.value }); };
+    const err = el('p', { class: 'note check-said', role: 'alert' });
+    const save = async () => { if (await call('/api/todo/set', { item: it.id, note: note.value }, null, err)) app.closeWindow(); };
     note.onkeydown = (e) => { if (e.key === 'Enter') save(); };
-    app.openWindow(`Note for ${it.name}`, [field('Note (one line, up to 120 characters)', note)], [btn('Cancel', () => app.closeWindow(), 'btn'), btn('Save', save, 'btn primary')], false);
+    app.openWindow(`Note for ${it.name}`, [field('Note (one line, up to 120 characters)', note), err], [btn('Cancel', () => app.closeWindow(), 'btn'), btn('Save', save, 'btn primary')], false);
     note.focus();
   }
 

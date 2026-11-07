@@ -14,6 +14,8 @@
   const hostOf = (u) => { try { return new URL(u).host; } catch { return String(u || ''); } };
   const oneLine = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
   const faultText = (e) => app.faultText(e);
+  // Kept in this browser; with storage blocked it is just empty, and the windows still open.
+  const judgedBy = () => { try { return localStorage.getItem('aho-judged-by') || ''; } catch { return ''; } };
 
   // ---- the window ----
   function open(title, body, buttons, wide = true) {
@@ -161,7 +163,7 @@
 
   function judge(p, a, f) {
     const why = el('textarea', { rows: '4', class: 'field-text', 'aria-label': 'Why it is not a fault' });
-    const by = el('input', { type: 'text', class: 'field-text', maxlength: '60', placeholder: 'you', 'aria-label': 'Checked by', value: localStorage.getItem('aho-judged-by') || '' });
+    const by = el('input', { type: 'text', class: 'field-text', maxlength: '60', placeholder: 'you', 'aria-label': 'Checked by', value: judgedBy() });
     const err = said();
     open(`Not a fault: ${f.rule}`, [el('p', { text: f.title }), el('p', { class: 'note', text: `${f.where}. Only this place is set aside, and only while its line stays the same.` }),
       el('label', { class: 'note', text: 'Why it is not a fault' }), why, el('label', { class: 'note', text: 'Checked by' }), by, err],
@@ -187,7 +189,7 @@
     const row = (f) => el('li', { class: 'finding' }, el('span', { class: `sev ${f.status === 'open' ? (SEV[f.sev] || SEV.Medium).cls : 'm-ok'}`, text: f.status === 'open' ? (SEV[f.sev] || SEV.Medium).mark : STATE[f.status] }),
       el('div', { class: 'what' }, el('b', { text: f.evidence }), el('span', { class: 'where', text: `${f.where} · ${f.ref || f.id} · ${f.fix}` }),
         el('span', {}, ...['open', 'fixed'].filter((s) => s !== f.status).map((s) => btn(s === 'open' ? 'Open again' : 'Mark fixed', async () => {
-          try { await app.engine('/api/faults/set', { id: p.id, fault: f.id, status: s, why: '', by: localStorage.getItem('aho-judged-by') || '' }); review(p, a); } catch (e) { line.textContent = faultText(e); }
+          try { await app.engine('/api/faults/set', { id: p.id, fault: f.id, status: s, why: '', by: judgedBy() }); review(p, a); } catch (e) { line.textContent = faultText(e); }
         }, false, { class: 'btn link' })))));
     open(`Review with AI: ${p.name}`, [
       el('p', { class: 'note', text: 'Rules find patterns; a reviewer finds judgement faults (money, access, promises, data). Copy this prompt into the AI you use, then paste its answer with Import report-back…. Nothing is sent from here.' }),
@@ -198,12 +200,18 @@
 
   function importBack(p, a) {
     const text = el('textarea', { rows: '10', class: 'field-text', 'aria-label': 'Report-back' });
-    const by = el('input', { type: 'text', class: 'field-text', maxlength: '60', placeholder: 'you', 'aria-label': 'Checked by', value: localStorage.getItem('aho-judged-by') || '' });
+    const by = el('input', { type: 'text', class: 'field-text', maxlength: '60', placeholder: 'you', 'aria-label': 'Checked by', value: judgedBy() });
     const err = said();
     open('Import a report-back', [el('p', { class: 'note', text: 'Paste what an AI or a project thread wrote back. Its "Findings" table (Id | Severity | Category | Where | Evidence | Fix) goes on the fault list; its "False flags" table (Rule | Where | Verdict | Why | What the rule should do) sets scanner findings aside one place at a time.' }),
       text, el('label', { class: 'note', text: 'Checked by' }), by, err],
     [btn('Import', async () => {
       if (!text.value.trim()) { err.textContent = 'Paste the report-back first.'; return text.focus(); }
+      // A report-back that calls many findings "not a fault" is asked about once: each one set aside stops counting in the audit
+      // and in the publish guard, and an AI that was itself misled can call a real fault false.
+      const judged = window.pageLogic.judgeRows(text.value);
+      if (judged > window.pageLogic.JUDGE_CONFIRM_ABOVE && !(await app.confirm({ title: `Set aside up to ${judged} findings?`, yes: `Set aside up to ${judged}`,
+        text: `This report-back calls ${judged} places "not a fault" (false flags or duplicates). A finding set aside stops counting in the audit and in the publish guard, so a wrong one hides a real fault. Only places that match the last audit are set aside, and each is kept with its reason and the name in Checked by.`,
+        more: [el('p', { class: 'note', text: 'To undo: open the audit, unfold "set aside as not a fault" and press Bring back beside each one. Read the list in the report-back first if you did not write it.' })] }))) return;
       try {
         const d = await app.engine('/api/audit/import', { id: p.id, text: text.value, by: by.value, source: '' });
         const good = d.results.filter((x) => x.ok).length;

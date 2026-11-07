@@ -680,3 +680,5 @@ details.more[open] > .more-menu { position: fixed; left: var(--more-left, auto);
 .help-sec { border-bottom: 1px solid var(--line); margin: 0; padding: 6px 0; }
 .help-sec > summary { font-weight: 600; color: var(--ink); font-size: 14px; }
 .help-sec ul { margin: 6px 0 4px; padding-left: 20px; }
+.confirm-box { width: min(480px, calc(100vw - 32px)); }
+.confirm-box .trust-code { display: block; margin: 4px 0 0; overflow-wrap: anywhere; }

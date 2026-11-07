@@ -36,6 +36,7 @@
       el('div', { class: 'row sheet-foot' }, btn('Close', close, true)));
     sheet.replaceChildren(box);
     sheet.hidden = false;
+    app.roving(tabs);
     if (onTab) tabs.querySelector('[aria-selected="true"]')?.focus();
     try { body.replaceChildren(...[await DRAW[section]()].flat().filter(Boolean)); } catch (e) { body.replaceChildren(el('p', { text: fault(e) })); }
   }
@@ -61,7 +62,7 @@
       el('p', { class: 'note', text: 'Every folder inside a working folder is a project.' }),
       ...f.workingFolders.map((w) => row(w.path, w.exists ? plural(w.projects, 'project', 'projects') : 'Not found: the folder was moved or deleted',
         btn('Open', async () => { try { const r = await app.engine('/api/folders/open', { path: w.path }); if (r.dryRun) say(`Test copy, not opened: ${r.dryRun}`); } catch (e) { say(fault(e)); } }),
-        btn('Remove', async () => { if (!confirm(`Take ${w.path} off the working folders? Its projects leave the list; the folder and its files are not touched.`)) return; try { await app.engine('/api/folders/remove', { path: w.path }); after('Working folder removed. Its files were not touched.'); } catch (e) { say(fault(e)); } }))),
+        btn('Remove', async () => { if (!(await app.confirm({ title: 'Take this folder off the working folders?', yes: 'Take it off', text: `Take ${w.path} off the working folders? Its projects leave the list; the folder and its files are not touched.` }))) return; try { await app.engine('/api/folders/remove', { path: w.path }); after('Working folder removed. Its files were not touched.'); } catch (e) { say(fault(e)); } }))),
       await folderPicker('working', 'Add working folder', async (p) => { const r = await app.engine('/api/folders/add', { path: p }); after(`Added ${r.path}: ${plural(r.projects, 'project', 'projects')} found.`); }),
       el('div', { class: 'row' }, btn('Scan folders', async () => {
         try { const r = await app.engine('/api/scan', {}); after(`Scan finished: ${plural(r.total, 'project', 'projects')}.${r.added.length ? ` New: ${r.added.join(', ')}.` : ''}${r.gone.length ? ` Gone: ${r.gone.join(', ')}.` : ''}${!r.added.length && !r.gone.length ? ' Nothing new since the last scan.' : ''}`); } catch (e) { say(fault(e)); }
@@ -140,11 +141,53 @@
     ];
   }
 
+  /** Check all now: asks for the round, waits until the office says it is done (up to 5 minutes; sites on one address are
+   * asked 10 seconds apart), then says how the sites stand. Never left at "Checking…". */
+  async function checkAllNow(e) {
+    const b = e.currentTarget;
+    b.disabled = true;
+    const here = () => !sheet.hidden && section === 'office';
+    try {
+      await app.engine('/api/live/check-all', {});
+      say('Checking the live sites, one at a time…');
+      let finished = false;
+      for (let i = 0; i < 150 && !finished; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const s = await app.engine('/api/stats');
+        finished = !s.liveBusy;
+      }
+      await app.loadProjects();
+      const sites = app.engineData.projects.filter((p) => p.liveUrl);
+      const n = (state) => sites.filter((p) => p.live?.state === state).length;
+      const parts = [[n('up'), 'up'], [n('unsure'), 'unsure'], [n('down'), 'down']].filter(([k]) => k).map(([k, w]) => `${k} ${w}`);
+      if (here()) say(finished ? `Checked ${plural(sites.length, 'live site', 'live sites')}${parts.length ? `: ${parts.join(', ')}` : ''}.` : 'The checks are still going. Each site\'s Live mark changes as it answers.');
+    } catch (err) { if (here()) say(fault(err)); } finally { b.disabled = false; }
+  }
+
   // ---- Office: theme, gone-home time, live checks, Thoughts chat, the planner. Each saved as soon as it changes. ----
   async function drawOffice() {
     const st = app.data?.setup || {};
     const quietIn = el('input', { type: 'number', class: 'field-text short', min: '5', max: '1440', value: String(st.quietMinutes || 60), 'aria-label': 'Gone-home time in minutes' });
-    quietIn.addEventListener('change', async () => { try { await app.api('/api/settings', { quietMinutes: quietIn.value }); await app.refresh(); say(`Staff go home after ${quietIn.value} minutes with nothing happening.`); } catch (e) { say(fault(e)); } });
+    // A number the office would refuse is refused here, in words beside the box; the saved time stays as it was.
+    let savedQuiet = st.quietMinutes || 60;
+    const quietSaid = el('span', { class: 'note m-bad', role: 'alert' });
+    quietIn.addEventListener('input', () => { quietSaid.textContent = ''; quietIn.removeAttribute('aria-invalid'); });
+    quietIn.addEventListener('change', async () => {
+      const q = window.pageLogic.quietMinutes(quietIn.value);
+      if (!q.ok) {
+        quietSaid.textContent = `${q.message} Nothing was changed: it is still ${savedQuiet} minutes.`;
+        quietIn.setAttribute('aria-invalid', 'true');
+        quietIn.value = String(savedQuiet);
+        return say('');
+      }
+      try {
+        await app.api('/api/settings', { quietMinutes: q.value });
+        savedQuiet = q.value;
+        quietIn.value = String(q.value);
+        await app.refresh();
+        say(`Staff go home after ${q.value} minutes with nothing happening.`);
+      } catch (e) { quietIn.value = String(savedQuiet); say(fault(e)); }
+    });
     const every = el('select', { class: 'field-text short', 'aria-label': 'Check the live sites every' }, [5, 10, 15].map((m) => el('option', { value: String(m), selected: (app.engineData.stats?.liveEvery || 15) === m }, `${m} minutes`)));
     every.addEventListener('change', async () => { try { const r = await app.engine('/api/live/every', { minutes: Number(every.value) }); say(`Live sites are checked every ${r.every} minutes.`); } catch (e) { say(fault(e)); } });
     // The theme the page was served in is the one in use (the office's choice, or its default).
@@ -172,9 +215,9 @@
       el('div', { class: 'row', role: 'group', 'aria-label': 'Theme' }, ...THEMES.map(themeBtn)),
       note(`Auto: light by day, dark at night. ${sun.theme.today()}`),
       el('h3', { text: 'The office' }),
-      field('Staff go home after', quietIn, el('span', { text: 'minutes with nothing happening' })),
+      field('Staff go home after', quietIn, el('span', { text: 'minutes with nothing happening' }), quietSaid),
       field('Thoughts chat', chat),
-      field('Live sites: check every', every, btn('Check all now', async () => { try { await app.engine('/api/live/check-all', {}); say('Checking the live sites, one at a time…'); } catch (e) { say(fault(e)); } })),
+      field('Live sites: check every', every, btn('Check all now', checkAllNow)),
       // The project planner is off until ticked: its tab, its check-ins in Needs attention and Filter by › Category.
       el('label', { class: 'row set-line', title: 'Shown, it also adds today\'s check-ins to Needs attention and Category to Filter by. Kept in this browser.' },
         el('input', { type: 'checkbox', checked: !!app.plannerOn?.(), onchange: (e) => { app.setPlannerOn?.(e.target.checked); say(e.target.checked ? 'The Project planner tab is shown, beside Prompts.' : 'The Project planner is hidden. Its scores and categories are kept.'); } }),
@@ -201,7 +244,7 @@
         const details = [...list.querySelectorAll('.pd-row')].map((r) => ({ id: r.dataset.id || undefined, label: r.querySelector('.pd-label').value, value: r.querySelector('.pd-value').value })).filter((d) => d.id || d.label.trim() || d.value.trim());
         try { const r = await app.engine('/api/private-details', { details }); say(r.details.length ? `Saved ${plural(r.details.length, 'private detail', 'private details')}. The next audit of each project looks for them.` : 'No private details saved; the audit still looks for this PC\'s own.'); show('private'); } catch (e) { say(fault(e)); }
       }, true), s.stored ? btn('Delete all', async () => {
-        if (!confirm(`Delete every private detail you saved? The file ${s.file} is removed. Audits then look only for this PC's own details and your project names, until you add them again.`)) return;
+        if (!(await app.confirm({ title: 'Delete all private details?', yes: 'Delete them all', text: `Delete every private detail you saved? The file ${s.file} is removed. Audits then look only for this PC's own details and your project names, until you add them again.` }))) return;
         try { await app.engine('/api/private-details/delete', {}); say('Every saved private detail is deleted: the file is gone.'); show('private'); } catch (e) { say(fault(e)); }
       }) : null),
       el('div', { class: 'row pd-auto' }, el('span', { class: 'note', text: 'Also looked for, by itself:' }),
@@ -235,7 +278,7 @@
         'Nothing drops off by itself: a row stays until you tick it. An unfinished Today row is still there tomorrow, marked with the day it came in. Ticked rows go to Done today, always in view; Show earlier lists the ones before for this week, this month, or hides them.',
         'My day… sets the hours in your day (8 to start); the top line adds up Today against it. A quick check (every week or month) comes into Today by itself when due, 1 a day (or 2), the longest overdue first.'),
       h3('Audit, Git and Live'),
-      li('Audit checks the code (and the running copy and live site, when there are) against about 130 rules: keys, injection, sign-in and payment gaps, uploads, exposed files, trackers, private details. It catches common faults, not everything. Not a fault… sets one place aside with your reason; Review with AI… builds a prompt to paste into the AI you use. The audit also reads the AI agent files (CLAUDE.md, AGENTS.md, skills, hooks, MCP servers); Settings › Check a skill checks a skill or plugin before you install it.',
+      li('Audit checks the code (and the running copy and live site, when there are) against its rules (the audit window says how many it ran): keys, injection, sign-in and payment gaps, uploads, exposed files, trackers, private details. It catches common faults, not everything. Not a fault… sets one place aside with your reason; Review with AI… builds a prompt to paste into the AI you use. The audit also reads the AI agent files (CLAUDE.md, AGENTS.md, skills, hooks, MCP servers); Settings › Check a skill checks a skill or plugin before you install it.',
         'Git: ● backed up, ▲ unsaved or not pushed or only on this PC, ○ no git. The window gives the exact commands to copy, and See what changed shows every changed line. The office only reads git: it never commits, pushes or changes a folder.',
         'Live: the address a project is hosted at, checked when the office starts and every 5, 10 or 15 minutes with one plain request: ● up, ▲ unsure, ✕ down.'),
       h3('Backups'),
@@ -244,6 +287,9 @@
         'Backups are only ever added. When a drive is full, plug in another and add it: the full one keeps its backups. With two drives plugged in, Run backups now asks which one to use.'),
       h3('Prompts'),
       p('Prompts you use again and again, a tile per category: Copy, Edit (which can move it), Remove; New category, Add prompt, Rename and Delete category. Words in [brackets] are yours to fill in. Kept on this PC only.'),
+      h3('Project planner'),
+      li('The Project planner scores your projects (stage, category, deadline) and splits your day into a focus three and a last-hour pair, with check-ins. It is off until you tick Settings › Office › Show the Project planner tab. Then the tab appears beside Prompts, Category joins Filter by, and today\'s check-ins join Needs attention (so that count goes up).',
+        'Hours and rules sets the hours in your day; Categories groups projects by who they are for; Plan again picks today\'s last-hour pair afresh. Unticking the box hides the planner and keeps its scores and categories.'),
       h3('What leaves this PC'),
       p('Nothing about you or your projects. The only requests that leave this PC are plain page requests to the live addresses you add, and, only if you tick it under About, one request a day to GitHub for the newest Git version, and, when you press About › Check for updates, a look at GitHub for the newest signed release of the office. Transcripts are read, never changed or sent.'),
       h3('If something goes wrong'),
@@ -296,9 +342,17 @@
       try {
         const r = await app.engine('/api/update/take', { version });
         said(el('p', { text: `Updated to ${r.version} (${r.from} to ${r.to})${r.linked ? '. This copy is now linked to GitHub, so later updates come the same way' : ''}.` }));
-        await app.engine('/api/update/restart', {}).catch(() => null);
-        backAgain();
+        if (r.restart?.blocked) return said(el('p', { text: r.restart.text }), el('div', { class: 'row' }, btn('Restart now', () => restart('The new version is in place, but the office has not restarted, so the old one is still running.'), true)));
+        await restart('The new version is in place, but the office has not restarted, so the old one is still running.');
       } catch (e) { failed(e); }
+    }
+    // The office may refuse a restart (a backup is running): that is said, with a button to try again. A connection that
+    // drops because the office is stopping is the restart working, and the page waits for it to come back.
+    async function restart(why) {
+      try { await app.engine('/api/update/restart', {}); } catch (e) {
+        if (e?.error) return said(el('p', { text: `${why} ${fault(e)}` }), el('div', { class: 'row' }, btn('Restart now', () => restart(why), true)));
+      }
+      backAgain();
     }
     async function check() {
       said(el('p', { class: 'note', text: 'Asking GitHub for the newest version…' }));
@@ -306,15 +360,16 @@
       try { r = await app.engine('/api/update/check', {}); } catch (e) { return failed(e); }
       const again = btn('Check again', check);
       const when = `Checked ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
-      if (!r.version) return said(el('p', {}, el('b', { text: '● There is no signed release on GitHub yet.' })), el('p', { class: 'note', text: `Update takes only a version signed by the office's maker, and ${r.from} has none so far. ${when}` }), el('div', { class: 'row' }, again));
-      if (!r.newer) return said(el('p', {}, el('b', { text: '● You have the newest version.' })), el('p', { class: 'note', text: `The newest signed release on ${r.from} is ${r.version}. ${when}` }), el('div', { class: 'row' }, again));
+      const skipped = r.skippedText?.length ? el('p', { class: 'm-warn', text: `▲ ${[].concat(r.skippedText).join(' ')}` }) : null;
+      if (!r.version) return said(el('p', {}, el('b', { text: '● There is no signed release on GitHub yet.' })), el('p', { class: 'note', text: `Update takes only a version signed by the office's maker, and ${r.from} has none so far. ${when}` }), skipped, el('div', { class: 'row' }, again));
+      if (!r.newer) return said(el('p', {}, el('b', { text: '● You have the newest version.' })), el('p', { class: 'note', text: `The newest signed release on ${r.from} is ${r.version}. ${when}` }), skipped, el('div', { class: 'row' }, again));
       const zipNote = r.zip ? note(`This copy came from a zip: Update now first links it to GitHub (after checking its files are ${r.mine} as released), then takes ${r.version}.`) : null;
       const list = el('ul', { class: 'update-list' }, r.commits.map((c) => el('li', {}, el('span', { class: 'note', text: `${c.date} ` }), c.text)));
       const blocked = r.changed.length ? `Files here were changed (${r.changed.slice(0, 3).join(', ')}${r.changed.length > 3 ? ', …' : ''}), so it will not update until they are kept or undone.`
         : r.own ? 'This copy has saved changes of its own that the new version does not, so it cannot simply move forward. Bring it up to date by hand (see AGENTS.md, "Update it").' : '';
       const go = btn('Update now', (e) => take(e.currentTarget, r.version), true);
       said(el('p', {}, el('b', { text: `▲ Version ${r.version} is out: ${plural(r.behind, 'change', 'changes')} since yours.` })),
-        list, blocked ? el('p', { text: blocked }) : null, zipNote,
+        list, blocked ? el('p', { text: blocked }) : null, zipNote, skipped,
         el('div', { class: 'row' }, blocked ? null : go, again),
         more('How Update works',
           note('Update now checks the signature again, starts the new version once as a test copy (a version that does not start is never taken), then takes it and restarts the office (the page reloads itself). Your data folder is never touched, and nothing here is overwritten: an update that would is refused.'),
@@ -326,10 +381,16 @@
     const lastRow = !last ? null : row(last.back ? `Went back to ${last.to} (from ${last.from})${day(last.when)}` : `Last update: ${last.from} to ${last.to}${day(last.when)}`,
       st.canGoBack ? `Go back returns to ${last.from} and restarts the office. Your data folder is not touched.` : '',
       st.canGoBack && st.here ? btn(`Go back to ${last.from}`, async (e) => {
-        if (!confirm(`Go back to ${last.from}? The office moves back to the version it had before the last update and restarts.`)) return;
-        e.currentTarget.disabled = true;
+        const b = e.currentTarget;
+        if (!(await app.confirm({ title: `Go back to ${last.from}?`, yes: 'Go back', text: 'The office moves back to the version it had before the last update and restarts.' }))) return;
+        b.disabled = true;
         said(el('p', { text: `Going back to ${last.from}…` }));
-        try { await app.engine('/api/update/back', {}); await app.engine('/api/update/restart', {}).catch(() => null); backAgain(); } catch (x) { failed(x); }
+        try {
+          const r = await app.engine('/api/update/back', {});
+          const why = 'Went back, but the office has not restarted, so the other version is still running.';
+          if (r.restart?.blocked) return said(el('p', { text: r.restart.text }), el('div', { class: 'row' }, btn('Restart now', () => restart(why), true)));
+          await restart(why);
+        } catch (x) { failed(x); }
       }) : null);
     // Nothing is asked of GitHub until Check for updates is pressed.
     said(el('div', { class: 'row' }, btn('Check for updates', check, true),
@@ -356,12 +417,12 @@
       row('Git', gitLine),
       el('label', { class: 'tick-row' }, online, el('span', { text: 'Check online for a newer Git (asks GitHub once a day; off until you tick it)' })),
       row('Quit the office', 'Stops it and every local copy it started.', btn('Quit', async () => {
-        if (!confirm('Quit the office? It stops, and so does every local copy it started.')) return;
+        if (!(await app.confirm({ title: 'Quit the office?', yes: 'Quit', text: 'It stops, and so does every local copy it started.' }))) return;
         try { await app.engine('/api/quit', {}); } catch (e) { if (e?.error?.fault) return say(fault(e)); /* else it is stopping */ }
         document.body.replaceChildren(el('p', { class: 'empty stopped', text: 'The office has stopped. You can close this window.' }));
       })),
       row('Uninstall', 'Removes its shortcuts and start link, and stops it. Your files stay.', btn('Uninstall…', async () => {
-        if (!confirm('Uninstall AI Head Office Overview? It stops, and its shortcuts and start link are removed. Nothing is deleted: its folder stays, and you can remove it yourself.')) return;
+        if (!(await app.confirm({ title: 'Uninstall AI Head Office Overview?', yes: 'Uninstall', text: 'It stops, and its shortcuts and start link are removed. Nothing is deleted: its folder stays, and you can remove it yourself.' }))) return;
         try {
           const r = await app.engine('/api/uninstall', {});
           const dry = r.results.filter((x) => x.dryRun).map((x) => x.dryRun);

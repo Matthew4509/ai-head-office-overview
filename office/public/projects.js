@@ -43,26 +43,39 @@
   }
   const bytes = (n) => (n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`);
 
+  // Only the newest answer is drawn: a slow earlier list (git reads can take seconds) arriving after Stop's reload would
+  // put a stopped site back as running. Asking and drawing are apart, so a fault in the drawing is not "not answering".
+  const loads = window.pageLogic.sequence();
   async function loadProjects() {
+    const mine = loads.begin();
+    let d;
+    try { d = await engine('/api/projects'); } catch (e) { if (loads.isLatest(mine)) app.showFault(e); return; }
+    if (!loads.isLatest(mine)) return;
+    eng.projects = d.projects || [];
+    eng.stats = d.stats || eng.stats;
+    eng.at = Date.now();
     try {
-      const d = await engine('/api/projects');
-      eng.projects = d.projects || [];
-      eng.stats = d.stats || eng.stats;
-      eng.at = Date.now();
       app.draw();
       drawPC();
-    } catch (e) { app.showFault(e); }
+    } catch (e) {
+      console.error('[draw]', e);
+      app.showFault({ error: { fault: 'The page could not draw the project list.', reason: String((e && e.message) || e), wayOut: 'Reload the page (F5). If it keeps happening, restart the office.' } });
+    }
   }
   // The stats are cheap (every 3 s); the project list is read again when something it shows changed (a site
   // started or stopped, a port taken, tokens counted, a live check) and at least every 30 s.
+  // One poll at a time: a list that takes long to read is waited for, not asked again every 3 seconds on top of itself.
+  let polling = false;
   async function poll() {
+    if (polling) return;
+    polling = true;
     try {
       eng.stats = await engine('/api/stats');
       app.welcome?.(eng.stats);
       const rev = [eng.stats.rowsRev, eng.stats.tokensAt, eng.stats.liveRev, eng.stats.backupRev].join('|');
       if (rev !== eng.rev || Date.now() - eng.at > 30000) { eng.rev = rev; await loadProjects(); }
       drawPC();
-    } catch { /* app.js says when the office is not answering */ }
+    } catch { /* app.js says when the office is not answering */ } finally { polling = false; }
   }
   app.loadProjects = loadProjects;
 
@@ -154,6 +167,13 @@
     });
   }
 
+  /** Runs `fn` (a question to the person) with the project's busy mark off, so its tile does not read "Starting…" meanwhile. */
+  async function unbusy(id, fn) {
+    eng.busy.delete(id);
+    app.draw();
+    try { return await fn(); } finally { eng.busy.add(id); app.draw(); }
+  }
+
   /** One action on a project; the buttons are looked up again by id at click time, so a redrawn tile never acts on old data. */
   async function act(id, what) {
     const p = eng.projects.find((x) => x.id === id);
@@ -164,9 +184,13 @@
       if (what === 'run' || what === 'move') {
         // Use another port (move): another program holds its port, so it starts on a clean one, kept for next time.
         const body = { id, key: p.commands[0]?.key, open: true, move: what === 'move' };
+        // The office reads the start command (and, the first time, works out what to ask) for a second or two before anything
+        // else shows: say so at once.
+        say(`Getting ${p.name} ready: reading its start command…`);
         let r = await engine('/api/start', body);
         // The first run of this command (or a changed one): nothing started; the person sees it and says yes first.
         if (r.needsTrust) {
+          say('');
           if (!(await trustWindow(r.needsTrust))) { say(`${p.name} was not started.`); return; }
           r = await engine('/api/start', { ...body, trust: r.needsTrust.fp });
         }
@@ -186,7 +210,9 @@
         await engine('/api/projects/hide', { id, hidden: what === 'hide' });
         say(what === 'hide' ? `${p.name} is hidden: tick Show hidden to see it.` : `${p.name} is shown again.`);
       } else if (what === 'remove') {
-        if (!confirm(`Take ${p.name} off the list? Its folder and files stay where they are${p.running ? `, and its local copy on port ${p.running.port} is stopped` : ''}. Bring it back under Settings › Folders.`)) return;
+        const yes = await unbusy(id, () => app.confirm({ title: `Take ${p.name} off the list?`, yes: 'Take off the list',
+          text: `Its folder and files stay where they are${p.running ? `, and its local copy on port ${p.running.port} is stopped` : ''}. Bring it back under Settings › Folders.` }));
+        if (!yes) return;
         await engine('/api/projects/remove', { id });
         say(`${p.name} is off the list. Its files were not touched.`);
       } else if (what === 'free-port') {
@@ -195,7 +221,12 @@
         const o = ((await engine('/api/port-owners', {})).owners || []).find((x) => x.port === port);
         if (!o) { say(`Port ${port} is not held by another program any more.`); return; }
         if (o.why) { say(`The program on port ${port} (${o.name}) is not stopped: ${o.why}. Use another port starts ${p.name} on a clean port instead, or close that program yourself.`); return; }
-        if (!confirm(`Stop ${o.name} (program id ${o.pid})? It holds port ${port}, which ${p.name} needs. Anything unsaved in it is lost.`)) return;
+        // Several node.exe programs run on a dev PC: its command line says which one this is.
+        const cmd = oneLine(o.cmd || '').slice(0, 300);
+        const yes = await unbusy(id, () => app.confirm({ title: `Stop ${o.name} (program id ${o.pid})?`, yes: 'Stop it',
+          text: `It holds port ${port}, which ${p.name} needs. Anything unsaved in it is lost.${o.parent ? ` It was started by program id ${o.parent}.` : ''}`,
+          more: cmd ? [el('p', { class: 'note', text: 'The command it was started with:' }), el('code', { class: 'trust-code', text: cmd })] : [el('p', { class: 'note', text: 'Windows gave no command line for it.' })] }));
+        if (!yes) return;
         const r = await engine('/api/stop-port', { port, pid: o.pid });
         say(r.dryRun ? `Test copy, not stopped: ${r.dryRun}` : r.free ? `Port ${port} is free now.` : `${r.name || o.name} was stopped: port ${port} is free.`);
       }

@@ -2356,7 +2356,7 @@
   }
 
   function addView(holder) {
-    const canvas = el('canvas', { class: 'office-canvas', role: 'img', 'aria-label': 'The office: each Claude thread as a little person at their project\'s desk while it works, standing with a question mark when it needs you, in the meeting room when it thinks a long time (once it has a table), in the kitchen, the lounge or a deck chair when it has finished, and on a beach towel once a favourite has gone home. A locked room is dark: click it to unlock it. The List tab says the same in words.' });
+    const canvas = el('canvas', { class: 'office-canvas', role: 'img', 'aria-label': 'The office: each Claude thread as a little person at their project\'s desk while it works, standing with a question mark when it needs you, in the meeting room when it thinks a long time (once it has a table), in the kitchen, the lounge or a deck chair when it has finished, and on a beach towel once a favourite has gone home. A locked room is dark: click it to unlock it. The Projects tab and Needs attention say the same in words.' });
     const strip = el('div', { class: 'office-strip', 'aria-live': 'off' });
     const view = { canvas, ctx: canvas.getContext('2d'), strip };
     holder.append(canvas, strip);

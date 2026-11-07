@@ -57,6 +57,9 @@ export class Office {
     this.tok = null;
     this.tokSeen = new Map();
     this.dirty = false;
+    /** When the ledger and the cache were last written, and the least time between two writes. */
+    this.savedAt = 0;
+    this.saveEveryMs = o.saveEveryMs ?? 15000;
     /** Links that open a thread in the AI desktop app (the open-thread button). */
     this.appLinks = o.appLinks || new AppLinks();
   }
@@ -312,12 +315,17 @@ export class Office {
     return true;
   }
 
-  /** Saves the ledger and the read positions, if anything changed. */
-  save() {
+  /** Saves the ledger and the read positions, if anything changed. The two are written together (they must agree about what
+   * has been counted) and at most once every `saveEveryMs` (15 s): the cache holds every thread's summary and is large, and
+   * a working thread changes it at every scan. What is not yet saved stays marked changed, and `save(true)` (on the way out)
+   * writes it at once. The first save is never held back. */
+  save(force = false) {
     if (!this.dirty) return;
+    if (!force && this.savedAt && Date.now() - this.savedAt < this.saveEveryMs) return;
     writeJson(this.file('ledger.json'), this.ledger);
     writeJson(this.file('cache.json'), { version: CACHE_VERSION, since: this.settings.openedAt, files: this.files });
     this.dirty = false;
+    this.savedAt = Date.now();
   }
 
   /** Everyone, every project, and who is waiting: what the page draws. */

@@ -5,6 +5,9 @@
 
 import fs from 'node:fs';
 
+/** The most files kept for a thread (the newest): the lists are saved whole in the cache. */
+const MAX_WROTE = 200;
+const MAX_EDITS = 500;
 /** Tools that change files. */
 const WRITERS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
 /** Tools that run commands. */
@@ -271,8 +274,14 @@ export function addLine(t, l) {
           t.edits = t.edits || {};
           const n = (t.edits[p] = (t.edits[p] || 0) + 1);
           if ([3, 6, 10].includes(n)) eventAt(t, at, 'again', { file: String(p).split(/[\\/]/).pop().slice(0, 60), n });
+          // A long thread touches many files, and both lists are saved whole: only the newest are kept.
+          const keys = Object.keys(t.edits);
+          if (keys.length > MAX_EDITS) for (const k of keys.slice(0, keys.length - MAX_EDITS)) delete t.edits[k];
         }
-        if (p && !t.wrote.includes(p)) t.wrote.push(p);
+        if (p && !t.wrote.includes(p)) {
+          t.wrote.push(p);
+          if (t.wrote.length > MAX_WROTE) t.wrote.splice(0, t.wrote.length - MAX_WROTE);
+        }
         t.worked = true;
       } else if (SHELLS.has(b.name) && input.command && !onlyLooks(input.command)) {
         t.ran.push({ cmd: String(input.command).slice(0, 300), cwd: commandFolder(input.command, l.cwd) });
