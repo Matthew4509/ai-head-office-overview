@@ -323,6 +323,14 @@ function signedTag(work, version, pem = KEY.pem, force = false) {
     assert.match((await update.check(W())).reason, /no signature/);
     noRefs();
   });
+  await check('a stray unsigned tag above the newest signed release does not block it: it is skipped and named', async () => {
+    signedTag(work, '0.1.99', KEY.pem, true); // re-sign the moved 0.1.99 for the commit it is on
+    g(work, 'push', '-q', '-f', origin, 'main', 'v0.1.99');
+    const r = await update.check(W());
+    assert(r.ok && r.signed && r.version === '0.1.99' && JSON.stringify(r.skipped) === '["0.1.101"]', JSON.stringify(r));
+    noRefs();
+    g(work, 'push', '-q', origin, ':refs/tags/v0.1.101'); g(work, 'tag', '-d', 'v0.1.101');
+  });
   await check('commits of its own: shown, and Update now refuses (not a fast-forward)', async () => {
     signedTag(work, '0.1.101', KEY.pem, true);
     g(work, 'push', '-q', '-f', origin, 'v0.1.101');

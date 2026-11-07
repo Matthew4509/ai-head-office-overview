@@ -30,9 +30,21 @@ function readText(file) {
   }
 }
 
-/** Not there = `fallback`; there but unreadable = set aside (or kept), then `fallback`. */
+/** Whether a parsed value is the kind of thing the caller expects: an array where `fallback` is one, else a plain object. */
+const sameShape = (value, fallback) => Array.isArray(fallback) ? Array.isArray(value)
+  : (value !== null && typeof value === 'object' && !Array.isArray(value));
+
+/** Not there = `fallback`; there but unreadable, or valid JSON of the wrong kind (null, a number, [] for {}) = set aside
+ *  (or kept), then `fallback`. A wrong-kind file used to be handed back as it was and broke the office on every start. */
 export function readJson(file, fallback) {
-  try { return JSON.parse(readText(file).replace(/^﻿/, '')); } catch (e) {
+  try {
+    const value = JSON.parse(readText(file).replace(/^﻿/, ''));
+    if (fallback !== undefined && fallback !== null && typeof fallback === 'object' && !sameShape(value, fallback)) {
+      setAside(file);
+      return fallback;
+    }
+    return value;
+  } catch (e) {
     if (e.code !== 'ENOENT') setAside(file);
     return fallback;
   }
