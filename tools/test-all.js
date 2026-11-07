@@ -35,4 +35,19 @@ if (pick('office')) run('office/test (' + officeTests.length + ' files)', ['--te
 
 const failed = results.filter(r => !r.ok);
 console.log('\n' + (results.length - failed.length) + ' of ' + results.length + ' suites passed' + (failed.length ? '; failed: ' + failed.map(r => r.label).join(', ') : '') + '.');
+// A full, clean pass leaves a stamp for this exact tree; tools/bake.js refuses a tree without one, so a release is only
+// ever made from what the whole suite passed on. A filtered run or a changed working tree leaves none (and removes any old one).
+const STAMP = path.join(HERE, '_releases', 'test-stamp.json');
+try { fs.rmSync(STAMP, { force: true }); } catch {}
+if (!failed.length && !only.length) {
+  try {
+    const git = a => spawnSync('git', a, { cwd: HERE, encoding: 'utf8' }).stdout.trim();
+    if (git(['status', '--porcelain', '--untracked-files=no'])) console.log('No test stamp: files changed since the commit, so a pass says nothing about the commit.');
+    else {
+      fs.mkdirSync(path.dirname(STAMP), { recursive: true });
+      fs.writeFileSync(STAMP, JSON.stringify({ tree: git(['rev-parse', 'HEAD^{tree}']), commit: git(['rev-parse', 'HEAD']), at: new Date().toISOString(), suites: results.length }) + '\n');
+      console.log('Test stamp written for this commit.');
+    }
+  } catch {}
+}
 process.exit(failed.length ? 1 : 0);

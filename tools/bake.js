@@ -58,13 +58,19 @@ if (!CHECK_ONLY) {
   } catch { console.error('Bake stopped: this folder is not a git repository with a commit, so what ships cannot be matched to the signed tag.'); process.exit(1); }
   const bad = [...SHIP.filter(f => !tracked.has(f) && f !== 'projects.json').map(f => f + '  [not committed]'), ...SHIP.filter(f => dirty.includes(f)).map(f => f + '  [changed since the commit]')];
   if (bad.length) { console.error('Bake stopped: ' + bad.length + ' shipped file(s) are not what is committed (commit or remove them first):\n  ' + bad.join('\n  ')); process.exit(1); }
+  // The whole suite must have passed on exactly this commit's files (tools/test-all.js writes the stamp).
+  let stamp = null, tree = '';
+  try { tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: HERE, encoding: 'utf8' }).trim(); stamp = JSON.parse(fs.readFileSync(path.join(HERE, '_releases', 'test-stamp.json'), 'utf8')); } catch {}
+  if (!stamp || stamp.tree !== tree) { console.error('Bake stopped: no full test pass is recorded for this commit\'s files. Run npm test on a clean working tree (it writes the stamp), then bake again.'); process.exit(1); }
 }
 fs.rmSync(stage, { recursive: true, force: true });
 fs.mkdirSync(root, { recursive: true });
 for (const rel of SHIP) {
   const to = path.join(root, rel);
   fs.mkdirSync(path.dirname(to), { recursive: true });
-  fs.copyFileSync(path.join(HERE, rel), to);
+  // The committed bytes, not the working-tree file, so the zip is exactly what the signed commit holds (--check reads the tree).
+  if (CHECK_ONLY) fs.copyFileSync(path.join(HERE, rel), to);
+  else fs.writeFileSync(to, execFileSync('git', ['cat-file', 'blob', 'HEAD:' + rel], { cwd: HERE, maxBuffer: 64 * 1024 * 1024 }));
 }
 fs.writeFileSync(path.join(root, 'projects.json'), JSON.stringify(EMPTY_PROJECTS, null, 2) + '\n');
 
