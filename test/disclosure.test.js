@@ -345,6 +345,11 @@ async function main() {
     });
     check('SEC-012: a key the files still hold is not reported again as history', () => assert(a1.findings.some(f => f.rule === 'SEC-003' && f.where === 'keep.js:1') && !h1.some(f => /keep\.js/.test(f.where))));
     check('SEC-012: the key itself never reaches the audit', () => assert(!JSON.stringify(a1).includes(live.slice(8)) && !JSON.stringify(a1).includes(gh.slice(4))));
+    // A remote that is set up but never pushed to (a local path has no remote branches yet) is not "no remote".
+    git(kr, 'remote', 'add', 'pending', path.join(tmp, 'not-yet-made.git'));
+    const h1b = (await runAudit(kr, null, { disclosure: ctx, root: false })).findings.filter(f => f.rule === 'SEC-012');
+    check('SEC-012: a remote that is set up but never pushed to reads "not pushed yet", not "no remote"', () => assert(h1b.length === 1 && /not pushed yet/.test(h1b[0].title) && !/only on this PC/.test(h1b[0].title), JSON.stringify(h1b.map(f => f.title))));
+    git(kr, 'remote', 'remove', 'pending');
     git(tmp, 'init', '-q', '--bare', kremote); git(kr, 'remote', 'add', 'origin', kremote); git(kr, 'push', '-q', 'origin', 'main');
     const h2 = (await runAudit(kr, null, { disclosure: ctx, root: false })).findings.filter(f => f.rule === 'SEC-012');
     check('SEC-012: once pushed it is Critical and says so', () => assert(h2.length === 1 && h2[0].sev === 'Critical' && /already on the remote/.test(h2[0].title), JSON.stringify(h2)));

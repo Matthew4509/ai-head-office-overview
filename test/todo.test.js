@@ -259,5 +259,12 @@ check('impossible dates are not dates; a damaged quick check is kept, due today,
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+check('add: a size that is not one of the sizes is refused (as set does), and no size means 1 h', () => {
+  const s = fresh();
+  for (const size of [0, -3, 'x', 2.5, 45]) assert.strictEqual(T.add(s, { project: 'alpha-1a2b3c', size, zone: 'today' }, MON).ok, false, String(size));
+  assert.strictEqual(s.items.length, 0);
+  assert.strictEqual(T.add(s, { project: 'alpha-1a2b3c', zone: 'today' }, MON).item.size, 60);
+});
+
 console.log(failures ? failures + ' FAILED' : 'all passed');
 process.exit(failures ? 1 : 0);
