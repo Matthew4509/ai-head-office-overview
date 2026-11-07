@@ -126,6 +126,32 @@ check('F13: a file already in a group is not listed twice under "Other code"', (
   assert(!other || !other.files.some(f => named.includes(f)), JSON.stringify(other));
 });
 
+check('0.1.18: one folder with a great many files stops the walk at the limit', () => {
+  const big = path.join(tmp, 'bigfolder');
+  fs.mkdirSync(big);
+  for (let i = 0; i < 4200; i++) fs.writeFileSync(path.join(big, 'f' + i + '.js'), '1\n');
+  assert(review.fileGroups(big).total <= 4000, 'total ' + review.fileGroups(big).total);
+});
+check('0.1.18: the forms search reads at most 300 files', () => {
+  const many = path.join(tmp, 'manyhtml');
+  fs.mkdirSync(many);
+  for (let i = 0; i < 320; i++) fs.writeFileSync(path.join(many, 'a' + String(i).padStart(3, '0') + '.html'), '<p>x</p>\n');
+  fs.writeFileSync(path.join(many, 'zz-form.html'), '<form method="post"></form>\n');
+  assert(!review.fileGroups(many).groups.some(x => x.name === 'Forms visitors send'));
+});
+check('0.1.18: a place longer than 300 characters is refused', () => {
+  const where = 'a/' + 'b'.repeat(300) + '.php:3';
+  const r = review.parseFindings('## Findings\n| Id | Severity | Category | Where | Evidence | Fix |\n|---|---|---|---|---|---|\n| 1 | High | auth | ' + where + ' | e | f |\n');
+  assert.strictEqual(r.rows.length, 0);
+  assert.strictEqual(r.refused.length, 1);
+});
+check('0.1.18: a bare "#" line is not joined to a "Findings" line below it', () => {
+  const r = review.parseFindings('##\nFindings\n| Id | Severity | Category | Where | Evidence | Fix |\n|---|---|---|---|---|---|\n| 1 | High | auth | a.php:3 | e | f |\n');
+  assert.strictEqual(r.rows.length, 0);
+  const ok = review.parseFindings('## 2. Findings\n| 1 | High | auth | a.php:3 | e | f |\n');
+  assert.strictEqual(ok.rows.length, 1);
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(failures ? failures + ' FAILED' : 'all passed');
 process.exit(failures ? 1 : 0);
