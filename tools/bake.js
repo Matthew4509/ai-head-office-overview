@@ -48,6 +48,17 @@ const out = path.join(HERE, '_releases');
 const stage = path.join(out, 'stage-' + VERSION);
 const root = path.join(stage, 'ai-head-office-overview');
 const zip = path.join(out, 'ai-head-office-overview-' + VERSION + '.zip');
+// The signed tag covers the committed files, so the zip may only hold committed, unchanged ones: a stray file dropped in
+// a shipped folder, or an edit not yet committed, would put in the zip what the signature never covered.
+if (!CHECK_ONLY) {
+  let tracked, dirty;
+  try {
+    tracked = new Set(execFileSync('git', ['ls-files'], { cwd: HERE, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split(/\r?\n/).filter(Boolean));
+    dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: HERE, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split(/\r?\n/).filter(Boolean).map(l => l.slice(3).replace(/"/g, ''));
+  } catch { console.error('Bake stopped: this folder is not a git repository with a commit, so what ships cannot be matched to the signed tag.'); process.exit(1); }
+  const bad = [...SHIP.filter(f => !tracked.has(f) && f !== 'projects.json').map(f => f + '  [not committed]'), ...SHIP.filter(f => dirty.includes(f)).map(f => f + '  [changed since the commit]')];
+  if (bad.length) { console.error('Bake stopped: ' + bad.length + ' shipped file(s) are not what is committed (commit or remove them first):\n  ' + bad.join('\n  ')); process.exit(1); }
+}
 fs.rmSync(stage, { recursive: true, force: true });
 fs.mkdirSync(root, { recursive: true });
 for (const rel of SHIP) {

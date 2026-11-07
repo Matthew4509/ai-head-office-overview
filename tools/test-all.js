@@ -3,6 +3,7 @@
 //   node tools/test-all.js server setup     only the suites whose names contain one of these words
 'use strict';
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
@@ -10,9 +11,14 @@ const HERE = path.resolve(__dirname, '..');
 const only = process.argv.slice(2);
 const pick = name => !only.length || only.some(w => name.includes(w));
 const results = [];
+// Every suite gets throwaway data, AI-app settings and app records, so none can read or write this PC's real ones, even
+// by loading a lib module whose default data folder is the real data/ (a suite that sets its own still wins).
+const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'aho-tests-'));
+process.on('exit', () => { try { fs.rmSync(SCRATCH, { recursive: true, force: true }); } catch {} });
+const ENV = { ...process.env, AHO_DATA: path.join(SCRATCH, 'data'), AHO_SETTINGS: path.join(SCRATCH, 'no-ai-settings.json'), AHO_APP_SESSIONS: path.join(SCRATCH, 'no-app-sessions') };
 const run = (label, args) => {
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, args, { cwd: HERE, encoding: 'utf8', timeout: 15 * 60 * 1000 });
+  const r = spawnSync(process.execPath, args, { cwd: HERE, env: ENV, encoding: 'utf8', timeout: 15 * 60 * 1000 });
   const secs = Math.round((Date.now() - t0) / 1000);
   const ok = r.status === 0;
   results.push({ label, ok, secs });
