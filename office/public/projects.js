@@ -144,7 +144,7 @@
         ...(t.env || []).map(([k, v]) => fact('Setting (env)', `${k}=${v}`)),
         (t.envRisky || []).length ? el('p', { class: 'm-bad', text: `▲ ${t.envRisky.join(', ')} can change which program runs or what it loads. Run it only if you know why the project sets ${t.envRisky.length > 1 ? 'them' : 'it'}.` }) : null,
         fact('From', t.from),
-        el('p', { class: 'note', text: 'The office remembers your yes for this exact command, and asks again if it changes.' })],
+        el('p', { class: 'note', text: 'The office remembers your yes for this exact command, and asks again if the command changes. It does not check the files of the project itself: if they change later, the same command runs the changed files without asking. Your yes is for the command, not a promise that the project is safe.' })],
       [el('button', { type: 'button', class: 'btn primary', onclick: () => finish(false) }, 'Cancel'),
         el('button', { type: 'button', class: 'btn', onclick: () => finish(true) }, 'Run it')]);
       // Closed another way (Escape, a click beside it, another window): the same as Cancel.
