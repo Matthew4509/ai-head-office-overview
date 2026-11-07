@@ -39,7 +39,7 @@
     const starredFirst = (list) => [...list.filter((p) => p.starred), ...list.filter((p) => !p.starred)];
     const tiles = (list, withCat) => el('ul', { class: 'prompt-list' }, list.map((p) => el('li', { class: `prompt-row${p.starred ? ' starred' : ''}` },
       el('div', { class: 'prompt-txt' }, el('div', { class: 'prompt-name' }, el('b', { text: p.title }), starBtn(p)),
-        withCat ? el('span', { class: 'note', text: catOf(p.category)?.name || '' }) : null, el('span', { class: 'prompt-text', text: p.text })),
+        withCat ? el('span', { class: 'note', text: catOf(p.category)?.name || '' }) : null, el('span', { class: 'prompt-text', text: p.text }), p.credit ? el('span', { class: 'note', text: 'Thanks to ' + p.credit }) : null),
       el('div', { class: 'row' }, btn('Copy', () => copy(p), true), btn('Edit', () => promptWindow(p)), btn('Remove', () => removePrompt(p))))));
     let body;
     if (!cat && !q) {
@@ -90,14 +90,15 @@
     const cat = el('select', { class: 'field-text', 'aria-label': 'Category' }, st.cats.map((c) => el('option', { value: c.id, selected: c.id === start }, c.name)));
     const text = el('textarea', { class: 'field-text', rows: '12', 'aria-label': 'Prompt', placeholder: 'Type or paste the prompt. Put the parts to fill in each time in [brackets].' });
     text.value = p ? p.text : '';
+    const credit = el('input', { type: 'text', class: 'field-text', maxlength: '80', value: p && p.credit ? p.credit : '', placeholder: 'For example: a Reddit user who suggested it (optional)', 'aria-label': 'Credit' });
     const count = el('p', { class: 'note' });
     const err = el('p', { class: 'note check-said', role: 'alert' });
     const tally = () => { count.textContent = `${text.value.length.toLocaleString()} of 20,000 characters`; };
     text.addEventListener('input', tally); tally();
-    open(p ? 'Edit prompt' : 'Add prompt', [el('label', { class: 'note', text: 'Name' }), title, el('label', { class: 'note', text: 'Category' }), cat, el('label', { class: 'note', text: 'Prompt' }), text, count, err],
+    open(p ? 'Edit prompt' : 'Add prompt', [el('label', { class: 'note', text: 'Name' }), title, el('label', { class: 'note', text: 'Category' }), cat, el('label', { class: 'note', text: 'Prompt' }), text, count, el('label', { class: 'note', text: 'Credit (who thought of it, optional)' }), credit, err],
       [btn(p ? 'Save' : 'Add prompt', async () => {
         try {
-          const r = await app.engine('/api/prompts/save', { id: p ? p.id : undefined, category: cat.value, title: title.value, text: text.value });
+          const r = await app.engine('/api/prompts/save', { id: p ? p.id : undefined, category: cat.value, title: title.value, text: text.value, credit: credit.value });
           close(); app.say(`Prompt "${r.prompt.title}" ${p ? 'saved' : 'added'}${catOf(r.prompt.category) ? ` in ${catOf(r.prompt.category).name}` : ''}.`); load();
         } catch (e) { err.textContent = fault(e); }
       }, true), btn('Cancel', close)]);

@@ -48,7 +48,7 @@ const asides = (dir, base) => fs.readdirSync(dir).filter(n => n.startsWith(base 
     const d = fs.mkdtempSync(path.join(tmp, 'p-')), f = path.join(d, 'prompts.json');
     fs.writeFileSync(f, '{"prompts": [{"id": "a", "title": "Mine", "text": "keep me"');
     const st = Prompts.load(f);
-    assert.strictEqual(st.categories.length, 10); // the office's own start-line prompt + nine kinds of expert
+    assert.strictEqual(st.categories.length, 12); // the office's own start-line prompt, Coming soon, Safety rules + nine kinds of expert
     const kept = asides(d, 'prompts');
     assert(kept.length === 1 && /keep me/.test(fs.readFileSync(path.join(d, kept[0]), 'utf8')));
   });
@@ -57,8 +57,8 @@ const asides = (dir, base) => fs.readdirSync(dir).filter(n => n.startsWith(base 
     fs.writeFileSync(f, JSON.stringify({ categories: [{ id: 'c', name: 'C' }, { id: 'c', name: 'again' }, { id: 'b', name: ' ' }, null, 5], prompts: [{ id: 'p', title: 'T', text: 'x', category: 'gone' }, { id: 'q', title: 'U', text: 'y', category: 'c' }, null] }));
     const st = Prompts.load(f);
     // (a file from before the start-line prompt also gets that starter once, at the front)
-    assert.deepStrictEqual(st.categories.map(c => [c.id, c.name]), [['starter-office', 'AI Head Office Overview'], ['mine', 'My prompts'], ['c', 'C'], ['b', 'Untitled']]);
-    assert.deepStrictEqual(st.prompts.map(p => [p.id, p.category]), [['starter-office-1', 'starter-office'], ['p', 'mine'], ['q', 'c']]);
+    assert.deepStrictEqual(st.categories.map(c => [c.id, c.name]), [['starter-office', 'AI Head Office Overview'], ['starter-comingsoon', 'Coming soon'], ['starter-safety', 'Safety rules'], ['mine', 'My prompts'], ['c', 'C'], ['b', 'Untitled']]);
+    assert.deepStrictEqual(st.prompts.map(p => [p.id, p.category]), [['starter-office-1', 'starter-office'], ['starter-comingsoon-1', 'starter-comingsoon'], ['starter-safety-1', 'starter-safety'], ['starter-safety-2', 'starter-safety'], ['starter-safety-3', 'starter-safety'], ['starter-safety-4', 'starter-safety'], ['p', 'mine'], ['q', 'c']]);
   });
 
   await check('a saved audit with junk findings is read as far as it makes sense', () => {

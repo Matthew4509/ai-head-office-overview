@@ -64,15 +64,15 @@ async function main() {
     assert.strictEqual(st.categories[0].name, 'AI Head Office Overview');
     const p = st.prompts.find(x => x.category === st.categories[0].id);
     assert.deepStrictEqual([p.title, p.text], [START_LINE_TITLE, START_LINE_PROMPT]);
-    assert.deepStrictEqual(JSON.parse(fs.readFileSync(pf, 'utf8')).added, ['office']);
+    assert.deepStrictEqual(JSON.parse(fs.readFileSync(pf, 'utf8')).added, ['office', 'comingsoon', 'safety']);
   });
   const old = path.join(WS, 'data', 'prompts-old.json');
   fs.writeFileSync(old, JSON.stringify({ categories: [{ id: 'mine', name: 'My prompts' }, { id: 'starter-seo', name: 'SEO specialist' }],
     prompts: [{ id: 'a1', category: 'mine', title: 'Mine', text: 'My own prompt.' }] }));
   await check('a file from an earlier version gets it once, at the front, and keeps everything it had', () => {
     const st = Prompts.load(old);
-    assert.deepStrictEqual(st.categories.map(c => c.id), ['starter-office', 'mine', 'starter-seo']);
-    assert.deepStrictEqual(st.prompts.map(p => p.id), ['starter-office-1', 'a1']);
+    assert.deepStrictEqual(st.categories.map(c => c.id), ['starter-office', 'starter-comingsoon', 'starter-safety', 'mine', 'starter-seo']);
+    assert.deepStrictEqual(st.prompts.map(p => p.id), ['starter-office-1', 'starter-comingsoon-1', 'starter-safety-1', 'starter-safety-2', 'starter-safety-3', 'starter-safety-4', 'a1']);
     Prompts.load(old);
     assert.strictEqual(Prompts.load(old).prompts.filter(p => p.id === 'starter-office-1').length, 1, 'added twice');
   });
@@ -89,12 +89,12 @@ async function main() {
     try {
       let st;
       assert.doesNotThrow(() => { st = Prompts.load(ro); });
-      assert.deepStrictEqual(st.categories.map(c => c.id), ['starter-office', 'mine']);
+      assert.deepStrictEqual(st.categories.map(c => c.id), ['starter-office', 'starter-comingsoon', 'starter-safety', 'mine']);
       assert.strictEqual(fs.readFileSync(ro, 'utf8'), before, 'the read-only file was changed');
       assert(!fs.existsSync(ro + '.tmp'), 'a half-written copy was left beside it');
     } finally { fs.chmodSync(ro, 0o666); }
     Prompts.load(ro);
-    assert.deepStrictEqual(JSON.parse(fs.readFileSync(ro, 'utf8')).added, ['office']);
+    assert.deepStrictEqual(JSON.parse(fs.readFileSync(ro, 'utf8')).added, ['safety', 'comingsoon', 'office']);
   });
   await check('an edit that saves to a read-only file still reports the error', () => {
     const ro = path.join(WS, 'data', 'prompts-ro2.json');
@@ -104,8 +104,15 @@ async function main() {
   });
   await check('an edit elsewhere in the file keeps the record that it was given', () => {
     assert(Prompts.upsert(old, { category: 'mine', title: 'Two', text: 'Another.' }).ok);
-    assert.deepStrictEqual(JSON.parse(fs.readFileSync(old, 'utf8')).added, ['office']);
+    assert.deepStrictEqual(JSON.parse(fs.readFileSync(old, 'utf8')).added, ['safety', 'comingsoon', 'office']);
     assert(!Prompts.load(old).categories.some(c => c.id === 'starter-office'));
+  });
+  await check('the Safety rules starter carries its credit, and an edit can add, keep or clear a credit', () => {
+    const p = Prompts.load(pf).prompts.find(x => x.id === 'starter-safety-1');
+    assert(p && /Never delete files/.test(p.text) && /firmconsideration717/.test(p.credit), JSON.stringify(p));
+    assert(Prompts.upsert(pf, { id: p.id, category: p.category, title: p.title, text: p.text, credit: '  Someone   else ' }).prompt.credit === 'Someone else');
+    assert(!('credit' in Prompts.upsert(pf, { id: p.id, category: p.category, title: p.title, text: p.text }).prompt), 'credit not cleared');
+    assert(Prompts.upsert(pf, { id: p.id, category: p.category, title: p.title, text: p.text, credit: 'x'.repeat(81) }).ok === false);
   });
 
   // ---- A test copy of the office: the page's copy, and which file held a bad start entry ----
