@@ -11,6 +11,10 @@ a tile: run its local copy, check its git and live site, audit it for common sec
 **[Install](#install-and-start)** · **[What you need](#what-you-need)** · **[Demo](#demo)** ·
 **[What's new](#whats-new-in-0117)** · **[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
 
+## What's new in 0.1.18
+
+- **Review with AI is sturdier.** Listing the files to review stops at its limit even inside one huge folder, and the search for forms reads at most 300 files. A reported fault whose place is longer than 300 characters is refused, and the "Findings" heading is matched more strictly. A fault list that cannot be read is moved aside as a ".damaged" copy and never written over.
+
 ## What's new in 0.1.17
 
 - **A stronger audit.** SQL files are scanned; new rules for request data written into
