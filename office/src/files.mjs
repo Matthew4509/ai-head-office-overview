@@ -36,14 +36,18 @@ const sameShape = (value, fallback) => Array.isArray(fallback) ? Array.isArray(v
 
 /** Not there = `fallback`; there but unreadable, or valid JSON of the wrong kind (null, a number, [] for {}) = set aside
  *  (or kept), then `fallback`. A wrong-kind file used to be handed back as it was and broke the office on every start. */
-export function readJson(file, fallback) {
+export function readJson(file, fallback, clean) {
   try {
     const value = JSON.parse(readText(file).replace(/^﻿/, ''));
     if (fallback !== undefined && fallback !== null && typeof fallback === 'object' && !sameShape(value, fallback)) {
       setAside(file);
       return fallback;
     }
-    return value;
+    if (!clean) return value;
+    // `clean` cuts what was read to the shape the office uses; when it had to drop or repair something, the file is copied aside first.
+    const cleaned = clean(value);
+    if (JSON.stringify(cleaned) !== JSON.stringify(value)) setAside(file);
+    return cleaned;
   } catch (e) {
     if (e.code !== 'ENOENT') setAside(file);
     return fallback;

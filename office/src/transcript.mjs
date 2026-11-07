@@ -198,12 +198,12 @@ export function addLine(t, l) {
   if (!l || typeof l !== 'object') return;
   if (l.type === 'custom-title' && l.customTitle) { t.title = String(l.customTitle); return; }
   if (l.type !== 'user' && l.type !== 'assistant') return;
-  const at = l.timestamp || '';
+  const at = typeof l.timestamp === 'string' ? l.timestamp : '';
   if (at) {
     if (!t.startedAt) t.startedAt = at;
     if (at > t.lastAt) t.lastAt = at;
   }
-  if (l.cwd) { t.cwd = l.cwd; if (!t.startCwd) t.startCwd = l.cwd; }
+  if (typeof l.cwd === 'string' && l.cwd) { t.cwd = l.cwd; if (!t.startCwd) t.startCwd = l.cwd; }
   const m = l.message || {};
   if (l.type === 'user') {
     const c = m.content;
@@ -258,7 +258,7 @@ export function addLine(t, l) {
   for (const b of blocks) {
     if (!b) continue;
     if (b.type === 'tool_use') {
-      const input = b.input || {};
+      const input = b.input && typeof b.input === 'object' ? b.input : {};
       const words = wordsFor(b.name, input);
       t.last = { kind: 'tool', at, tool: b.name, words };
       pushStep(t, at, words);
@@ -269,7 +269,7 @@ export function addLine(t, l) {
         if (ids.length > 20) delete t.pending[ids[0]];
       }
       if (WRITERS.has(b.name)) {
-        const p = input.file_path || input.notebook_path;
+        const p = [input.file_path, input.notebook_path].find((x) => typeof x === 'string' && x);
         if (p) {
           t.edits = t.edits || {};
           const n = (t.edits[p] = (t.edits[p] || 0) + 1);
@@ -283,7 +283,7 @@ export function addLine(t, l) {
           if (t.wrote.length > MAX_WROTE) t.wrote.splice(0, t.wrote.length - MAX_WROTE);
         }
         t.worked = true;
-      } else if (SHELLS.has(b.name) && input.command && !onlyLooks(input.command)) {
+      } else if (SHELLS.has(b.name) && typeof input.command === 'string' && input.command && !onlyLooks(input.command)) {
         t.ran.push({ cmd: String(input.command).slice(0, 300), cwd: commandFolder(input.command, l.cwd) });
         if (t.ran.length > 200) t.ran.shift();
         t.worked = true;

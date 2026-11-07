@@ -22,8 +22,13 @@ function readSettings(file) {
     if (e.code === 'ENOENT') return { data: {}, text: '' };
     throw e;
   }
-  try { return { data: JSON.parse(text || '{}'), text }; } catch {
-    return { error: { fault: 'Claude\'s settings file could not be read.', reason: `${file} is not valid JSON, so the office will not touch it.`, wayOut: 'Fix the file (or let Claude fix it), then try again.' } };
+  try {
+    const data = JSON.parse(text || '{}');
+    // A settings file is an object, and its hooks (when it has any) an object too: anything else is not the office's to rewrite.
+    if (data && typeof data === 'object' && !Array.isArray(data) && (data.hooks == null || (typeof data.hooks === 'object' && !Array.isArray(data.hooks)))) return { data, text };
+    throw new Error('wrong shape');
+  } catch {
+    return { error: { fault: 'Claude\'s settings file could not be read.', reason: `${file} is not valid JSON, or is not a settings object, so the office will not touch it.`, wayOut: 'Fix the file (or let Claude fix it), then try again.' } };
   }
 }
 

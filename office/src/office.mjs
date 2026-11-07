@@ -11,6 +11,7 @@ import { folderOf, stateOf, assignSeats, defaultName, projectOf, normPath } from
 import { cleanLook } from './look.mjs';
 import { AppLinks } from './applinks.mjs';
 import { readJson, writeJson } from './files.mjs';
+import { oneLine } from './text.mjs';
 
 /** How long a finished thread on the Needs attention list stays there. */
 const WAITING_DAYS = 7;
@@ -20,6 +21,32 @@ const CACHE_VERSION = 6;
  * a folder or thread called one of these is refused. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 export const safeKey = (k) => !UNSAFE_KEYS.has(String(k));
+const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+/** What a hand-edited or damaged file may still hold, cut to the shapes the office reads (readJson sets the file aside first). */
+const THEME_NAMES = ['auto', 'dark', 'light', 'system'];
+export function cleanSettings(s) {
+  const o = isPlain(s) ? { ...s } : {};
+  if (typeof o.openedAt !== 'string' || Number.isNaN(Date.parse(o.openedAt))) delete o.openedAt;
+  if (!(Number.isFinite(o.quietMinutes) && o.quietMinutes >= 5 && o.quietMinutes <= 1440)) delete o.quietMinutes;
+  if (typeof o.root !== 'string') delete o.root;
+  if (!THEME_NAMES.includes(o.theme)) delete o.theme;
+  if (Array.isArray(o.favProjects)) o.favProjects = o.favProjects.filter((x) => typeof x === 'string'); else delete o.favProjects;
+  return o;
+}
+export function cleanSeats(s) {
+  const out = {};
+  for (const [folder, seats] of Object.entries(isPlain(s) ? s : {})) {
+    if (!safeKey(folder) || !isPlain(seats)) continue;
+    out[folder] = Object.fromEntries(Object.entries(seats).filter(([n, rec]) => safeKey(n) && isPlain(rec)));
+  }
+  return out;
+}
+export function cleanLedger(l) {
+  const threads = {};
+  for (const [id, rec] of Object.entries(isPlain(l) && isPlain(l.threads) ? l.threads : {})) if (safeKey(id) && isPlain(rec)) threads[id] = rec;
+  return { ...(isPlain(l) ? l : {}), threads };
+}
+export const cleanDone = (d) => Object.fromEntries(Object.entries(isPlain(d) ? d : {}).filter(([id, v]) => safeKey(id) && typeof v === 'string'));
 
 // The office's own files: read and written by files.mjs (a damaged one is copied aside, or kept, never wiped unseen).
 // A file of the AI app's (a thread's custom-title.json) is only ever read: nothing is written in its folder.
@@ -39,15 +66,15 @@ export class Office {
     this.bonus = Math.max(0, Number(o.bonus) || 0);
     this.workingFolders = o.workingFolders || (() => []);
     this.file = (n) => path.join(this.dataDir, n);
-    this.settings = readJson(this.file('settings.json'), {});
+    this.settings = readJson(this.file('settings.json'), {}, cleanSettings);
     if (!this.settings.openedAt) {
       this.settings.openedAt = new Date(this.now()).toISOString();
       this.saveSettings();
     }
     if (!this.settings.quietMinutes) this.settings.quietMinutes = 60;
-    this.seatNames = readJson(this.file('seats.json'), {});
-    this.ledger = readJson(this.file('ledger.json'), { threads: {} });
-    this.done = readJson(this.file('done.json'), {});
+    this.seatNames = readJson(this.file('seats.json'), {}, cleanSeats);
+    this.ledger = readJson(this.file('ledger.json'), { threads: {} }, cleanLedger);
+    this.done = readJson(this.file('done.json'), {}, cleanDone);
     const cache = readJson(this.file('cache.json'), {});
     /** file path -> { offset, size, mtime, t } */
     this.files = cache.version === CACHE_VERSION && cache.since === this.settings.openedAt ? cache.files || {} : {};
@@ -83,6 +110,7 @@ export class Office {
     try { dirs = fs.readdirSync(this.transcriptsDir, { withFileTypes: true }).filter((d) => d.isDirectory()); } catch { dirs = []; }
     const add = (file, id, parent) => {
       let mtime = 0;
+      if (!safeKey(id) || (parent && !safeKey(parent))) return;
       try { mtime = fs.statSync(file).mtimeMs; } catch { return; }
       out.push({ file, id, parent, mtime });
     };
@@ -231,8 +259,8 @@ export class Office {
     const f = String(folder ?? '');
     if (!safeKey(f)) return false;
     const s = String(Math.max(1, Math.floor(Number(seat) || 1)));
-    const name = String(nick || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-    this.seatNames[f] = this.seatNames[f] || {};
+    const name = oneLine(nick, 40);
+    if (!Object.hasOwn(this.seatNames, f)) this.seatNames[f] = {};
     if (name) this.seatNames[f][s] = { ...(this.seatNames[f][s] || {}), nick: name };
     else if (this.seatNames[f][s]) delete this.seatNames[f][s].nick;
     writeJson(this.file('seats.json'), this.seatNames);
@@ -248,7 +276,7 @@ export class Office {
     const f = String(folder ?? '');
     if (!safeKey(f)) return false;
     const s = String(Math.max(1, Math.floor(Number(seat) || 1)));
-    this.seatNames[f] = this.seatNames[f] || {};
+    if (!Object.hasOwn(this.seatNames, f)) this.seatNames[f] = {};
     const rec = { ...(this.seatNames[f][s] || {}) };
     if (on) rec.fav = true;
     else delete rec.fav;
@@ -269,7 +297,7 @@ export class Office {
     const f = String(folder ?? '');
     if (!safeKey(f)) return false;
     const s = String(Math.max(1, Math.floor(Number(seat) || 1)));
-    this.seatNames[f] = this.seatNames[f] || {};
+    if (!Object.hasOwn(this.seatNames, f)) this.seatNames[f] = {};
     const rec = { ...(this.seatNames[f][s] || {}) };
     if (hidden) rec.favHidden = true;
     else delete rec.favHidden;
@@ -283,7 +311,7 @@ export class Office {
     const f = String(folder ?? '');
     if (!safeKey(f)) return false;
     const s = String(Math.max(1, Math.floor(Number(seat) || 1)));
-    this.seatNames[f] = this.seatNames[f] || {};
+    if (!Object.hasOwn(this.seatNames, f)) this.seatNames[f] = {};
     const rec = { ...(this.seatNames[f][s] || {}) };
     if (look === null) delete rec.look;
     else {
@@ -338,7 +366,7 @@ export class Office {
     const root = this.root();
     const names = this.folderNames(root);
     const today = localDay(new Date(now).toISOString());
-    const helpersOf = {};
+    const helpersOf = Object.create(null);
     const mains = [];
     for (const r of Object.values(this.files)) {
       if (r.parent) (helpersOf[r.parent] = helpersOf[r.parent] || []).push(r.t);
