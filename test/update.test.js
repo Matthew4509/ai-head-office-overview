@@ -328,6 +328,7 @@ function signedTag(work, version, pem = KEY.pem, force = false) {
     g(work, 'push', '-q', '-f', origin, 'main', 'v0.1.99');
     const r = await update.check(W());
     assert(r.ok && r.signed && r.version === '0.1.99' && JSON.stringify(r.skipped) === '["0.1.101"]', JSON.stringify(r));
+    assert(r.skippedText.length === 1 && /^v0.1.101 was skipped: its tag carries no signature/.test(r.skippedText[0]), JSON.stringify(r.skippedText));
     noRefs();
     g(work, 'push', '-q', origin, ':refs/tags/v0.1.101'); g(work, 'tag', '-d', 'v0.1.101');
   });
