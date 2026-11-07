@@ -301,7 +301,7 @@ async function keysInWhatIsPublished() {
   const C = await runAudit(cd, null, { disclosure: ctx('care') });
   const atC = where => C.findings.filter(f => String(f.where).startsWith(where));
   check('a placeholder in a csv stays quiet', () => assert(!atC('place.csv').length, JSON.stringify(atC('place.csv'))));
-  check('a test folder keeps the code rules\' handling (only Critical)', () => assert(!atC('tests/data.csv').length && atC('seen.csv').some(f => f.rule === 'SEC-005'), C.findings.map(x => x.rule + '@' + x.where).join(', ')));
+  check('a test folder keeps the code rules\' handling (Critical, and the High keys, which tests publish too: R4)', () => assert(atC('tests/data.csv').some(f => f.rule === 'SEC-005') && atC('seen.csv').some(f => f.rule === 'SEC-005'), C.findings.map(x => x.rule + '@' + x.where).join(', ')));
   check('a key inside one long minified line is found through the slices', () => assert(atC('dist/long.js').some(f => f.rule === 'SEC-003'), C.findings.map(x => x.rule + '@' + x.where).join(', ')));
   check('a password example in a markdown note is not a finding', () => assert(!atC('docs.md').length, JSON.stringify(atC('docs.md'))));
   check('a file git ignores is not read for this', () => assert(!atC('secret.log').length));

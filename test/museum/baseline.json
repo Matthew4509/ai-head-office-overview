@@ -299,7 +299,15 @@
   "ai-route-calls-repo-open",
   "ai-post-only-adds-record",
   "ai-secret-as-fallback",
-  "ai-secret-under-its-name"
+  "ai-secret-under-its-name",
+  "sec-service-token-formats",
+  "sec-bearer-in-header",
+  "inj-eval-request-data",
+  "auth-md5-password-js",
+  "sec-camel-password-short",
+  "sec-env-generic-secrets",
+  "sec-db-url-in-tests",
+  "inj-padded-long-line"
  ],
  "knownFalseFlags": []
 }

@@ -18,6 +18,8 @@ const token = (role, iss = 'supabase') => [b64({ alg: 'HS256', typ: 'JWT' }), b6
 
 // [rule, file, fires, stays quiet]
 const PAIRS = [
+  ['INJ-020', 'run.js', `app.post('/run', (req, res) => { res.send(String(eval(req.body.code))); });\n`, `app.post('/run', (req, res) => { res.send(String(JSON.parse(req.body.json))); });\nconst two = eval('1 + 1');\n`],
+  ['AUTH-017', 'users.js', `const hash = crypto.createHash('md5').update(req.body.password).digest('hex');\n`, `const hash = crypto.createHash('md5').update(fileBytes).digest('hex');\nconst pw = await bcrypt.hash(req.body.password, 12);\n`],
   ['IMG-001', 'thumb.php', `<?php\n$src = imagecreatefrompng($path);\nimagepng(imagescale($src, 200), $out);\n`,
     `<?php\n[$w, $h] = getimagesize($path);\nif ($w * $h > MAX_PIXELS) throw new RuntimeException('too many pixels');\n$src = imagecreatefrompng($path);\n`],
   ['IMG-002', 'profile.php', `<?php\nif (exif_imagetype($_FILES['p']['tmp_name']) !== IMAGETYPE_JPEG) exit;\nmove_uploaded_file($_FILES['p']['tmp_name'], "photos/$id.jpg");\n`,

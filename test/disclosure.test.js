@@ -385,7 +385,7 @@ async function main() {
     check('so a zip that holds one is fix-first', () => assert.strictEqual(Z.verdict, 'fix-first'));
     check('a key in a zip inside a zip is found', () => assert(Z.findings.some(f => f.rule === 'SEC-003' && f.where === 'releases/app-1.0.zip > inner.zip > deep/env.txt:1'), list(Z)));
     check('a placeholder in a zip stays quiet', () => assert(!Z.findings.some(f => /place\.csv/.test(f.where)), list(Z)));
-    check('a zip\'s entries are judged by their path inside it: a test folder, a dev file', () => assert(!Z.findings.some(f => /tests\/data\.csv|compose\.yaml/.test(f.where)) && Z.findings.some(f => f.rule === 'SEC-005' && /seen\.csv:1$/.test(f.where)), list(Z)));
+    check('a zip\'s entries are judged by their path inside it: a test folder, a dev file', () => assert(!Z.findings.some(f => /compose\.yaml/.test(f.where)) && Z.findings.some(f => f.rule === 'SEC-005' && /tests\/data\.csv:1$/.test(f.where)) && Z.findings.some(f => f.rule === 'SEC-005' && /seen\.csv:1$/.test(f.where)), list(Z)));
     check('an office file, in a zip or by itself, stays out of this', () => assert(!Z.findings.some(f => f.area === 'secrets' && /docx/.test(f.where)), list(Z)));
     check('an entry\'s name never carries a private detail into a key finding', () => {
       assert(Z.findings.some(f => f.rule === 'SEC-003' && /\[my email\]\.csv:1$/.test(f.where)), list(Z));
