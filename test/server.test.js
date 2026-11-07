@@ -80,7 +80,7 @@ async function main() {
     s.on('error', () => r(null)); s.listen(8085, '127.0.0.1', () => r(s));
   });
   if (await portOpen(PORT)) { console.log('Port ' + PORT + ' is in use: stop whatever holds it, then run the test again.'); process.exit(1); }
-  const srv = spawn(NODE, [path.join(__dirname, '..', 'server.js'), '--dry-run'], { env: { ...process.env, AHO_TEST_LOCAL_LIVE: '1', AHO_PORT: String(PORT), AHO_DATA: DATA, AHO_ROOT: WS, AHO_SHORTCUT_DIR: path.join(DATA, 'shortcuts') }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const srv = spawn(NODE, [path.join(__dirname, '..', 'server.js'), '--dry-run'], { env: { ...process.env, AHO_SETTINGS: '', AHO_TEST_LOCAL_LIVE: '1', AHO_PORT: String(PORT), AHO_DATA: DATA, AHO_ROOT: WS, AHO_SHORTCUT_DIR: path.join(DATA, 'shortcuts') }, stdio: ['ignore', 'pipe', 'pipe'] });
   srvPid = srv.pid;
   let out = ''; srv.stdout.on('data', d => { out += d; }); srv.stderr.on('data', d => { out += d; });
   for (let i = 0; i < 50 && !(await portOpen(PORT)); i++) await sleep(200);
