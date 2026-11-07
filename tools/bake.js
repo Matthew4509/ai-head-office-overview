@@ -63,6 +63,8 @@ if (!CHECK_ONLY) {
   try { tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: HERE, encoding: 'utf8' }).trim(); stamp = JSON.parse(fs.readFileSync(path.join(HERE, '_releases', 'test-stamp.json'), 'utf8')); } catch {}
   if (!stamp || stamp.tree !== tree) { console.error('Bake stopped: no full test pass is recorded for this commit\'s files. Run npm test on a clean working tree (it writes the stamp), then bake again.'); process.exit(1); }
 }
+const CRLF_FILES = /\.(cmd|ps1)$/i;
+const crlfBytes = buf => Buffer.from(buf.toString('latin1').replace(/\r?\n/g, '\r\n'), 'latin1');
 fs.rmSync(stage, { recursive: true, force: true });
 fs.mkdirSync(root, { recursive: true });
 for (const rel of SHIP) {
@@ -70,7 +72,13 @@ for (const rel of SHIP) {
   fs.mkdirSync(path.dirname(to), { recursive: true });
   // The committed bytes, not the working-tree file, so the zip is exactly what the signed commit holds (--check reads the tree).
   if (CHECK_ONLY) fs.copyFileSync(path.join(HERE, rel), to);
-  else fs.writeFileSync(to, execFileSync('git', ['cat-file', 'blob', 'HEAD:' + rel], { cwd: HERE, maxBuffer: 64 * 1024 * 1024 }));
+  else {
+    const blob = execFileSync('git', ['cat-file', 'blob', 'HEAD:' + rel], { cwd: HERE, maxBuffer: 64 * 1024 * 1024 });
+    // .gitattributes says *.cmd and *.ps1 are eol=crlf: git keeps them with LF inside the repository and a checkout turns
+    // them into CRLF. The blob is the LF form, so the same conversion is made here (the CRLF check below needs it, and
+    // Windows batch files must have it).
+    fs.writeFileSync(to, CRLF_FILES.test(rel) ? crlfBytes(blob) : blob);
+  }
 }
 fs.writeFileSync(path.join(root, 'projects.json'), JSON.stringify(EMPTY_PROJECTS, null, 2) + '\n');
 
