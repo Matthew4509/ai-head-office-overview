@@ -524,6 +524,17 @@ audit lists the record of every rule it shows that someone has judged.
   without asking, an MCP server fetched at whatever version is newest, and every project MCP server switched on.
   A worktree copy inside `.claude` is the project again, so it is not read twice. The same install line is a warning
   in a guide (it names where the program comes from) and Critical in a hook or script, which runs it on its own.
+  **A saved secret (AGENT-023, High):** a password, key or token inside `.claude/settings.local.json`,
+  `.claude/settings.json` or `.mcp.json`. Claude Code's "Yes, and don't ask again" keeps the approved command word for
+  word, so a password typed into it (`PGPASSWORD=`, `sshpass -p`, `mysql -p…`, `curl -u`, a token in an address or
+  header) sits in the file, and the file is often committed or zipped. Every string in the file is read: allow rules,
+  `env`, hooks, MCP arguments, environment and headers. A variable (`$DB_URL`), a placeholder and a wildcard rule
+  (`Bash(npm run:*)`) are quiet, and the value is never repeated in a finding. Git history, forks and older copies are
+  not read, so rotate a secret that was ever saved. A file the project itself ignores is softened to Medium like any
+  other leak; Claude Code's own entry in your **global** git ignore list does not count, because it never travels with the
+  project. **SEC-024 (Medium):** `.claude/settings.local.json` holds saved approvals and git tracks it, or the project's own
+  `.gitignore` does not cover it. A backup zip of a project with such a secret says in its note and its `.txt` that the
+  zip is not encrypted (the file is still zipped as it is).
 - **Settings › Check a skill** runs the same check on a skill, plugin or agent folder **before** you install it:
   paste its `SKILL.md`, or choose its folder or its `.zip` / `.skill` file. It answers **Do not install**, **Read these
   first** or **No known attack found**, and lists what the skill does: the scripts and hooks it runs, the services it
@@ -671,6 +682,10 @@ audit lists the record of every rule it shows that someone has judged.
   (`--incomplete` goes on and says so) and `disclose.js` warns and ends with exit code 2, never "Nothing found".
 - `node tools/benchmark.js`: the audit's benchmark over `test/museum/`, one small made-up project per kind of real fault,
   per bucket (R one-file rule, X across files, L live site, A AI agent files).
+- `node test/saved-secrets.test.js`: AGENT-023, a secret saved in `.claude/settings*.json` or `.mcp.json`: the shapes it
+  finds, the ones it stays quiet on, a damaged file, and that the value is never shown.
+- `node test/saved-secrets-git.test.js`: what git says about that file: SEC-024, the rating kept when only a global ignore
+  list hides it, and softened when the project ignores it (git on PATH; temp folders only).
 - `node test/agents.test.js`: the AI agent files check (`lib/agents.js`): Check a skill on pasted text, a folder and a
   zip, each verdict, what a skill does (scripts, hooks, services, keys), and the agent files in a project audit. Each
   rule's should-fire and must-stay-quiet pair is in the museum's bucket A (`test/museum/cases-6-agent-files.js`).

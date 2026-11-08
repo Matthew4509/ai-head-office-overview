@@ -86,6 +86,10 @@ folder's own `origin`), and checks the signature against the key the office carr
 - **Reads:** `~/.claude/projects` (transcripts), `~/.codex/sessions` (token counts), the project folders in its
   working folders, and the Claude desktop app's thread records (the Open button). It never writes to any of them,
   with one exception the user turns on per project: the publish guard (below).
+  The audit also reads a project's `.claude/settings.json`, `.claude/settings.local.json` and `.mcp.json` for a saved
+  password, key or token (AGENT-023, `lib/agents.js`), and asks git (read-only) whether the project keeps
+  `.claude/settings.local.json` out of git (SEC-024, `lib/audit.js`). It names the file and line and never repeats the
+  value. A backup note warns when a zipped project holds such a secret.
 - **Writes:** its own `data` folder; when the user runs a backup, a zip, a .txt and `backups-index.json` in the
   backup folder they chose (`lib/backup.js`; it never changes a project's files, and deletes old zips only when the
   user turned on Keep last N); the AI app's `~/.claude/settings.json` only when the user turns advanced

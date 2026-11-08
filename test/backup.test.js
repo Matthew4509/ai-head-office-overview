@@ -802,6 +802,34 @@ check('AHO-15: a backup folder inside the office\'s own folder is refused, and n
   assert.ok((await b.addDrive(path.join(tmp, 'usb17'), { projects: [p] })).ok, 'a folder beside it is fine');
 });
 
+check('a project whose .claude/settings.local.json holds a typed password: the run note and the .txt warn that the zip is not encrypted, and never show the password; what is zipped is unchanged', async () => {
+  const pw = ['Zk4', 'mP9qR2xT'].join(''); // made up
+  const b = engine();
+  const p = project('Sigma');
+  mk(p.dir, '.claude/settings.local.json', JSON.stringify({ permissions: { allow: ['Bash(PGPASSWORD=' + pw + ' psql -h db)'] } }));
+  const usb = path.join(tmp, 'usb-sigma');
+  assert.ok((await b.addDrive(usb, { projects: [p] })).ok);
+  b.setListed([p.dir], true);
+  await b.start([p]); const j = await waitJob(b);
+  assert.strictEqual(j.items[0].state, 'done', JSON.stringify(j.items[0]));
+  assert.match(j.items[0].note, /settings\.local\.json holds a password or key.*not encrypted/);
+  const dir = path.join(usb, Backup.FOLDER_NAME, 'Sigma');
+  const zip = fs.readdirSync(dir).find(f => f.endsWith('.zip'));
+  assert.ok((await listZip(path.join(dir, zip))).some(e => e.name === 'Sigma/.claude/settings.local.json'), 'still zipped');
+  const txt = fs.readFileSync(path.join(dir, zip.replace(/\.zip$/, '.txt')), 'utf8');
+  assert.match(txt, /Warning: \.claude\/settings\.local\.json holds a password or key/);
+  assert.ok(!txt.includes(pw) && !JSON.stringify(j).includes(pw));
+  // a project without one gets no warning
+  const q = project('Tau'); mk(q.dir, '.claude/settings.local.json', JSON.stringify({ permissions: { allow: ['Bash(npm run:*)'] } }));
+  const usb2 = path.join(tmp, 'usb-tau');
+  const b2 = engine();
+  assert.ok((await b2.addDrive(usb2, { projects: [q] })).ok);
+  b2.setListed([q.dir], true);
+  await b2.start([q]); const j2 = await waitJob(b2);
+  assert.strictEqual(j2.items[0].state, 'done', JSON.stringify(j2.items[0]));
+  assert.ok(!/not encrypted/.test(j2.items[0].note), j2.items[0].note);
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); console.log('ok   ' + name); } catch (e) { failures++; console.log('FAIL ' + name + ': ' + (e && e.stack || e)); }
