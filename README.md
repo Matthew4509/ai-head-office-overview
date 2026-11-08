@@ -9,7 +9,22 @@ a tile: run its local copy, check its git and live site, audit it for common sec
 ![The office: every room unlocked and furnished, the staff at work, and Needs attention](screenshots/office.png)
 
 **[Install](#install-and-start)** · **[What you need](#what-you-need)** · **[Demo](#demo)** ·
-**[What's new](#whats-new-in-0118)** · **[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
+**[What's new](#whats-new-in-0119)** · **[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
+
+## What's new in 0.1.19
+
+- **Saved passwords in Claude Code's settings files are now found.** When you pick "Yes, and don't ask again", Claude
+  Code keeps that command word for word in `.claude/settings.local.json`, a password you typed into it included, and
+  that file is often committed or zipped. The audit now reads `.claude/settings.json`, `.claude/settings.local.json`
+  and `.mcp.json` for a saved password, key or token (**AGENT-023**, High), so the publish guard stops a push that
+  would carry one. It knows `PGPASSWORD=`, `sshpass -p`, `mysql -p`, `curl -u`, tokens in addresses and headers, and
+  more. A variable (`$DB_URL`), a placeholder and a wildcard rule are left alone, and the value is never shown.
+- **Is the file kept out of git? (SEC-024, Medium).** `.claude/settings.local.json` holds saved approvals and git
+  tracks it, or the project's own `.gitignore` does not cover it. Claude Code adds the file to your *global* git ignore
+  list, but that never travels with the project, so it does not count.
+- **Backups warn too.** A backup of a project that holds such a secret says, in its note and its `.txt`, that the zip
+  is not encrypted. What is zipped is unchanged.
+- Rotate any password or key that was ever saved in one of these files: git history, forks and older zips keep copies.
 
 ## What's new in 0.1.18
 
