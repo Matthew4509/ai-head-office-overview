@@ -9,9 +9,30 @@ a tile: run its local copy, check its git and live site, audit it for common sec
 ![The office: every room unlocked and furnished, the staff at work, and Needs attention](screenshots/office.png)
 
 **[Install](#install-and-start)** · **[What you need](#what-you-need)** · **[Demo](#demo)** ·
-**[What's new](#whats-new-in-0117)** · **[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
+**[What's new](#whats-new-in-0118)** · **[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
 
 ## What's new in 0.1.18
+
+- **Prompts:** two new starter groups. **Coming soon** has a prompt for a one-page coming-soon site, and **Safety rules**
+  has a never-delete-files rule and a list of twelve standing rules, worded for Claude (memory), Claude Code
+  (`rules.md`) and ChatGPT. A prompt can carry an optional **credit** (who thought of it), shown as "Thanks to ...". A
+  starter group added in a new version comes once to a library made earlier, and one you delete does not come back.
+- **A stronger scanner.** New rules SEC-021, SEC-022, INJ-020 and AUTH-017; SEC-020 now finds filled-in secrets in a
+  `.env`. Very long lines are read in slices, password and secret names are checked with a minimum length, the High
+  secret rules also run in test folders, and slow patterns are bounded.
+- **Open review faults no longer read as a pass.** A project with a Review with AI fault open says the scanner found
+  nothing, not that it passed; the import window shows why a line was refused; the audit window notes that the guard
+  checks git history.
+- **Damaged files never wedge the office.** A data file or transcript that is the right kind but wrong inside is set
+  aside and read again, never written over. Network paths, short-name (8.3) folders and `\\?\` paths are refused,
+  long names are capped and hidden characters are stripped from names and prompts.
+- **Update** skips a stray unsigned tag in favour of the newest signed release, says when a restart is blocked, and
+  names the tags it skipped. The live-site checker is bounded on hostile pages, and git reads are capped.
+- **The page** has its own confirm window in place of every browser one, a result for **Check all**, tab arrow keys,
+  focus that returns where it was, a confirm before a bulk report-back of more than ten rows, and a throttled save.
+- **Smaller:** long text wraps; To Do refuses a bad size; Check a skill catches a `.env` in an image address; a set-up
+  remote is not "no remote"; the first-run window says the yes covers the command, not the project's files.
+- **Release zips** are built from the committed files and only after a full test pass on the same tree.
 
 - **Review with AI is sturdier.** Listing the files to review stops at its limit even inside one huge folder, and the search for forms reads at most 300 files. A reported fault whose place is longer than 300 characters is refused, and the "Findings" heading is matched more strictly. A fault list that cannot be read is moved aside as a ".damaged" copy and never written over.
 
