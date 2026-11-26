@@ -429,7 +429,9 @@ async function main() {
       assert(o && o.pid === hog.pid && /node/i.test(o.name) && o.projects.includes('Beta Site') && !o.why, JSON.stringify(o));
     });
     await check('stop-port in a test copy reports, and does not stop the program', async () => {
-      const r = (await api('/api/stop-port', { port: pBeta, pid: hog.pid })).json;
+      // On a busy PC Windows can be slow to name the program: the office then says so (unknown) and stops nothing.
+      let r;
+      for (let i = 0; i < 5; i++) { r = (await api('/api/stop-port', { port: pBeta, pid: hog.pid })).json; if (!r.unknown) break; await new Promise(res => setTimeout(res, 1000)); }
       assert(r.ok && /taskkill \/PID \d+/.test(r.dryRun), JSON.stringify(r));
       assert(await portOpen(pBeta), 'the program must still be running');
     });
