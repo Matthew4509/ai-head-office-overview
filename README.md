@@ -9,7 +9,20 @@ a tile: run its local copy, check its git and live site, audit it for common sec
 ![The office: every room unlocked and furnished, the staff at work, and Needs attention](screenshots/office.png)
 
 **[Install](#install-and-start)** · **[What you need](#what-you-need)** · **[Demo](#demo)** ·
-**[What's new](#whats-new-in-0119)** · **[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
+**[What's new](#whats-new-in-0120)** · **[Safety and privacy](#safety-and-privacy)** · **[Licence](#licence)**
+
+## What's new in 0.1.20
+
+- **The planner keeps your categories.** A `categories.json` that was cut short, or held for a moment by another
+  program (a virus scanner, a sync program), could make the next planner save take every project out of its
+  categories. Now the categories are kept, and a planner read while a file was held is shown but never saved back.
+- **Keep last N keeps the backup it has just made.** A backup dated in the future (the PC's clock was ahead once, or
+  an index from another PC) could make Keep last 1 delete the new zip. A date after now now counts as now.
+- **Update recovers from a first link that was stopped part way.** A copy unpacked from the zip whose first Update now
+  was cut short (the office closed, the PC turned off) is linked again. A `.git` folder that could be your own is never
+  removed: Update says how to go on.
+- **Free port says when Windows does not answer.** On a busy PC, Windows can be slow to say which program holds a
+  port. The office asks again, and if it still does not know, it says so and stops nothing.
 
 ## What's new in 0.1.19
 
